@@ -42,6 +42,28 @@ function calculateStudentStats(courses, categories) {
   };
 }
 
+function calculatePathwayProgress(courses, pathways, coursePathways) {
+  return pathways.map(pathway => {
+    const linkedCourseIds = coursePathways
+      .filter(cp => cp.pathway_id === pathway.id)
+      .map(cp => cp.course_id);
+    
+    const pathwayCourses = courses.filter(c => linkedCourseIds.includes(c.id));
+    const earnedCredits = pathwayCourses.reduce((sum, c) => sum + Number(c.credits), 0);
+    const requiredCredits = Number(pathway.credits_required);
+    const percentage = requiredCredits > 0 ? Math.round((earnedCredits / requiredCredits) * 100) : 0;
+    
+    return {
+      ...pathway,
+      earnedCredits,
+      requiredCredits,
+      percentage: Math.min(percentage, 100),
+      isComplete: earnedCredits >= requiredCredits,
+      courses: pathwayCourses
+    };
+  });
+}
+
 function generateAlerts(profile, stats) {
   const alerts = [];
   const gradeLevel = profile?.grade || 9;
@@ -102,6 +124,14 @@ function DualCreditBadge({ type }) {
   return <span className={`text-xs px-2 py-1 rounded-full font-medium ${style.bg} ${style.text}`}>{style.label}</span>;
 }
 
+function CTEBadge({ pathway }) {
+  return (
+    <span className="text-xs px-2 py-1 rounded-full font-medium bg-emerald-500/20 text-emerald-400">
+      {pathway.icon} {pathway.name}
+    </span>
+  );
+}
+
 function AlertBanner({ alerts }) {
   if (!alerts || alerts.length === 0) return null;
   const typeColors = {
@@ -140,7 +170,31 @@ function CategoryCard({ category, earnedCredits, onClick }) {
   );
 }
 
-function CourseItem({ course, category, onDelete, showDelete = true }) {
+function PathwayCard({ pathway }) {
+  return (
+    <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-2xl">{pathway.icon || '🎯'}</span>
+        {pathway.isComplete && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-medium">✓ Complete</span>}
+      </div>
+      <h3 className="text-white font-semibold mb-1">{pathway.name}</h3>
+      <p className="text-slate-400 text-xs mb-3">{pathway.earnedCredits} / {pathway.requiredCredits} credits</p>
+      <ProgressBar earned={pathway.earnedCredits} required={pathway.requiredCredits} color={pathway.isComplete ? '#10b981' : '#f59e0b'} />
+      {pathway.courses.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-700">
+          <p className="text-slate-500 text-xs mb-2">Courses:</p>
+          <div className="flex flex-wrap gap-1">
+            {pathway.courses.map(c => (
+              <span key={c.id} className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">{c.name}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CourseItem({ course, category, pathways = [], onDelete, showDelete = true }) {
   return (
     <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
       <div className="flex items-start justify-between">
@@ -155,6 +209,11 @@ function CourseItem({ course, category, onDelete, showDelete = true }) {
             <span>•</span>
             <span>{course.term}</span>
           </div>
+          {pathways.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {pathways.map(p => <CTEBadge key={p.id} pathway={p} />)}
+            </div>
+          )}
         </div>
         {showDelete && onDelete && (
           <button onClick={() => onDelete(course.id)} className="text-slate-500 hover:text-red-400 transition-colors p-1">
@@ -183,10 +242,11 @@ function LoadingSpinner() {
 // ADD COURSE MODAL
 // ============================================
 
-function AddCourseModal({ isOpen, onClose, onAdd, categories }) {
+function AddCourseModal({ isOpen, onClose, onAdd, categories, pathways }) {
   const [formData, setFormData] = useState({
     name: '', credits: 1, category_id: '', term: 'Spring 2025',
-    is_dual_credit: false, dual_credit_type: 'transfer', grade: 'A'
+    is_dual_credit: false, dual_credit_type: 'transfer', grade: 'A',
+    selectedPathways: []
   });
   const [loading, setLoading] = useState(false);
 
@@ -196,14 +256,29 @@ function AddCourseModal({ isOpen, onClose, onAdd, categories }) {
     }
   }, [categories]);
 
+  const togglePathway = (pathwayId) => {
+    setFormData(f => ({
+      ...f,
+      selectedPathways: f.selectedPathways.includes(pathwayId)
+        ? f.selectedPathways.filter(id => id !== pathwayId)
+        : [...f.selectedPathways, pathwayId]
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     await onAdd({
-      ...formData,
-      dual_credit_type: formData.is_dual_credit ? formData.dual_credit_type : null
+      name: formData.name,
+      credits: formData.credits,
+      category_id: formData.category_id,
+      term: formData.term,
+      is_dual_credit: formData.is_dual_credit,
+      dual_credit_type: formData.is_dual_credit ? formData.dual_credit_type : null,
+      grade: formData.grade,
+      selectedPathways: formData.selectedPathways
     });
-    setFormData({ name: '', credits: 1, category_id: categories[0]?.id || '', term: 'Spring 2025', is_dual_credit: false, dual_credit_type: 'transfer', grade: 'A' });
+    setFormData({ name: '', credits: 1, category_id: categories[0]?.id || '', term: 'Spring 2025', is_dual_credit: false, dual_credit_type: 'transfer', grade: 'A', selectedPathways: [] });
     setLoading(false);
     onClose();
   };
@@ -264,6 +339,7 @@ function AddCourseModal({ isOpen, onClose, onAdd, categories }) {
             </select>
           </div>
 
+          {/* Dual Credit Section */}
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={formData.is_dual_credit} onChange={(e) => setFormData({ ...formData, is_dual_credit: e.target.checked })}
@@ -291,6 +367,31 @@ function AddCourseModal({ isOpen, onClose, onAdd, categories }) {
             )}
           </div>
 
+          {/* CTE Pathways Section */}
+          {pathways.length > 0 && (
+            <div className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">🎯</span>
+                <span className="text-white font-medium">CTE Pathways</span>
+              </div>
+              <p className="text-slate-400 text-sm mb-3">Select if this course counts toward a career pathway:</p>
+              <div className="space-y-2">
+                {pathways.map(pathway => (
+                  <label key={pathway.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-700/50">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.selectedPathways.includes(pathway.id)}
+                      onChange={() => togglePathway(pathway.id)}
+                      className="w-5 h-5 rounded bg-slate-700 border-slate-600 text-emerald-500" 
+                    />
+                    <span className="text-lg">{pathway.icon}</span>
+                    <span className="text-white">{pathway.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button type="submit" disabled={loading}
             className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold py-4 rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all active:scale-[0.98] disabled:opacity-50">
             {loading ? 'Adding...' : 'Add Course'}
@@ -305,7 +406,7 @@ function AddCourseModal({ isOpen, onClose, onAdd, categories }) {
 // TRANSCRIPT MODAL
 // ============================================
 
-function TranscriptModal({ isOpen, onClose, profile, courses, categories, stats }) {
+function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathways, pathwayProgress, stats }) {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const generatePDF = () => {
@@ -339,6 +440,12 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, stats 
           .progress-item { text-align: center; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 6px; }
           .progress-item .number { font-size: 24px; font-weight: bold; }
           .progress-item .label { font-size: 11px; opacity: 0.9; }
+          .cte-section { margin-bottom: 30px; padding: 20px; background: #ecfdf5; border-radius: 8px; border: 1px solid #10b981; }
+          .cte-section h2 { color: #065f46; margin-bottom: 15px; }
+          .cte-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+          .cte-item { background: white; padding: 15px; border-radius: 6px; border: 1px solid #d1fae5; }
+          .cte-item h3 { color: #065f46; font-size: 14px; margin-bottom: 5px; }
+          .cte-item p { color: #64748b; font-size: 12px; }
           .term-section { margin-bottom: 25px; }
           .term-section h3 { color: #4f46e5; font-size: 14px; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #e2e8f0; }
           .course-table { width: 100%; border-collapse: collapse; }
@@ -348,6 +455,7 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, stats 
           .badge-transfer { background: #dbeafe; color: #1d4ed8; }
           .badge-associate { background: #fef3c7; color: #b45309; }
           .badge-both { background: #ede9fe; color: #7c3aed; }
+          .badge-cte { background: #d1fae5; color: #065f46; }
           .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
         </style>
       </head>
@@ -371,6 +479,20 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, stats 
             <div class="progress-item"><div class="number">${stats.totalRequired - stats.totalEarned}</div><div class="label">Remaining</div></div>
           </div>
         </div>
+        ${pathwayProgress && pathwayProgress.length > 0 ? `
+        <div class="cte-section">
+          <h2>🎯 CTE Pathway Progress</h2>
+          <div class="cte-grid">
+            ${pathwayProgress.map(p => `
+              <div class="cte-item">
+                <h3>${p.icon} ${p.name}</h3>
+                <p>${p.earnedCredits} / ${p.requiredCredits} credits (${p.percentage}%)</p>
+                ${p.isComplete ? '<p style="color: #10b981; font-weight: bold;">✓ Complete</p>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
         ${Object.entries(coursesByTerm).sort((a, b) => b[0].localeCompare(a[0])).map(([term, termCourses]) => `
           <div class="term-section">
             <h3>${term}</h3>
@@ -480,8 +602,7 @@ function AuthScreen({ onLogin }) {
         });
         if (signUpError) throw signUpError;
         if (data.user) {
-          alert('Account created! Please check your email to verify, then log in.');
-          setMode('login');
+          onLogin(data.user);
         }
       } else {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
@@ -596,12 +717,400 @@ function AuthScreen({ onLogin }) {
 }
 
 // ============================================
+// ADMIN DASHBOARD
+// ============================================
+
+function AdminDashboard({ user, profile, onLogout }) {
+  const [activeTab, setActiveTab] = useState('categories');
+  const [categories, setCategories] = useState([]);
+  const [pathways, setPathways] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showPathwayModal, setShowPathwayModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+
+  useEffect(() => {
+    fetchData();
+  }, [profile]);
+
+  async function fetchData() {
+    setLoading(true);
+    const { data: catData } = await supabase
+      .from('credit_categories')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .order('display_order');
+    
+    const { data: pathData } = await supabase
+      .from('cte_pathways')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .order('display_order');
+
+    if (catData) setCategories(catData);
+    if (pathData) setPathways(pathData);
+    setLoading(false);
+  }
+
+  const handleDeleteCategory = async (id) => {
+    if (!confirm('Delete this category? This cannot be undone.')) return;
+    await supabase.from('credit_categories').delete().eq('id', id);
+    setCategories(categories.filter(c => c.id !== id));
+  };
+
+  const handleDeletePathway = async (id) => {
+    if (!confirm('Delete this pathway? This cannot be undone.')) return;
+    await supabase.from('cte_pathways').delete().eq('id', id);
+    setPathways(pathways.filter(p => p.id !== id));
+  };
+
+  const handleSaveCategory = async (data) => {
+    if (editingItem) {
+      const { data: updated } = await supabase
+        .from('credit_categories')
+        .update(data)
+        .eq('id', editingItem.id)
+        .select()
+        .single();
+      if (updated) setCategories(categories.map(c => c.id === updated.id ? updated : c));
+    } else {
+      const { data: created } = await supabase
+        .from('credit_categories')
+        .insert([{ ...data, school_id: profile.school_id }])
+        .select()
+        .single();
+      if (created) setCategories([...categories, created]);
+    }
+    setShowCategoryModal(false);
+    setEditingItem(null);
+  };
+
+  const handleSavePathway = async (data) => {
+    if (editingItem) {
+      const { data: updated } = await supabase
+        .from('cte_pathways')
+        .update(data)
+        .eq('id', editingItem.id)
+        .select()
+        .single();
+      if (updated) setPathways(pathways.map(p => p.id === updated.id ? updated : p));
+    } else {
+      const { data: created } = await supabase
+        .from('cte_pathways')
+        .insert([{ ...data, school_id: profile.school_id }])
+        .select()
+        .single();
+      if (created) setPathways([...pathways, created]);
+    }
+    setShowPathwayModal(false);
+    setEditingItem(null);
+  };
+
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl" />
+      </div>
+
+      <header className="relative sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-white">Admin Panel</h1>
+              <p className="text-slate-400 text-sm">{profile.full_name}</p>
+            </div>
+            <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Tab Navigation */}
+        <div className="flex gap-2 bg-slate-900 p-1 rounded-xl">
+          <button onClick={() => setActiveTab('categories')}
+            className={`flex-1 py-3 rounded-lg font-medium transition-all ${activeTab === 'categories' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+            📚 Graduation Requirements
+          </button>
+          <button onClick={() => setActiveTab('pathways')}
+            className={`flex-1 py-3 rounded-lg font-medium transition-all ${activeTab === 'pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+            🎯 CTE Pathways
+          </button>
+        </div>
+
+        {/* Categories Tab */}
+        {activeTab === 'categories' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Credit Categories</h2>
+              <button onClick={() => { setEditingItem(null); setShowCategoryModal(true); }}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Add Category
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {categories.map(cat => (
+                <div key={cat.id} className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="text-3xl">{cat.icon || '📘'}</span>
+                    <div>
+                      <h3 className="text-white font-semibold">{cat.name}</h3>
+                      <p className="text-slate-400 text-sm">{cat.credits_required} credits required</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setEditingItem(cat); setShowCategoryModal(true); }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg transition-all">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button onClick={() => handleDeleteCategory(cat.id)}
+                      className="bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 p-2 rounded-lg transition-all">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {categories.length === 0 && (
+                <div className="text-center py-12 text-slate-400">
+                  No categories yet. Add your first graduation requirement!
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Pathways Tab */}
+        {activeTab === 'pathways' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">CTE Pathways</h2>
+              <button onClick={() => { setEditingItem(null); setShowPathwayModal(true); }}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Add Pathway
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {pathways.map(pathway => (
+                <div key={pathway.id} className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="text-3xl">{pathway.icon || '🎯'}</span>
+                    <div>
+                      <h3 className="text-white font-semibold">{pathway.name}</h3>
+                      <p className="text-slate-400 text-sm">{pathway.credits_required} credits required</p>
+                      {pathway.description && <p className="text-slate-500 text-xs mt-1">{pathway.description}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setEditingItem(pathway); setShowPathwayModal(true); }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg transition-all">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button onClick={() => handleDeletePathway(pathway.id)}
+                      className="bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 p-2 rounded-lg transition-all">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {pathways.length === 0 && (
+                <div className="text-center py-12 text-slate-400">
+                  No CTE pathways yet. Add your first career pathway!
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Category Modal */}
+      {showCategoryModal && (
+        <CategoryModal
+          isOpen={showCategoryModal}
+          onClose={() => { setShowCategoryModal(false); setEditingItem(null); }}
+          onSave={handleSaveCategory}
+          initialData={editingItem}
+        />
+      )}
+
+      {/* Pathway Modal */}
+      {showPathwayModal && (
+        <PathwayModal
+          isOpen={showPathwayModal}
+          onClose={() => { setShowPathwayModal(false); setEditingItem(null); }}
+          onSave={handleSavePathway}
+          initialData={editingItem}
+        />
+      )}
+    </div>
+  );
+}
+
+// Category Edit Modal
+function CategoryModal({ isOpen, onClose, onSave, initialData }) {
+  const [formData, setFormData] = useState({
+    name: initialData?.name || '',
+    icon: initialData?.icon || '📘',
+    credits_required: initialData?.credits_required || 1,
+    display_order: initialData?.display_order || 0
+  });
+  const [loading, setLoading] = useState(false);
+
+  const icons = ['📚', '📐', '🔬', '🌍', '🗣️', '🎨', '⚡', '✨', '💻', '🎵', '🏃', '📖', '🔧', '💼', '🎭'];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    await onSave(formData);
+    setLoading(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+        <h2 className="text-xl font-bold text-white mb-6">{initialData ? 'Edit Category' : 'Add Category'}</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Category Name</label>
+            <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500"
+              placeholder="e.g., Mathematics" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Icon</label>
+            <div className="flex flex-wrap gap-2">
+              {icons.map(icon => (
+                <button key={icon} type="button" onClick={() => setFormData({ ...formData, icon })}
+                  className={`text-2xl p-2 rounded-lg transition-all ${formData.icon === icon ? 'bg-indigo-500' : 'bg-slate-800 hover:bg-slate-700'}`}>
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Credits Required</label>
+            <input type="number" required min="0.5" step="0.5" value={formData.credits_required}
+              onChange={(e) => setFormData({ ...formData, credits_required: Number(e.target.value) })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose}
+              className="flex-1 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex-1 bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50">
+              {loading ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Pathway Edit Modal
+function PathwayModal({ isOpen, onClose, onSave, initialData }) {
+  const [formData, setFormData] = useState({
+    name: initialData?.name || '',
+    description: initialData?.description || '',
+    icon: initialData?.icon || '🎯',
+    credits_required: initialData?.credits_required || 3,
+    display_order: initialData?.display_order || 0
+  });
+  const [loading, setLoading] = useState(false);
+
+  const icons = ['🏥', '💻', '📈', '🔧', '📖', '🎨', '🚗', '🍳', '⚖️', '🌱', '🎬', '✈️', '🔬', '🏗️', '🎯'];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    await onSave(formData);
+    setLoading(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+        <h2 className="text-xl font-bold text-white mb-6">{initialData ? 'Edit Pathway' : 'Add CTE Pathway'}</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Pathway Name</label>
+            <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500"
+              placeholder="e.g., Healthcare" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+            <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500"
+              placeholder="e.g., Prepare for careers in medical services" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Icon</label>
+            <div className="flex flex-wrap gap-2">
+              {icons.map(icon => (
+                <button key={icon} type="button" onClick={() => setFormData({ ...formData, icon })}
+                  className={`text-2xl p-2 rounded-lg transition-all ${formData.icon === icon ? 'bg-emerald-500' : 'bg-slate-800 hover:bg-slate-700'}`}>
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Credits Required</label>
+            <input type="number" required min="0.5" step="0.5" value={formData.credits_required}
+              onChange={(e) => setFormData({ ...formData, credits_required: Number(e.target.value) })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose}
+              className="flex-1 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex-1 bg-emerald-500 text-white font-semibold py-3 rounded-xl hover:bg-emerald-600 transition-all disabled:opacity-50">
+              {loading ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // STUDENT DASHBOARD
 // ============================================
 
 function StudentDashboard({ user, profile, onLogout }) {
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [pathways, setPathways] = useState([]);
+  const [coursePathways, setCoursePathways] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -615,44 +1124,79 @@ function StudentDashboard({ user, profile, onLogout }) {
   async function fetchData() {
     setLoading(true);
     
-    // Fetch categories for this school
     const { data: catData } = await supabase
       .from('credit_categories')
       .select('*')
       .eq('school_id', profile.school_id)
       .order('display_order');
     
-    // Fetch courses for this student
     const { data: courseData } = await supabase
       .from('courses')
       .select('*')
       .eq('student_id', user.id);
 
+    const { data: pathData } = await supabase
+      .from('cte_pathways')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .order('display_order');
+
+    const { data: cpData } = await supabase
+      .from('course_pathways')
+      .select('*');
+
     if (catData) setCategories(catData);
     if (courseData) setCourses(courseData);
+    if (pathData) setPathways(pathData);
+    if (cpData) setCoursePathways(cpData.filter(cp => courseData?.some(c => c.id === cp.course_id)));
     setLoading(false);
   }
 
   const stats = useMemo(() => calculateStudentStats(courses, categories), [courses, categories]);
   const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
+  const pathwayProgress = useMemo(() => calculatePathwayProgress(courses, pathways, coursePathways), [courses, pathways, coursePathways]);
 
   const handleAddCourse = async (courseData) => {
+    const { selectedPathways, ...courseFields } = courseData;
+    
     const { data, error } = await supabase
       .from('courses')
-      .insert([{ ...courseData, student_id: user.id }])
+      .insert([{ ...courseFields, student_id: user.id }])
       .select()
       .single();
     
-    if (data) setCourses([...courses, data]);
+    if (data) {
+      setCourses([...courses, data]);
+      
+      // Add pathway links
+      if (selectedPathways && selectedPathways.length > 0) {
+        const pathwayLinks = selectedPathways.map(pathwayId => ({
+          course_id: data.id,
+          pathway_id: pathwayId
+        }));
+        
+        const { data: cpData } = await supabase
+          .from('course_pathways')
+          .insert(pathwayLinks)
+          .select();
+        
+        if (cpData) setCoursePathways([...coursePathways, ...cpData]);
+      }
+    }
     if (error) console.error('Error adding course:', error);
   };
 
   const handleDeleteCourse = async (id) => {
     await supabase.from('courses').delete().eq('id', id);
     setCourses(courses.filter(c => c.id !== id));
+    setCoursePathways(coursePathways.filter(cp => cp.course_id !== id));
   };
 
   const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
+  const getPathwaysForCourse = (course) => {
+    const pathwayIds = coursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
+    return pathways.filter(p => pathwayIds.includes(p.id));
+  };
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
@@ -718,6 +1262,18 @@ function StudentDashboard({ user, profile, onLogout }) {
               </div>
             </div>
 
+            {/* CTE Pathway Progress */}
+            {pathways.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
+                <div className="space-y-3">
+                  {pathwayProgress.map(pathway => (
+                    <PathwayCard key={pathway.id} pathway={pathway} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {stats.totalDualCredits > 0 && (
               <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-4">
@@ -754,7 +1310,7 @@ function StudentDashboard({ user, profile, onLogout }) {
 
             <div className="space-y-3">
               {courses.filter(c => !selectedCategory || c.category_id === selectedCategory).map(course => (
-                <CourseItem key={course.id} course={course} category={getCategoryForCourse(course)} onDelete={handleDeleteCourse} />
+                <CourseItem key={course.id} course={course} category={getCategoryForCourse(course)} pathways={getPathwaysForCourse(course)} onDelete={handleDeleteCourse} />
               ))}
               {courses.filter(c => !selectedCategory || c.category_id === selectedCategory).length === 0 && (
                 <div className="text-center py-12 text-slate-400">
@@ -781,8 +1337,8 @@ function StudentDashboard({ user, profile, onLogout }) {
         </div>
       </nav>
 
-      <AddCourseModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={handleAddCourse} categories={categories} />
-      <TranscriptModal isOpen={showTranscriptModal} onClose={() => setShowTranscriptModal(false)} profile={profile} courses={courses} categories={categories} stats={stats} />
+      <AddCourseModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={handleAddCourse} categories={categories} pathways={pathways} />
+      <TranscriptModal isOpen={showTranscriptModal} onClose={() => setShowTranscriptModal(false)} profile={profile} courses={courses} categories={categories} pathways={pathways} pathwayProgress={pathwayProgress} stats={stats} />
     </div>
   );
 }
@@ -795,7 +1351,6 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [students, setStudents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStudent, setSelectedStudent] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -804,21 +1359,18 @@ function CounselorDashboard({ user, profile, onLogout }) {
   async function fetchData() {
     setLoading(true);
 
-    // Fetch categories
     const { data: catData } = await supabase
       .from('credit_categories')
       .select('*')
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-    // Fetch students at this school
     const { data: studentData } = await supabase
       .from('profiles')
       .select('*')
       .eq('school_id', profile.school_id)
       .eq('role', 'student');
 
-    // Fetch all courses for these students
     if (studentData) {
       const studentIds = studentData.map(s => s.id);
       const { data: courseData } = await supabase
@@ -934,7 +1486,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
@@ -944,7 +1495,6 @@ export default function App() {
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -983,7 +1533,11 @@ export default function App() {
     return <AuthScreen onLogin={(user) => { setUser(user); fetchProfile(user.id); }} />;
   }
 
-  if (profile.role === 'counselor' || profile.role === 'admin') {
+  if (profile.role === 'admin') {
+    return <AdminDashboard user={user} profile={profile} onLogout={handleLogout} />;
+  }
+
+  if (profile.role === 'counselor') {
     return <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
   }
 
