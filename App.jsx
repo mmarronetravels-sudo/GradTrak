@@ -722,12 +722,61 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathwa
       </html>
     `;
 
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      // Popup blocked - use alternative method
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
+      const iframeDoc = iframe.contentWindow.document;
+      iframeDoc.open();
+      iframeDoc.write(printContent);
+      iframeDoc.close();
+      
+      iframe.contentWindow.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow.print();
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            setIsGenerating(false);
+          }, 1000);
+        }, 250);
+      };
+      
+      // Fallback if onload doesn't fire
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.log('Print error:', e);
+        }
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          setIsGenerating(false);
+        }, 1000);
+      }, 1000);
+      
+      return;
+    }
+    
     printWindow.document.write(printContent);
     printWindow.document.close();
     printWindow.onload = () => {
       setTimeout(() => { printWindow.print(); setIsGenerating(false); }, 250);
     };
+    
+    // Fallback timeout
+    setTimeout(() => {
+      setIsGenerating(false);
+    }, 5000);
   };
 
   if (!isOpen) return null;
@@ -1961,8 +2010,15 @@ export default function App() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.log('Sign out error:', e);
+    }
+    // Clear all storage to ensure clean logout
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = window.location.origin;
   };
 
   if (loading) {
