@@ -1690,7 +1690,12 @@ function StudentDashboard({ user, profile, onLogout }) {
               <p className="text-slate-400 text-sm">Class of {profile.graduation_year || 'N/A'}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowPrivacyModal(true)} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition-all" title="Privacy Settings">
+              {counselors.length > 0 && (
+                <button onClick={() => setShowScheduleModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 rounded-xl transition-all" title="Schedule Appointment">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </button>
+              )}
+              <button onClick={() => setShowPrivacyModal(true)} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition-all" title="Privacy Settings">              
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
               </button>
               <button onClick={() => setShowTranscriptModal(true)} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition-all">
