@@ -1567,11 +1567,13 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
   const [coursePathways, setCoursePathways] = useState([]);
+  const [counselors, setCounselors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const displayName = getDisplayName(profile);
 
