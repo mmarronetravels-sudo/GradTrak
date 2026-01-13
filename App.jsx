@@ -2194,16 +2194,16 @@ export default function App() {
     setLoading(false);
   }
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.log('Sign out error:', e);
-    }
-    // Clear all storage to ensure clean logout
+  const handleLogout = () => {
+    // Clear storage first (synchronous)
     localStorage.clear();
     sessionStorage.clear();
-    window.location.href = window.location.origin;
+    
+    // Sign out from Supabase (don't wait for it)
+    supabase.auth.signOut().catch(() => {});
+    
+    // Force redirect immediately
+    window.location.replace(window.location.origin);
   };
 
   if (loading) {
