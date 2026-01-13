@@ -1608,10 +1608,18 @@ function StudentDashboard({ user, profile, onLogout }) {
       .from('course_pathways')
       .select('*');
 
+    // Fetch counselors with scheduling links
+    const { data: counselorData } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, scheduling_link')
+      .eq('school_id', profile.school_id)
+      .eq('role', 'counselor');
+
     if (catData) setCategories(catData);
     if (courseData) setCourses(courseData);
     if (pathData) setPathways(pathData);
     if (cpData) setCoursePathways(cpData.filter(cp => courseData?.some(c => c.id === cp.course_id)));
+    if (counselorData) setCounselors(counselorData.filter(c => c.scheduling_link));
     setLoading(false);
   }
 
