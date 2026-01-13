@@ -2128,13 +2128,53 @@ function CounselorDashboard({ user, profile, onLogout }) {
           )}
         </div>
       </main>
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">⚙️ Settings</h2>
+              <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">📅 Scheduling Link (Zoom Calendar)</label>
+                <input
+                  type="url"
+                  value={schedulingLink}
+                  onChange={(e) => setSchedulingLink(e.target.value)}
+                  placeholder="https://zoom.us/schedule/..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+                <p className="text-slate-500 text-xs mt-2">Students will see a "Schedule Appointment" button that opens this link.</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowSettingsModal(false)}
+                className="flex-1 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+                Cancel
+              </button>
+              <button onClick={async () => { await supabase.from('profiles').update({ scheduling_link: schedulingLink }).eq('id', profile.id); setShowSettingsModal(false); }}
+                className="flex-1 bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ============================================
 // PARENT DASHBOARD
-// ============================================
 
 function ParentDashboard({ user, profile, onLogout }) {
   const displayName = getDisplayName(profile);
