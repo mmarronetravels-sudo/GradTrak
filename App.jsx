@@ -1891,13 +1891,16 @@ export default function App() {
     setProfile(data);
     setLoading(false);
   }
-
   const handleLogout = async () => {
+  try {
     await logAudit('logout', 'profiles', user?.id);
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-  };
+  } catch (e) {
+    console.log('Audit log failed, continuing logout');
+  }
+  await supabase.auth.signOut();
+  setUser(null);
+  setProfile(null);
+};
 
   if (loading) {
     return (
