@@ -1892,16 +1892,9 @@ export default function App() {
     setLoading(false);
   }
   const handleLogout = async () => {
-  try {
-    await logAudit('logout', 'profiles', user?.id);
-  } catch (e) {
-    console.log('Audit log failed, continuing logout');
-  }
   await supabase.auth.signOut();
-  setUser(null);
-  setProfile(null);
+  window.location.reload();
 };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
