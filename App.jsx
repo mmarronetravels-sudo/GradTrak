@@ -1820,6 +1820,51 @@ function StudentDashboard({ user, profile, onLogout }) {
       <AddCourseModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={handleAddCourse} categories={categories} pathways={pathways} />
       <TranscriptModal isOpen={showTranscriptModal} onClose={() => setShowTranscriptModal(false)} profile={profile} courses={courses} categories={categories} pathways={pathways} pathwayProgress={pathwayProgress} stats={stats} />
       <PrivacySettingsModal isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} profile={profile} />
+      
+      {/* Schedule Appointment Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">📅 Schedule Appointment</h2>
+              <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <p className="text-slate-400 text-sm mb-4">Select a counselor to schedule an appointment:</p>
+            
+            <div className="space-y-3">
+              {counselors.map(counselor => (
+                
+                  key={counselor.id}
+                  href={counselor.scheduling_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl p-4 transition-all text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-white font-medium">{counselor.full_name || counselor.email}</h3>
+                      <p className="text-slate-400 text-sm">{counselor.email}</p>
+                    </div>
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </div>
+                </a>
+              ))}
+            </div>
+            
+            <button onClick={() => setShowScheduleModal(false)}
+              className="w-full mt-6 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
