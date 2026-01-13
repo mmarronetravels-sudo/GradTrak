@@ -1562,11 +1562,13 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
   const [coursePathways, setCoursePathways] = useState([]);
+  const [counselors, setCounselors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const displayName = getDisplayName(profile);
 
@@ -1601,10 +1603,18 @@ function StudentDashboard({ user, profile, onLogout }) {
       .from('course_pathways')
       .select('*');
 
+    // Fetch counselors with scheduling links
+    const { data: counselorData } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, scheduling_link')
+      .eq('school_id', profile.school_id)
+      .eq('role', 'counselor');
+
     if (catData) setCategories(catData);
     if (courseData) setCourses(courseData);
     if (pathData) setPathways(pathData);
     if (cpData) setCoursePathways(cpData.filter(cp => courseData?.some(c => c.id === cp.course_id)));
+    if (counselorData) setCounselors(counselorData.filter(c => c.scheduling_link));
     setLoading(false);
   }
 
@@ -1675,6 +1685,11 @@ function StudentDashboard({ user, profile, onLogout }) {
               <p className="text-slate-400 text-sm">Class of {profile.graduation_year || 'N/A'}</p>
             </div>
             <div className="flex items-center gap-2">
+              {counselors.length > 0 && (
+                <button onClick={() => setShowScheduleModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white p-2.5 rounded-xl transition-all" title="Schedule Appointment">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </button>
+              )}
               <button onClick={() => setShowPrivacyModal(true)} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition-all" title="Privacy Settings">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
               </button>
@@ -1800,6 +1815,51 @@ function StudentDashboard({ user, profile, onLogout }) {
       <AddCourseModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={handleAddCourse} categories={categories} pathways={pathways} />
       <TranscriptModal isOpen={showTranscriptModal} onClose={() => setShowTranscriptModal(false)} profile={profile} courses={courses} categories={categories} pathways={pathways} pathwayProgress={pathwayProgress} stats={stats} />
       <PrivacySettingsModal isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} profile={profile} />
+      
+      {/* Schedule Appointment Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">📅 Schedule Appointment</h2>
+              <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <p className="text-slate-400 text-sm mb-4">Select a counselor to schedule an appointment:</p>
+            
+            <div className="space-y-3">
+              {counselors.map(counselor => (
+                <a
+                  key={counselor.id}
+                  href={counselor.scheduling_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl p-4 transition-all text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-white font-medium">{getDisplayName(counselor)}</h3>
+                      <p className="text-slate-400 text-sm">{counselor.email}</p>
+                    </div>
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </div>
+                </a>
+              ))}
+            </div>
+            
+            <button onClick={() => setShowScheduleModal(false)}
+              className="w-full mt-6 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1810,11 +1870,15 @@ function StudentDashboard({ user, profile, onLogout }) {
 
 function CounselorDashboard({ user, profile, onLogout }) {
   const [students, setStudents] = useState([]);
+  const [parents, setParents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
   const [coursePathways, setCoursePathways] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showLinkParentModal, setShowLinkParentModal] = useState(false);
+  const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
   const displayName = getDisplayName(profile);
 
   useEffect(() => {
@@ -1844,6 +1908,12 @@ function CounselorDashboard({ user, profile, onLogout }) {
       .eq('school_id', profile.school_id)
       .eq('role', 'student');
 
+    const { data: parentData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .eq('role', 'parent');
+
     if (studentData) {
       const studentIds = studentData.map(s => s.id);
       const { data: courseData } = await supabase
@@ -1858,6 +1928,50 @@ function CounselorDashboard({ user, profile, onLogout }) {
       const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
         const stats = calculateStudentStats(studentCourses, catData || []);
+        const alerts = generateAlerts(student, stats);
+        const studentCoursePathways = cpData?.filter(cp => studentCourses.some(c => c.id === cp.course_id)) || [];
+        const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
+        return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
+      });
+
+      setStudents(studentsWithCourses);
+      if (cpData) setCoursePathways(cpData);
+    }
+
+    if (parentData) setParents(parentData.map(p => ({ ...p, displayName: getDisplayName(p) })));
+    if (catData) setCategories(catData);
+    if (pathData) setPathways(pathData);
+    setLoading(false);
+  }
+
+  const handleSaveSchedulingLink = async () => {
+    await supabase
+      .from('profiles')
+      .update({ scheduling_link: schedulingLink })
+      .eq('id', profile.id);
+    setShowSettingsModal(false);
+  };
+
+  const handleLinkParent = async (parentId, studentId) => {
+    const { error } = await supabase
+      .from('parent_students')
+      .insert([{ parent_id: parentId, student_id: studentId, created_by: profile.id }]);
+    
+    if (!error) {
+      await logAudit('link_parent', 'parent_students', null, { parent_id: parentId, student_id: studentId });
+      alert('Parent linked successfully!');
+    } else if (error.code === '23505') {
+      alert('This parent is already linked to this student.');
+    } else {
+      alert('Error linking parent: ' + error.message);
+    }
+  };
+
+  const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
+  const getPathwaysForCourse = (course, studentCoursePathways) => {
+    const pathwayIds = studentCoursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
+    return pathways.filter(p => pathwayIds.includes(p.id));
+  };
         const alerts = generateAlerts(student, stats);
         const studentCoursePathways = cpData?.filter(cp => studentCourses.some(c => c.id === cp.course_id)) || [];
         const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
@@ -2056,10 +2170,19 @@ function CounselorDashboard({ user, profile, onLogout }) {
               <h1 className="text-lg font-bold text-white">{displayName}</h1>
               <p className="text-slate-400 text-sm">School Counselor</p>
             </div>
-            <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-              Sign Out
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowLinkParentModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl transition-all flex items-center gap-2 text-sm" title="Link Parent to Student">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                Link Parent
+              </button>
+              <button onClick={() => setShowSettingsModal(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl transition-all" title="Settings">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              </button>
+              <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -2121,6 +2244,98 @@ function CounselorDashboard({ user, profile, onLogout }) {
           )}
         </div>
       </main>
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">⚙️ Settings</h2>
+              <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">📅 Scheduling Link (Zoom Calendar)</label>
+                <input
+                  type="url"
+                  value={schedulingLink}
+                  onChange={(e) => setSchedulingLink(e.target.value)}
+                  placeholder="https://zoom.us/schedule/..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+                <p className="text-slate-500 text-xs mt-2">Students will see a "Schedule Appointment" button that opens this link.</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowSettingsModal(false)}
+                className="flex-1 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+                Cancel
+              </button>
+              <button onClick={handleSaveSchedulingLink}
+                className="flex-1 bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link Parent Modal */}
+      {showLinkParentModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">👨‍👩‍👧 Link Parent to Student</h2>
+              <button onClick={() => setShowLinkParentModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {parents.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <p>No parent accounts found.</p>
+                <p className="text-sm mt-2">Parents need to sign up first with the "Parent/Guardian" role.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-slate-400 text-sm">Select a parent and student to link:</p>
+                
+                {parents.map(parent => (
+                  <div key={parent.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <h3 className="text-white font-medium mb-3">{parent.displayName}</h3>
+                    <p className="text-slate-400 text-sm mb-3">{parent.email}</p>
+                    <div className="space-y-2">
+                      {students.map(student => (
+                        <button
+                          key={student.id}
+                          onClick={() => handleLinkParent(parent.id, student.id)}
+                          className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-lg transition-all text-left"
+                        >
+                          <span className="text-white text-sm">{student.displayName}</span>
+                          <span className="text-slate-400 text-xs">Grade {student.grade}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <button onClick={() => setShowLinkParentModal(false)}
+              className="w-full mt-6 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2130,27 +2345,291 @@ function CounselorDashboard({ user, profile, onLogout }) {
 // ============================================
 
 function ParentDashboard({ user, profile, onLogout }) {
+  const [linkedStudents, setLinkedStudents] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [loading, setLoading] = useState(true);
   const displayName = getDisplayName(profile);
-  
-  return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+  useEffect(() => {
+    fetchLinkedStudents();
+  }, [profile]);
+
+  async function fetchLinkedStudents() {
+    setLoading(true);
+    
+    // Get linked student IDs
+    const { data: links } = await supabase
+      .from('parent_students')
+      .select('student_id')
+      .eq('parent_id', profile.id);
+
+    if (links && links.length > 0) {
+      const studentIds = links.map(l => l.student_id);
       
-      <div className="text-center p-8">
-        <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-4xl">👨‍👩‍👧</span>
-        </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Parent Portal</h1>
-        <p className="text-slate-400 mb-6">Welcome, {displayName}</p>
-        <p className="text-slate-500 text-sm mb-6">
-          Parent account linking coming soon.<br />
-          Contact your school administrator to link your account to your student.
-        </p>
-        <button onClick={onLogout}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl transition-all">
-          Sign Out
-        </button>
+      // Get student profiles
+      const { data: studentData } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', studentIds);
+
+      // Get categories for the school
+      const { data: catData } = await supabase
+        .from('credit_categories')
+        .select('*')
+        .eq('school_id', profile.school_id)
+        .order('display_order');
+
+      // Get courses for all linked students
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('*')
+        .in('student_id', studentIds);
+
+      if (studentData) {
+        const studentsWithStats = studentData.map(student => {
+          const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
+          const stats = calculateStudentStats(studentCourses, catData || []);
+          const alerts = generateAlerts(student, stats);
+          return { ...student, courses: studentCourses, stats, alerts, displayName: getDisplayName(student) };
+        });
+        setLinkedStudents(studentsWithStats);
+      }
+
+      if (catData) setCategories(catData);
+    }
+    
+    setLoading(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <LoadingSpinner />
       </div>
+    );
+  }
+
+  // No linked students yet
+  if (linkedStudents.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+        
+        <div className="text-center p-8">
+          <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-4xl">👨‍👩‍👧</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Parent Portal</h1>
+          <p className="text-slate-400 mb-6">Welcome, {displayName}</p>
+          <p className="text-slate-500 text-sm mb-6">
+            No students linked to your account yet.<br />
+            Contact your school counselor to link your student.
+          </p>
+          <button onClick={onLogout}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl transition-all">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Student detail view
+  if (selectedStudent) {
+    const student = selectedStudent;
+    const coursesByTerm = student.courses.reduce((acc, course) => {
+      if (!acc[course.term]) acc[course.term] = [];
+      acc[course.term].push(course);
+      return acc;
+    }, {});
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl" />
+        </div>
+
+        <header className="relative sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+          <div className="max-w-4xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setSelectedStudent(null)} 
+                  className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-xl transition-all">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
+                  <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+                </div>
+              </div>
+              <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all">
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
+          <AlertBanner alerts={student.alerts} />
+
+          <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 backdrop-blur-sm rounded-3xl p-6 border border-indigo-500/20">
+            <div className="flex items-center gap-6">
+              <CircularProgress percentage={student.stats.percentage} size={100} strokeWidth={8} color="#818cf8" bgColor="#334155">
+                <span className="text-2xl font-bold text-white">{student.stats.percentage}%</span>
+              </CircularProgress>
+              <div>
+                <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
+                <p className="text-slate-300">
+                  <span className="text-2xl font-bold text-white">{student.stats.totalEarned}</span>
+                  <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
+                </p>
+                <p className="text-slate-400 text-sm mt-1">{student.stats.totalRequired - student.stats.totalEarned} credits remaining</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {categories.map(cat => {
+                const earned = student.stats.creditsByCategory[cat.id] || 0;
+                const required = Number(cat.credits_required);
+                const isComplete = earned >= required;
+                return (
+                  <div key={cat.id} className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">{cat.icon || '📘'}</span>
+                      {isComplete && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-medium">✓</span>}
+                    </div>
+                    <h4 className="text-white font-semibold text-sm mb-1">{cat.name}</h4>
+                    <p className="text-slate-400 text-xs mb-2">{earned} / {required}</p>
+                    <ProgressBar earned={earned} required={required} color={isComplete ? '#10b981' : '#6366f1'} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {student.stats.totalDualCredits > 0 && (
+            <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">🎓</span>
+                <h2 className="text-lg font-bold text-white">Dual Credit Summary</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-white">{student.stats.totalDualCredits}</p>
+                  <p className="text-slate-400 text-xs">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-400">{student.stats.associateCredits}</p>
+                  <p className="text-slate-400 text-xs">Associate</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-sky-400">{student.stats.transferCredits}</p>
+                  <p className="text-slate-400 text-xs">Transfer</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
+            {Object.entries(coursesByTerm).sort((a, b) => b[0].localeCompare(a[0])).map(([term, termCourses]) => (
+              <div key={term} className="mb-4">
+                <h4 className="text-slate-400 text-sm font-medium mb-2 px-1">{term}</h4>
+                <div className="space-y-2">
+                  {termCourses.map(course => {
+                    const cat = categories.find(c => c.id === course.category_id);
+                    return (
+                      <div key={course.id} className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-white font-medium">{course.name}</h4>
+                              {course.is_dual_credit && <DualCreditBadge type={course.dual_credit_type} />}
+                              {course.grade && <span className="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-300">{course.grade}</span>}
+                            </div>
+                            <p className="text-slate-400 text-sm mt-1">{cat?.icon} {cat?.name} • {course.credits} credits</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Main view - list of linked students
+  return (
+    <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl" />
+      </div>
+
+      <header className="relative sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-white">👨‍👩‍👧 Parent Portal</h1>
+              <p className="text-slate-400 text-sm">{displayName}</p>
+            </div>
+            <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <div className="space-y-3">
+          <h2 className="text-xl font-bold text-white">My Students</h2>
+          {linkedStudents.map(student => (
+            <button 
+              key={student.id} 
+              onClick={() => setSelectedStudent(student)}
+              className="w-full bg-slate-900/80 rounded-2xl p-5 border border-slate-800 hover:bg-slate-800/80 hover:border-indigo-500/30 transition-all text-left"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="text-white font-semibold">{student.displayName}</h3>
+                    {student.alerts.some(a => a.type === 'critical') && (
+                      <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
+                    )}
+                  </div>
+                  <p className="text-slate-400 text-sm">Grade {student.grade || 'N/A'} • Class of {student.graduation_year || 'N/A'}</p>
+                  <p className="text-slate-500 text-xs mt-1">{student.courses.length} courses • {student.stats.totalEarned} credits earned</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CircularProgress percentage={student.stats.percentage} size={50} strokeWidth={4}
+                    color={student.stats.percentage >= 75 ? '#10b981' : student.stats.percentage >= 50 ? '#818cf8' : '#f59e0b'} bgColor="#334155">
+                    <span className="text-xs font-bold text-white">{student.stats.percentage}%</span>
+                  </CircularProgress>
+                  <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }
