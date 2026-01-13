@@ -1815,6 +1815,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [coursePathways, setCoursePathways] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
   const displayName = getDisplayName(profile);
 
   useEffect(() => {
