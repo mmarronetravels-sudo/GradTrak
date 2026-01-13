@@ -1811,7 +1811,10 @@ function StudentDashboard({ user, profile, onLogout }) {
 function CounselorDashboard({ user, profile, onLogout }) {
   const [students, setStudents] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [pathways, setPathways] = useState([]);
+  const [coursePathways, setCoursePathways] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const displayName = getDisplayName(profile);
 
   useEffect(() => {
@@ -1829,6 +1832,12 @@ function CounselorDashboard({ user, profile, onLogout }) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
+    const { data: pathData } = await supabase
+      .from('cte_pathways')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .order('display_order');
+
     const { data: studentData } = await supabase
       .from('profiles')
       .select('*')
@@ -1842,19 +1851,33 @@ function CounselorDashboard({ user, profile, onLogout }) {
         .select('*')
         .in('student_id', studentIds);
 
+      const { data: cpData } = await supabase
+        .from('course_pathways')
+        .select('*');
+
       const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
         const stats = calculateStudentStats(studentCourses, catData || []);
         const alerts = generateAlerts(student, stats);
-        return { ...student, courses: studentCourses, stats, alerts, displayName: getDisplayName(student) };
+        const studentCoursePathways = cpData?.filter(cp => studentCourses.some(c => c.id === cp.course_id)) || [];
+        const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
+        return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
       });
 
       setStudents(studentsWithCourses);
+      if (cpData) setCoursePathways(cpData);
     }
 
     if (catData) setCategories(catData);
+    if (pathData) setPathways(pathData);
     setLoading(false);
   }
+
+  const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
+  const getPathwaysForCourse = (course, studentCoursePathways) => {
+    const pathwayIds = studentCoursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
+    return pathways.filter(p => pathwayIds.includes(p.id));
+  };
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
@@ -1865,6 +1888,158 @@ function CounselorDashboard({ user, profile, onLogout }) {
     avgProgress: students.length > 0 ? Math.round(students.reduce((sum, s) => sum + s.stats.percentage, 0) / students.length) : 0
   };
 
+  // Student Detail View
+  if (selectedStudent) {
+    const student = selectedStudent;
+    const coursesByTerm = student.courses.reduce((acc, course) => {
+      if (!acc[course.term]) acc[course.term] = [];
+      acc[course.term].push(course);
+      return acc;
+    }, {});
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl" />
+        </div>
+
+        <header className="relative sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+          <div className="max-w-4xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setSelectedStudent(null)} 
+                  className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-xl transition-all">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
+                  <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+                </div>
+              </div>
+              <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
+          {/* Alerts */}
+          <AlertBanner alerts={student.alerts} />
+
+          {/* Progress Overview */}
+          <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 backdrop-blur-sm rounded-3xl p-6 border border-indigo-500/20">
+            <div className="flex items-center gap-6">
+              <CircularProgress percentage={student.stats.percentage} size={100} strokeWidth={8} color="#818cf8" bgColor="#334155">
+                <span className="text-2xl font-bold text-white">{student.stats.percentage}%</span>
+              </CircularProgress>
+              <div>
+                <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
+                <p className="text-slate-300">
+                  <span className="text-2xl font-bold text-white">{student.stats.totalEarned}</span>
+                  <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
+                </p>
+                <p className="text-slate-400 text-sm mt-1">{student.stats.totalRequired - student.stats.totalEarned} credits remaining</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Credit Categories */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {categories.map(cat => {
+                const earned = student.stats.creditsByCategory[cat.id] || 0;
+                const required = Number(cat.credits_required);
+                const isComplete = earned >= required;
+                return (
+                  <div key={cat.id} className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">{cat.icon || '📘'}</span>
+                      {isComplete && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-medium">✓</span>}
+                    </div>
+                    <h4 className="text-white font-semibold text-sm mb-1">{cat.name}</h4>
+                    <p className="text-slate-400 text-xs mb-2">{earned} / {required}</p>
+                    <ProgressBar earned={earned} required={required} color={isComplete ? '#10b981' : '#6366f1'} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* CTE Pathways */}
+          {student.pathwayProgress && student.pathwayProgress.length > 0 && student.pathwayProgress.some(p => p.earnedCredits > 0) && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
+              <div className="space-y-3">
+                {student.pathwayProgress.filter(p => p.earnedCredits > 0).map(pathway => (
+                  <PathwayCard key={pathway.id} pathway={pathway} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Dual Credit Summary */}
+          {student.stats.totalDualCredits > 0 && (
+            <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">🎓</span>
+                <h2 className="text-lg font-bold text-white">Dual Credit Summary</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-white">{student.stats.totalDualCredits}</p>
+                  <p className="text-slate-400 text-xs">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-400">{student.stats.associateCredits}</p>
+                  <p className="text-slate-400 text-xs">Associate</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-sky-400">{student.stats.transferCredits}</p>
+                  <p className="text-slate-400 text-xs">Transfer</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Courses by Term */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
+            {Object.entries(coursesByTerm).sort((a, b) => b[0].localeCompare(a[0])).map(([term, termCourses]) => (
+              <div key={term} className="mb-4">
+                <h4 className="text-slate-400 text-sm font-medium mb-2 px-1">{term}</h4>
+                <div className="space-y-2">
+                  {termCourses.map(course => (
+                    <CourseItem 
+                      key={course.id} 
+                      course={course} 
+                      category={getCategoryForCourse(course)} 
+                      pathways={getPathwaysForCourse(course, student.coursePathways)}
+                      showDelete={false}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {student.courses.length === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                <p>No courses recorded yet.</p>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Main Student List View
   return (
     <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
@@ -1890,7 +2065,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
       </header>
 
       <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
             <p className="text-3xl font-bold text-white">{summaryStats.total}</p>
             <p className="text-slate-400 text-sm">Total Students</p>
@@ -1915,7 +2090,11 @@ function CounselorDashboard({ user, profile, onLogout }) {
             <div className="text-center py-12 text-slate-400">No students have signed up yet.</div>
           ) : (
             students.map(student => (
-              <div key={student.id} className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+              <button 
+                key={student.id} 
+                onClick={() => setSelectedStudent(student)}
+                className="w-full bg-slate-900/80 rounded-2xl p-5 border border-slate-800 hover:bg-slate-800/80 hover:border-indigo-500/30 transition-all text-left"
+              >
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
@@ -1925,13 +2104,19 @@ function CounselorDashboard({ user, profile, onLogout }) {
                       )}
                     </div>
                     <p className="text-slate-400 text-sm">Grade {student.grade || 'N/A'} • Class of {student.graduation_year || 'N/A'}</p>
+                    <p className="text-slate-500 text-xs mt-1">{student.courses.length} courses • {student.stats.totalEarned} credits earned</p>
                   </div>
-                  <CircularProgress percentage={student.stats.percentage} size={50} strokeWidth={4}
-                    color={student.stats.percentage >= 75 ? '#10b981' : student.stats.percentage >= 50 ? '#818cf8' : '#f59e0b'} bgColor="#334155">
-                    <span className="text-xs font-bold text-white">{student.stats.percentage}%</span>
-                  </CircularProgress>
+                  <div className="flex items-center gap-3">
+                    <CircularProgress percentage={student.stats.percentage} size={50} strokeWidth={4}
+                      color={student.stats.percentage >= 75 ? '#10b981' : student.stats.percentage >= 50 ? '#818cf8' : '#f59e0b'} bgColor="#334155">
+                      <span className="text-xs font-bold text-white">{student.stats.percentage}%</span>
+                    </CircularProgress>
+                    <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
