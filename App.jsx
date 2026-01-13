@@ -1838,7 +1838,7 @@ function StudentDashboard({ user, profile, onLogout }) {
             
             <div className="space-y-3">
               {counselors.map(counselor => (
-                
+                  <a
                   key={counselor.id}
                   href={counselor.scheduling_link}
                   target="_blank"
