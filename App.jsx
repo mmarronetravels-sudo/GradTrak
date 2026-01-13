@@ -6,16 +6,20 @@ import { supabase } from './supabase';
 // ============================================
 
 async function logAudit(action, tableName, recordId = null, details = null) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  
-  await supabase.from('audit_logs').insert([{
-    user_id: user.id,
-    action,
-    table_name: tableName,
-    record_id: recordId,
-    details
-  }]);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    await supabase.from('audit_logs').insert([{
+      user_id: user.id,
+      action,
+      table_name: tableName,
+      record_id: recordId,
+      details
+    }]);
+  } catch (e) {
+    console.log('Audit log failed:', e);
+  }
 }
 
 // ============================================
@@ -84,20 +88,78 @@ function calculatePathwayProgress(courses, pathways, coursePathways) {
 function generateAlerts(profile, stats) {
   const alerts = [];
   const gradeLevel = profile?.grade || 9;
-  const expectedProgress = { 9: 25, 10: 50, 11: 75, 12: 100 };
-  const expected = expectedProgress[gradeLevel] || 100;
+  
+  // Get current month to determine semester
+  const currentMonth = new Date().getMonth() + 1; // 1-12
+  
+  // Determine if we're in Fall (Aug-Dec) or Spring (Jan-May) semester
+  // Fall semester: August (8) - December (12)
+  // Spring semester: January (1) - July (7) - includes summer
+  const isFallSemester = currentMonth >= 8 && currentMonth <= 12;
+  
+  // Semester-based expected progress
+  // Each grade level = 2 semesters, each semester = ~12.5% of total credits
+  // Grade 9 Fall = 0%, Grade 9 Spring = 12.5%
+  // Grade 10 Fall = 25%, Grade 10 Spring = 37.5%
+  // Grade 11 Fall = 50%, Grade 11 Spring = 62.5%
+  // Grade 12 Fall = 75%, Grade 12 Spring = 87.5%
+  
+  const expectedProgress = {
+    9:  { fall: 0,    spring: 12.5 },
+    10: { fall: 25,   spring: 37.5 },
+    11: { fall: 50,   spring: 62.5 },
+    12: { fall: 75,   spring: 87.5 }
+  };
+  
+  const gradeExpectations = expectedProgress[gradeLevel] || { fall: 0, spring: 100 };
+  const expected = isFallSemester ? gradeExpectations.fall : gradeExpectations.spring;
+  
+  // Determine semester name for display
+  const semesterName = isFallSemester ? 'fall' : 'spring';
 
+  // Only show critical alert if more than 15% behind expected
   if (stats.percentage < expected - 15) {
-    alerts.push({ type: 'critical', message: `Significantly behind on credits (${stats.percentage}% vs expected ${expected}%)`, icon: '🚨' });
+    alerts.push({ 
+      type: 'critical', 
+      message: `Behind on credits (${stats.percentage}% vs expected ${expected}% for ${semesterName} of grade ${gradeLevel})`, 
+      icon: '🚨' 
+    });
   } else if (stats.percentage < expected - 5) {
-    alerts.push({ type: 'warning', message: `Slightly behind expected progress for grade ${gradeLevel}`, icon: '⚠️' });
+    alerts.push({ 
+      type: 'warning', 
+      message: `Slightly behind expected progress for ${semesterName} semester`, 
+      icon: '⚠️' 
+    });
   }
 
+  // Success message if on track with dual credits
   if (stats.percentage >= expected && stats.totalDualCredits >= 3) {
-    alerts.push({ type: 'success', message: `On track with ${stats.totalDualCredits} dual credits!`, icon: '🌟' });
+    alerts.push({ 
+      type: 'success', 
+      message: `On track with ${stats.totalDualCredits} dual credits!`, 
+      icon: '🌟' 
+    });
+  } else if (stats.percentage >= expected + 10) {
+    alerts.push({ 
+      type: 'success', 
+      message: `Ahead of schedule! Great progress!`, 
+      icon: '🌟' 
+    });
   }
 
   return alerts;
+}
+
+// Helper to get display name from profile
+function getDisplayName(profile) {
+  if (profile?.full_name && profile.full_name !== 'Unknown') {
+    return profile.full_name;
+  }
+  // Fall back to email username if name is missing
+  if (profile?.email) {
+    return profile.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return 'Student';
 }
 
 // ============================================
@@ -539,6 +601,7 @@ function AddCourseModal({ isOpen, onClose, onAdd, categories, pathways }) {
 
 function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathways, pathwayProgress, stats }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const displayName = getDisplayName(profile);
 
   const generatePDF = async () => {
     setIsGenerating(true);
@@ -558,7 +621,7 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathwa
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Transcript - ${profile.full_name}</title>
+        <title>Transcript - ${displayName}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
@@ -601,7 +664,7 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathwa
           <p>GradTrack Student Credit Record</p>
         </div>
         <div class="student-info">
-          <div><label>Student Name</label><p>${profile.full_name}</p></div>
+          <div><label>Student Name</label><p>${displayName}</p></div>
           <div><label>Email</label><p>${profile.email}</p></div>
           <div><label>Current Grade</label><p>Grade ${profile.grade || 'N/A'}</p></div>
           <div><label>Expected Graduation</label><p>Class of ${profile.graduation_year || 'N/A'}</p></div>
@@ -900,6 +963,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showPathwayModal, setShowPathwayModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const displayName = getDisplayName(profile);
 
   useEffect(() => {
     fetchData();
@@ -1054,7 +1118,7 @@ function AdminDashboard({ user, profile, onLogout }) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-bold text-white">Admin Panel</h1>
-              <p className="text-slate-400 text-sm">{profile.full_name}</p>
+              <p className="text-slate-400 text-sm">{displayName}</p>
             </div>
             <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -1455,6 +1519,7 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const displayName = getDisplayName(profile);
 
   useEffect(() => {
     fetchData();
@@ -1557,8 +1622,8 @@ function StudentDashboard({ user, profile, onLogout }) {
         <div className="max-w-lg mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-bold text-white">{profile.full_name}</h1>
-              <p className="text-slate-400 text-sm">Class of {profile.graduation_year}</p>
+              <h1 className="text-lg font-bold text-white">{displayName}</h1>
+              <p className="text-slate-400 text-sm">Class of {profile.graduation_year || 'N/A'}</p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setShowPrivacyModal(true)} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition-all" title="Privacy Settings">
@@ -1698,6 +1763,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [students, setStudents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const displayName = getDisplayName(profile);
 
   useEffect(() => {
     fetchData();
@@ -1731,7 +1797,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
         const stats = calculateStudentStats(studentCourses, catData || []);
         const alerts = generateAlerts(student, stats);
-        return { ...student, courses: studentCourses, stats, alerts };
+        return { ...student, courses: studentCourses, stats, alerts, displayName: getDisplayName(student) };
       });
 
       setStudents(studentsWithCourses);
@@ -1763,7 +1829,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-bold text-white">{profile.full_name}</h1>
+              <h1 className="text-lg font-bold text-white">{displayName}</h1>
               <p className="text-slate-400 text-sm">School Counselor</p>
             </div>
             <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
@@ -1804,12 +1870,12 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-white font-semibold">{student.full_name}</h3>
+                      <h3 className="text-white font-semibold">{student.displayName}</h3>
                       {student.alerts.some(a => a.type === 'critical') && (
                         <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
                       )}
                     </div>
-                    <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+                    <p className="text-slate-400 text-sm">Grade {student.grade || 'N/A'} • Class of {student.graduation_year || 'N/A'}</p>
                   </div>
                   <CircularProgress percentage={student.stats.percentage} size={50} strokeWidth={4}
                     color={student.stats.percentage >= 75 ? '#10b981' : student.stats.percentage >= 50 ? '#818cf8' : '#f59e0b'} bgColor="#334155">
@@ -1830,6 +1896,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
 // ============================================
 
 function ParentDashboard({ user, profile, onLogout }) {
+  const displayName = getDisplayName(profile);
+  
   return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
@@ -1839,7 +1907,7 @@ function ParentDashboard({ user, profile, onLogout }) {
           <span className="text-4xl">👨‍👩‍👧</span>
         </div>
         <h1 className="text-2xl font-bold text-white mb-2">Parent Portal</h1>
-        <p className="text-slate-400 mb-6">Welcome, {profile.full_name}</p>
+        <p className="text-slate-400 mb-6">Welcome, {displayName}</p>
         <p className="text-slate-500 text-sm mb-6">
           Parent account linking coming soon.<br />
           Contact your school administrator to link your account to your student.
@@ -1891,10 +1959,12 @@ export default function App() {
     setProfile(data);
     setLoading(false);
   }
+
   const handleLogout = async () => {
-  await supabase.auth.signOut();
-  window.location.reload();
-};
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
