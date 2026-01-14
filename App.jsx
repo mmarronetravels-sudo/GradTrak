@@ -1935,12 +1935,20 @@ function CounselorDashboard({ user, profile, onLogout }) {
         return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
       });
 
-      setStudents(studentsWithCourses);
+     setStudents(studentsWithCourses);
       if (cpData) setCoursePathways(cpData);
     }
 
+    // Fetch parents
+    const { data: parentData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('school_id', profile.school_id)
+      .eq('role', 'parent');
+
     if (catData) setCategories(catData);
     if (pathData) setPathways(pathData);
+    if (parentData) setParents(parentData);
     setLoading(false);
   }
 
