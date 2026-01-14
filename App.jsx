@@ -1484,7 +1484,7 @@ function AdminDashboard({ user, profile, onLogout }) {
                     const emailToId = {};
                     for (const student of importStatus.students) {
                       try {
-                        const tempPassword = 'Welcome' + Math.random().toString(36).slice(-4) + '!';
+                        const tempPassword = 'test123';
                         const { data, error } = await supabase.auth.signUp({ email: student.email, password: tempPassword });
                         if (error && error.message.includes('already registered')) {
                           const { data: existing } = await supabase.from('profiles').select('id').eq('email', student.email).single();
