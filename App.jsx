@@ -1999,13 +1999,12 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 <div>
                   <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
                   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
-                </div>
               </div>
-              <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                Sign Out
-              </button>
             </div>
+            <button onClick={() => setShowAddCourseModal(true)} className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Course
+            </button>
           </div>
         </header>
 
