@@ -153,13 +153,6 @@ function generateAlerts(profile, stats) {
 }
   
     });
-  } else if (stats.percentage < expected - 5) {
-    alerts.push({ 
-      type: 'warning', 
-      message: `Slightly behind expected progress for ${semesterName} semester`, 
-      icon: '⚠️' 
-    });
-  }
 
   // Success message if on track with dual credits
   if (stats.percentage >= expected && stats.totalDualCredits >= 3) {
