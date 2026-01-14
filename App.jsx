@@ -2155,7 +2155,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Credits</label>
-                    <input name="credits" type="number" step="0.5" min="0.5" max="4" defaultValue="1" required className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white" />
+                    <input name="credits" type="number" step="0.25" min="0.25" max="4" defaultValue="1" required className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Category</label>
