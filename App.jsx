@@ -514,7 +514,7 @@ function AddCourseModal({ isOpen, onClose, onAdd, categories, pathways }) {
               <label className="block text-sm font-medium text-slate-300 mb-2">Term</label>
               <select value={formData.term} onChange={(e) => setFormData({ ...formData, term: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500">
-                {['Fall 2024', 'Spring 2025', 'Fall 2025', 'Spring 2026'].map(t => <option key={t} value={t}>{t}</option>)}
+                {['Fall 2024', 'Winter 2024', 'Spring 2025', 'Fall 2025', 'Winter 2025', 'Spring 2026', 'Fall 2026', 'Winter 2026', 'Spring 2027'].map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
