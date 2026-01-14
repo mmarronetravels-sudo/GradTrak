@@ -1477,7 +1477,6 @@ function AdminDashboard({ user, profile, onLogout }) {
                 <div className="flex gap-3">
                   <button onClick={() => setImportStatus(null)} className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-xl">Cancel</button>
                   <button onClick={async () => {
-                    alert('Starting import with ' + importStatus.students.length + ' students');
                     setImportStatus({ stage: 'importing', message: 'Importing...', students: importStatus.students, courses: importStatus.courses });
                     let created = 0, coursesAdded = 0, errors = [];
                     const categoryMap = {};
