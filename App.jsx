@@ -2314,33 +2314,210 @@ function CounselorDashboard({ user, profile, onLogout }) {
 
 // ============================================
 // PARENT DASHBOARD
-
 function ParentDashboard({ user, profile, onLogout }) {
+  const [linkedStudents, setLinkedStudents] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [loading, setLoading] = useState(true);
   const displayName = getDisplayName(profile);
-  
-  return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+
+  useEffect(() => {
+    fetchLinkedStudents();
+  }, [profile]);
+
+  async function fetchLinkedStudents() {
+    setLoading(true);
+    
+    const { data: links } = await supabase
+      .from('parent_students')
+      .select('student_id')
+      .eq('parent_id', profile.id);
+
+    if (links && links.length > 0) {
+      const studentIds = links.map(l => l.student_id);
       
-      <div className="text-center p-8">
-        <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-4xl">👨‍👩‍👧</span>
-        </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Parent Portal</h1>
-        <p className="text-slate-400 mb-6">Welcome, {displayName}</p>
-        <p className="text-slate-500 text-sm mb-6">
-          Parent account linking coming soon.<br />
-          Contact your school administrator to link your account to your student.
-        </p>
-        <button onClick={onLogout}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl transition-all">
-          Sign Out
-        </button>
+      const { data: studentData } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', studentIds);
+
+      const { data: catData } = await supabase
+        .from('credit_categories')
+        .select('*')
+        .eq('school_id', profile.school_id)
+        .order('display_order');
+
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('*')
+        .in('student_id', studentIds);
+
+      if (studentData) {
+        const studentsWithStats = studentData.map(student => {
+          const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
+          const stats = calculateStudentStats(studentCourses, catData || []);
+          const alerts = generateAlerts(student, stats);
+          return { ...student, courses: studentCourses, stats, alerts, displayName: getDisplayName(student) };
+        });
+        setLinkedStudents(studentsWithStats);
+      }
+      if (catData) setCategories(catData);
+    }
+    setLoading(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
+    );
+  }
+
+  if (linkedStudents.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+        <div className="text-center p-8">
+          <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-4xl">👨‍👩‍👧</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Parent Portal</h1>
+          <p className="text-slate-400 mb-6">Welcome, {displayName}</p>
+          <p className="text-slate-500 text-sm mb-6">
+            No students linked to your account yet.<br />
+            Contact your school counselor to link your student.
+          </p>
+          <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl transition-all">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedStudent) {
+    const student = selectedStudent;
+    return (
+      <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+        <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setSelectedStudent(null)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-xl">
+                ← Back
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
+                <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+          {student.alerts.length > 0 && student.alerts.map((alert, i) => (
+            <div key={i} className={`p-4 rounded-xl ${alert.type === 'critical' ? 'bg-red-500/20 border border-red-500/30' : alert.type === 'warning' ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-emerald-500/20 border border-emerald-500/30'}`}>
+              <span className="mr-2">{alert.icon}</span>{alert.message}
+            </div>
+          ))}
+          <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 rounded-3xl p-6 border border-indigo-500/20">
+            <div className="flex items-center gap-6">
+              <div className="relative w-24 h-24">
+                <svg className="w-24 h-24 transform -rotate-90"><circle cx="48" cy="48" r="40" stroke="#334155" strokeWidth="8" fill="none" /><circle cx="48" cy="48" r="40" stroke="#818cf8" strokeWidth="8" fill="none" strokeDasharray={251.2} strokeDashoffset={251.2 - (251.2 * student.stats.percentage / 100)} strokeLinecap="round" /></svg>
+                <div className="absolute inset-0 flex items-center justify-center"><span className="text-2xl font-bold text-white">{student.stats.percentage}%</span></div>
+              </div>
+              <div>
+                <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
+                <p className="text-slate-300"><span className="text-2xl font-bold text-white">{student.stats.totalEarned}</span><span className="text-slate-400"> / {student.stats.totalRequired} credits</span></p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {categories.map(cat => {
+                const earned = student.stats.creditsByCategory[cat.id] || 0;
+                const required = Number(cat.credits_required);
+                return (
+                  <div key={cat.id} className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
+                    <span className="text-2xl">{cat.icon}</span>
+                    <h4 className="text-white font-semibold text-sm mt-2">{cat.name}</h4>
+                    <p className="text-slate-400 text-xs">{earned} / {required} credits</p>
+                    <div className="mt-2 h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, (earned/required)*100)}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">📚 Courses ({student.courses.length})</h3>
+            <div className="space-y-2">
+              {student.courses.map(course => {
+                const cat = categories.find(c => c.id === course.category_id);
+                return (
+                  <div key={course.id} className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-white font-medium">{course.name}</h4>
+                        <p className="text-slate-400 text-sm">{cat?.icon} {cat?.name} • {course.credits} credits • {course.term}</p>
+                      </div>
+                      {course.grade && <span className="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-300">{course.grade}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
+      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-white">👨‍👩‍👧 Parent Portal</h1>
+            <p className="text-slate-400 text-sm">{displayName}</p>
+          </div>
+          <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all">
+            Sign Out
+          </button>
+        </div>
+      </header>
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        <h2 className="text-xl font-bold text-white mb-4">My Students</h2>
+        <div className="space-y-3">
+          {linkedStudents.map(student => (
+            <button key={student.id} onClick={() => setSelectedStudent(student)}
+              className="w-full bg-slate-900/80 rounded-2xl p-5 border border-slate-800 hover:bg-slate-800/80 hover:border-indigo-500/30 transition-all text-left">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="text-white font-semibold">{student.displayName}</h3>
+                    {student.alerts.some(a => a.type === 'critical') && (
+                      <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
+                    )}
+                  </div>
+                  <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+                  <p className="text-slate-500 text-xs mt-1">{student.courses.length} courses • {student.stats.totalEarned} credits earned</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-white">{student.stats.percentage}%</div>
+                  <p className="text-slate-400 text-xs">complete</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }
-
 // ============================================
 // MAIN APP
 // ============================================
