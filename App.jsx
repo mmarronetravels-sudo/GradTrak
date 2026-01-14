@@ -1999,6 +1999,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 <div>
                   <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
                   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+                </div>
               </div>
             </div>
             <button onClick={() => setShowAddCourseModal(true)} className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2">
