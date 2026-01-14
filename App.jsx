@@ -2209,6 +2209,62 @@ function CounselorDashboard({ user, profile, onLogout }) {
         </div>
       </main>
 
+      {/* Link Parent Modal */}
+      {showLinkParentModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">👨‍👩‍👧 Link Parent to Student</h2>
+              <button onClick={() => setShowLinkParentModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {parents.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <p>No parent accounts found.</p>
+                <p className="text-sm mt-2">Parents need to sign up first with the "Parent/Guardian" role.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-slate-400 text-sm">Select a parent and student to link:</p>
+                {parents.map(parent => (
+                  <div key={parent.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <h3 className="text-white font-medium mb-2">{parent.full_name || parent.email}</h3>
+                    <p className="text-slate-400 text-sm mb-3">{parent.email}</p>
+                    <div className="space-y-2">
+                      {students.map(student => (
+                        <button
+                          key={student.id}
+                          onClick={async () => {
+                            const { error } = await supabase.from('parent_students').insert([{ parent_id: parent.id, student_id: student.id, created_by: profile.id }]);
+                            if (!error) { alert('Parent linked successfully!'); }
+                            else if (error.code === '23505') { alert('Already linked.'); }
+                            else { alert('Error: ' + error.message); }
+                          }}
+                          className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-lg transition-all text-left"
+                        >
+                          <span className="text-white text-sm">{student.displayName}</span>
+                          <span className="text-slate-400 text-xs">Grade {student.grade}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <button onClick={() => setShowLinkParentModal(false)}
+              className="w-full mt-6 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
       {/* Settings Modal */}
       {showSettingsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
