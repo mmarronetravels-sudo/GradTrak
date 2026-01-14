@@ -2226,7 +2226,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 className="flex-1 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
                 Cancel
               </button>
-              <button onClick={async () => { await supabase.from('profiles').update({ scheduling_link: schedulingLink }).eq('id', profile.id); setShowSettingsModal(false); }}
+             <button onClick={async () => { alert('Saving...'); await supabase.from('profiles').update({ scheduling_link: schedulingLink }).eq('id', profile.id); alert('Saved!'); setShowSettingsModal(false); }}
                 className="flex-1 bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all">
                 Save
               </button>
