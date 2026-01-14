@@ -152,26 +152,6 @@ function generateAlerts(profile, stats) {
   return alerts;
 }
   
-  // Determine trimester name for display
-  const trimesterName = currentTrimester === 1 ? 'Fall' : currentTrimester === 2 ? 'Winter' : 'Spring';
-
-  // Only show critical alert if more than 15% behind expected
-  if (stats.percentage < expected - 15) {
-    alerts.push({ 
-      type: 'critical', 
-      message: `Behind on credits (${stats.percentage}% vs expected ${expected}% for ${trime
-  const gradeExpectations = expectedProgress[gradeLevel] || { fall: 0, spring: 100 };
-  const expected = isFallSemester ? gradeExpectations.fall : gradeExpectations.spring;
-  
-  // Determine semester name for display
-  const semesterName = isFallSemester ? 'fall' : 'spring';
-
-  // Only show critical alert if more than 15% behind expected
-  if (stats.percentage < expected - 15) {
-    alerts.push({ 
-      type: 'critical', 
-      message: `Behind on credits (${stats.percentage}% vs expected ${expected}% for ${semesterName} of grade ${gradeLevel})`, 
-      icon: '🚨' 
     });
   } else if (stats.percentage < expected - 5) {
     alerts.push({ 
