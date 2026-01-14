@@ -152,26 +152,6 @@ function generateAlerts(profile, stats) {
   return alerts;
 }
   
-    });
-
-  // Success message if on track with dual credits
-  if (stats.percentage >= expected && stats.totalDualCredits >= 3) {
-    alerts.push({ 
-      type: 'success', 
-      message: `On track with ${stats.totalDualCredits} dual credits!`, 
-      icon: '🌟' 
-    });
-  } else if (stats.percentage >= expected + 10) {
-    alerts.push({ 
-      type: 'success', 
-      message: `Ahead of schedule! Great progress!`, 
-      icon: '🌟' 
-    });
-  }
-
-  return alerts;
-}
-
 // Helper to get display name from profile
 function getDisplayName(profile) {
   if (profile?.full_name && profile.full_name !== 'Unknown') {
