@@ -2265,6 +2265,38 @@ function CounselorDashboard({ user, profile, onLogout }) {
         </div>
       )}
 
+      {/* Add Course Modal for Counselors */}
+      {showAddCourseModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Add Course for {selectedStudent.displayName}</h2>
+              <button onClick={() => setShowAddCourseModal(false)} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <AddCourseForm 
+              categories={categories} 
+              pathways={pathways} 
+              onAdd={async (courseData) => {
+                const { error } = await supabase.from('courses').insert([{ ...courseData, student_id: selectedStudent.id }]);
+                if (!error) {
+                  alert('Course added!');
+                  setShowAddCourseModal(false);
+                  fetchData();
+                } else {
+                  alert('Error: ' + error.message);
+                }
+              }} 
+              onClose={() => setShowAddCourseModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
       {/* Settings Modal */}
       {/* Settings Modal */}
       {showSettingsModal && (
