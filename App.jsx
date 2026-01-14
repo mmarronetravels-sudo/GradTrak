@@ -2210,6 +2210,10 @@ function CounselorDashboard({ user, profile, onLogout }) {
               <p className="text-slate-400 text-sm">School Counselor</p>
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={() => setShowImportModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Import Data">
+                📥 Import
+              </button>
+              <button onClick={() => setShowLinkParentModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Link Parent">
               <button onClick={() => setShowLinkParentModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Link Parent">
                 👨‍👩‍👧 Link Parent
               </button>
