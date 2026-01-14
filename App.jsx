@@ -1883,6 +1883,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showLinkParentModal, setShowLinkParentModal] = useState(false);
+  const [parents, setParents] = useState([]);
   const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
   const displayName = getDisplayName(profile);
 
