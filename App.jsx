@@ -89,28 +89,41 @@ function generateAlerts(profile, stats) {
   const alerts = [];
   const gradeLevel = profile?.grade || 9;
   
-  // Get current month to determine semester
+  // Get current month to determine trimester
   const currentMonth = new Date().getMonth() + 1; // 1-12
   
-  // Determine if we're in Fall (Aug-Dec) or Spring (Jan-May) semester
-  // Fall semester: August (8) - December (12)
-  // Spring semester: January (1) - July (7) - includes summer
-  const isFallSemester = currentMonth >= 8 && currentMonth <= 12;
+  // Summit Learning Charter Trimesters:
+  // Fall: August - November (8-11)
+  // Winter: December - February (12, 1, 2)
+  // Spring: March - June (3-6), July is summer break
+  let currentTrimester;
+  if (currentMonth >= 8 && currentMonth <= 11) {
+    currentTrimester = 1; // Fall
+  } else if (currentMonth === 12 || currentMonth <= 2) {
+    currentTrimester = 2; // Winter
+  } else {
+    currentTrimester = 3; // Spring (or summer - use Spring expectations)
+  }
   
-  // Semester-based expected progress
-  // Each grade level = 2 semesters, each semester = ~12.5% of total credits
-  // Grade 9 Fall = 0%, Grade 9 Spring = 12.5%
-  // Grade 10 Fall = 25%, Grade 10 Spring = 37.5%
-  // Grade 11 Fall = 50%, Grade 11 Spring = 62.5%
-  // Grade 12 Fall = 75%, Grade 12 Spring = 87.5%
-  
+  // Trimester-based expected progress (2 credits per trimester, 6 per year, 24 total)
   const expectedProgress = {
-    9:  { fall: 0,    spring: 12.5 },
-    10: { fall: 25,   spring: 37.5 },
-    11: { fall: 50,   spring: 62.5 },
-    12: { fall: 75,   spring: 87.5 }
+    9:  { 1: 0,  2: 8,  3: 17 },
+    10: { 1: 25, 2: 33, 3: 42 },
+    11: { 1: 50, 2: 58, 3: 67 },
+    12: { 1: 75, 2: 83, 3: 92 }
   };
   
+  const gradeExpectations = expectedProgress[gradeLevel] || { 1: 0, 2: 50, 3: 100 };
+  const expected = gradeExpectations[currentTrimester];
+  
+  // Determine trimester name for display
+  const trimesterName = currentTrimester === 1 ? 'Fall' : currentTrimester === 2 ? 'Winter' : 'Spring';
+
+  // Only show critical alert if more than 15% behind expected
+  if (stats.percentage < expected - 15) {
+    alerts.push({ 
+      type: 'critical', 
+      message: `Behind on credits (${stats.percentage}% vs expected ${expected}% for ${trime
   const gradeExpectations = expectedProgress[gradeLevel] || { fall: 0, spring: 100 };
   const expected = isFallSemester ? gradeExpectations.fall : gradeExpectations.spring;
   
