@@ -1416,7 +1416,128 @@ function AdminDashboard({ user, profile, onLogout }) {
           onClose={() => { setShowPathwayModal(false); setEditingItem(null); }}
           onSave={handleSavePathway}
           initialData={editingItem}
-        />
+      />
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-lg border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">📥 Import Student Data</h2>
+              <button onClick={() => { setShowImportModal(false); setImportStatus(null); }} className="text-slate-400 hover:text-white p-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {!importStatus ? (
+              <div>
+                <p className="text-slate-400 text-sm mb-4">Upload an Excel file (.xlsx) with Students and Courses sheets.</p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    setImportStatus({ stage: 'reading', message: 'Reading file...' });
+                    try {
+                      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+                      const data = await file.arrayBuffer();
+                      const workbook = XLSX.read(data);
+                      const studentsSheet = workbook.Sheets['Students'];
+                      const coursesSheet = workbook.Sheets['Courses'];
+                      if (!studentsSheet) {
+                        setImportStatus({ stage: 'error', message: 'File must have a "Students" sheet.' });
+                        return;
+                      }
+                      const students = XLSX.utils.sheet_to_json(studentsSheet).filter(s => s.email);
+                      const courses = coursesSheet ? XLSX.utils.sheet_to_json(coursesSheet).filter(c => c.student_email && c.course_name) : [];
+                      setImportStatus({ stage: 'preview', students, courses, message: `Found ${students.length} students and ${courses.length} courses.` });
+                    } catch (err) {
+                      setImportStatus({ stage: 'error', message: 'Error reading file: ' + err.message });
+                    }
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:text-white file:cursor-pointer"
+                />
+              </div>
+            ) : importStatus.stage === 'error' ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">❌</div>
+                <p className="text-red-400">{importStatus.message}</p>
+                <button onClick={() => setImportStatus(null)} className="mt-4 bg-slate-800 text-slate-300 px-4 py-2 rounded-xl">Try Again</button>
+              </div>
+            ) : importStatus.stage === 'preview' ? (
+              <div>
+                <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
+                  <p className="text-white font-medium">📊 Preview</p>
+                  <p className="text-slate-400 text-sm mt-1">{importStatus.students.length} students, {importStatus.courses.length} courses</p>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setImportStatus(null)} className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-xl">Cancel</button>
+                  <button onClick={async () => {
+                    setImportStatus({ stage: 'importing', message: 'Importing...', students: importStatus.students, courses: importStatus.courses });
+                    let created = 0, coursesAdded = 0, errors = [];
+                    const categoryMap = {};
+                    categories.forEach(c => { categoryMap[c.name.toLowerCase()] = c.id; });
+                    const emailToId = {};
+                    for (const student of importStatus.students) {
+                      try {
+                        const tempPassword = 'Welcome' + Math.random().toString(36).slice(-4) + '!';
+                        const { data, error } = await supabase.auth.signUp({ email: student.email, password: tempPassword });
+                        if (error && error.message.includes('already registered')) {
+                          const { data: existing } = await supabase.from('profiles').select('id').eq('email', student.email).single();
+                          if (existing) emailToId[student.email] = existing.id;
+                          continue;
+                        }
+                        if (data?.user) {
+                          emailToId[student.email] = data.user.id;
+                          await supabase.from('profiles').update({ full_name: student.full_name, grade: parseInt(student.grade), graduation_year: parseInt(student.graduation_year), role: 'student', school_id: profile.school_id }).eq('id', data.user.id);
+                          created++;
+                        }
+                      } catch (err) { errors.push(student.email + ': ' + err.message); }
+                    }
+                    for (const course of importStatus.courses) {
+                      const studentId = emailToId[course.student_email];
+                      if (!studentId) { errors.push(course.course_name + ': student not found'); continue; }
+                      const catId = categoryMap[(course.category || '').toLowerCase()];
+                      if (!catId) { errors.push(course.course_name + ': invalid category'); continue; }
+                      try {
+                        await supabase.from('courses').insert({ student_id: studentId, name: course.course_name, credits: parseFloat(course.credits) || 1, category_id: catId, term: course.term || 'Fall 2024', grade: course.grade || null, is_dual_credit: (course.is_dual_credit || '').toLowerCase() === 'yes', dual_credit_type: course.dual_credit_type || null });
+                        coursesAdded++;
+                      } catch (err) { errors.push(course.course_name + ': ' + err.message); }
+                    }
+                    setImportStatus({ stage: 'done', created, coursesAdded, errors });
+                  }} className="flex-1 bg-indigo-500 text-white py-3 rounded-xl font-semibold">Import</button>
+                </div>
+              </div>
+            ) : importStatus.stage === 'importing' ? (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-400">{importStatus.message}</p>
+              </div>
+            ) : importStatus.stage === 'done' ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">✅</div>
+                <p className="text-white font-medium">Created {importStatus.created} students, added {importStatus.coursesAdded} courses</p>
+                {importStatus.errors.length > 0 && (
+                  <div className="mt-4 text-left bg-red-500/10 rounded-xl p-4 max-h-40 overflow-y-auto">
+                    <p className="text-red-400 text-sm font-medium mb-2">{importStatus.errors.length} issues:</p>
+                    {importStatus.errors.slice(0, 10).map((err, i) => <p key={i} className="text-red-400 text-xs">{err}</p>)}
+                    {importStatus.errors.length > 10 && <p className="text-red-400 text-xs">...and {importStatus.errors.length - 10} more</p>}
+                  </div>
+                )}
+                <button onClick={() => { setShowImportModal(false); setImportStatus(null); fetchData(); }} className="mt-4 bg-indigo-500 text-white px-6 py-2 rounded-xl">Done</button>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-400">Processing...</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
