@@ -2265,7 +2265,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
         </div>
       )}
 
-      {/* Add Course Modal for Counselors */}
+     {/* Add Course Modal for Counselors */}
       {showAddCourseModal && selectedStudent && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
@@ -2277,24 +2277,66 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 </svg>
               </button>
             </div>
-            <AddCourseForm 
-              categories={categories} 
-              pathways={pathways} 
-              onAdd={async (courseData) => {
-                const { error } = await supabase.from('courses').insert([{ ...courseData, student_id: selectedStudent.id }]);
-                if (!error) {
-                  alert('Course added!');
-                  setShowAddCourseModal(false);
-                  fetchData();
-                } else {
-                  alert('Error: ' + error.message);
-                }
-              }} 
-              onClose={() => setShowAddCourseModal(false)}
-            />
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.target;
+              const courseData = {
+                name: form.courseName.value,
+                credits: parseFloat(form.credits.value),
+                category_id: form.category.value,
+                term: form.term.value,
+                grade: form.grade.value || null,
+                student_id: selectedStudent.id
+              };
+              const { error } = await supabase.from('courses').insert([courseData]);
+              if (!error) {
+                alert('Course added!');
+                setShowAddCourseModal(false);
+                fetchData();
+              } else {
+                alert('Error: ' + error.message);
+              }
+            }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Course Name</label>
+                  <input name="courseName" required className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white" placeholder="e.g. Algebra 1" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Credits</label>
+                  <input name="credits" type="number" step="0.5" min="0.5" max="4" defaultValue="1" required className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Category</label>
+                  <select name="category" required className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                    <option value="">Select category...</option>
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Term</label>
+                  <select name="term" required className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                    {['Fall 2024', 'Winter 2024', 'Spring 2025', 'Fall 2025', 'Winter 2025', 'Spring 2026', 'Fall 2026', 'Winter 2026', 'Spring 2027'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Grade (optional)</label>
+                  <select name="grade" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                    <option value="">No grade yet</option>
+                    {['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F', 'P', 'NP'].map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowAddCourseModal(false)} className="flex-1 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">Cancel</button>
+                <button type="submit" className="flex-1 bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all">Add Course</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
+
+      {/* Settings Modal */}
 
       {/* Settings Modal */}
       {/* Settings Modal */}
