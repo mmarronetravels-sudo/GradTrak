@@ -2002,7 +2002,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 </div>
               </div>
             </div>
-            <button onClick={() => { alert('Button clicked!'); setShowAddCourseModal(true); }} className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2">
+            <button onClick={() => setShowAddCourseModal(true)} className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               Add Course
             </button>
