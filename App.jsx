@@ -123,6 +123,42 @@ function generateAlerts(profile, stats) {
   if (stats.percentage < expected - 15) {
     alerts.push({ 
       type: 'critical', 
+      message: `Behind on credits (${stats.percentage}% vs expected ${expected}% for ${trimesterName} of grade ${gradeLevel})`, 
+      icon: '🚨' 
+    });
+  } else if (stats.percentage < expected - 5) {
+    alerts.push({ 
+      type: 'warning', 
+      message: `Slightly behind expected progress for ${trimesterName} trimester`, 
+      icon: '⚠️' 
+    });
+  }
+
+  // Success message if on track with dual credits
+  if (stats.percentage >= expected && stats.totalDualCredits >= 3) {
+    alerts.push({ 
+      type: 'success', 
+      message: `On track with ${stats.totalDualCredits} dual credits!`, 
+      icon: '🌟' 
+    });
+  } else if (stats.percentage >= expected + 10) {
+    alerts.push({ 
+      type: 'success', 
+      message: `Ahead of schedule! Great progress!`, 
+      icon: '🌟' 
+    });
+  }
+
+  return alerts;
+}
+  
+  // Determine trimester name for display
+  const trimesterName = currentTrimester === 1 ? 'Fall' : currentTrimester === 2 ? 'Winter' : 'Spring';
+
+  // Only show critical alert if more than 15% behind expected
+  if (stats.percentage < expected - 15) {
+    alerts.push({ 
+      type: 'critical', 
       message: `Behind on credits (${stats.percentage}% vs expected ${expected}% for ${trime
   const gradeExpectations = expectedProgress[gradeLevel] || { fall: 0, spring: 100 };
   const expected = isFallSemester ? gradeExpectations.fall : gradeExpectations.spring;
