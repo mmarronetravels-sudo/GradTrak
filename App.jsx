@@ -1871,11 +1871,11 @@ function StudentDashboard({ user, profile, onLogout }) {
               </div>
             </div>
 
-            {pathways.length > 0 && (
+           {pathwayProgress.filter(p => p.earnedCredits > 0).length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
                 <div className="space-y-3">
-                  {pathwayProgress.map(pathway => (
+                  {pathwayProgress.filter(p => p.earnedCredits > 0).map(pathway => (
                     <PathwayCard key={pathway.id} pathway={pathway} />
                   ))}
                 </div>
