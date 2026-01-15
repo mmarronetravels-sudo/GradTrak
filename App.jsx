@@ -2774,14 +2774,16 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
-    setLoading(true);
-    await supabase.auth.signOut();
-    localStorage.removeItem('sb-vstiweftxjaszhnjwggb-auth-token');
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.log('Signout error:', e);
+    }
+    localStorage.clear();
+    sessionStorage.clear();
     setUser(null);
     setProfile(null);
-    setLoading(false);
   };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
