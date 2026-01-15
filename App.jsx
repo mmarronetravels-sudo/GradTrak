@@ -26,6 +26,30 @@ async function logAudit(action, tableName, recordId = null, details = null) {
 // UTILITY FUNCTIONS
 // ============================================
 
+function calculateYearlyProgress(courses, graduationYear) {
+  const currentYear = new Date().getFullYear();
+  const gradYear = parseInt(graduationYear) || currentYear + 1;
+  
+  const years = [
+    { grade: 9, label: 'Freshman', year: gradYear - 3 },
+    { grade: 10, label: 'Sophomore', year: gradYear - 2 },
+    { grade: 11, label: 'Junior', year: gradYear - 1 },
+    { grade: 12, label: 'Senior', year: gradYear }
+  ];
+  
+  const expectedPerYear = 6; // ~24 credits / 4 years
+  
+  return years.map(y => {
+    const yearCourses = courses.filter(c => {
+      const termYear = parseInt(c.term?.split(' ').pop()) || 0;
+      return termYear === y.year || termYear === y.year - 1; // Academic year spans 2 calendar years
+    });
+    const earned = yearCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+    const isPast = y.year < currentYear;
+    const isCurrent = y.year === currentYear || y.year === currentYear + 1;
+    return { ...y, earned, expected: expectedPerYear, isPast, isCurrent };
+  });
+}
 function calculateStudentStats(courses, categories) {
   const totalRequired = categories.reduce((sum, cat) => sum + Number(cat.credits_required), 0);
   
