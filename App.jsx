@@ -1762,6 +1762,7 @@ function PathwayModal({ isOpen, onClose, onSave, initialData }) {
         </form>
       </div>
     </div>
+      )}
 
       {/* Course Mappings Modal */}
       {showMappingsModal && (
