@@ -2727,47 +2727,59 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
+    let mounted = true;
+
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        
+        if (session?.user) {
+          setUser(session.user);
+          const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+          if (mounted) setProfile(data);
+        }
+      } catch (err) {
+        console.error('Auth init error:', err);
       }
-    });
+      if (mounted) setLoading(false);
+    }
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         setLoading(false);
         return;
       }
-      if (session?.user) {
+      
+      if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
-        await fetchProfile(session.user.id);
-      } else {
-        setUser(null);
-        setProfile(null);
+        const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (mounted) {
+          setProfile(data);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  async function fetchProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    setProfile(data);
-    setLoading(false);
-  }
-
-  const handleLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    supabase.auth.signOut().catch(() => {});
+  const handleLogout = async () => {
+    setLoading(true);
+    await supabase.auth.signOut();
+    localStorage.removeItem('sb-vstiweftxjaszhnjwggb-auth-token');
     setUser(null);
     setProfile(null);
+    setLoading(false);
   };
 
   if (loading) {
