@@ -2853,16 +2853,11 @@ export default function App() {
     };
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.log('Signout error:', e);
-    }
+  const handleLogout = () => {
     localStorage.clear();
     sessionStorage.clear();
-    setUser(null);
-    setProfile(null);
+    supabase.auth.signOut().catch(() => {});
+    window.location.replace(window.location.origin);
   };
   if (loading) {
     return (
