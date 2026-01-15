@@ -1763,8 +1763,6 @@ function PathwayModal({ isOpen, onClose, onSave, initialData }) {
       </div>
     </div>
       )}
-
-    </div>
   );
 }
 
