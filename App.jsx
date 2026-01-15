@@ -1761,10 +1761,11 @@ function PathwayModal({ isOpen, onClose, onSave, initialData }) {
           </div>
         </form>
       </div>
-
+    </div>
+  );
+}
 // ============================================
 // STUDENT DASHBOARD
-// ============================================
 function StudentDashboard({ user, profile, onLogout }) {
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
