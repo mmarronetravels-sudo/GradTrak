@@ -1762,7 +1762,7 @@ function PathwayModal({ isOpen, onClose, onSave, initialData }) {
         </form>
       </div>
     </div>
-        )}
+  )}
     </div>
   );
 }
