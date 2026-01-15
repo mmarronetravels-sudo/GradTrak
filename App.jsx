@@ -1253,7 +1253,7 @@ function AdminDashboard({ user, profile, onLogout }) {
               <button onClick={() => setShowLinkParentModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Link Parent">
                 👨‍👩‍👧 Link Parent
               </button>
-              <button onClick={() => setShowMappingsModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Course Mappings">
+              <button onClick={() => { console.log('clicked!'); setShowMappingsModal(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Course Mappings">
                 Course Mappings
               </button>
               <button onClick={() => setShowSettingsModal(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl transition-all" title="Settings">
