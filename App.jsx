@@ -1678,6 +1678,9 @@ function AdminDashboard({ user, profile, onLogout }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
 // Category Edit Modal
 function CategoryModal({ isOpen, onClose, onSave, initialData }) {
   const [formData, setFormData] = useState({
