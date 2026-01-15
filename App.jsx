@@ -1928,7 +1928,7 @@ function StudentDashboard({ user, profile, onLogout }) {
               </div>
             </div>
 
-            <div>
+            <YearlyProgressChart yearlyProgress={yearlyProgress} />            <div>
               <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
               <div className="grid grid-cols-2 gap-3">
                 {categories.map(cat => (
