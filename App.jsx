@@ -1116,6 +1116,11 @@ function AdminDashboard({ user, profile, onLogout }) {
       .order('created_at', { ascending: false });
 
     if (catData) setCategories(catData);
+    const { data: mappingData } = await supabase
+      .from('course_mappings')
+      .select('*')
+      .eq('school_id', profile.school_id);
+    if (mappingData) setCourseMappings(mappingData);
     if (pathData) setPathways(pathData);
     if (logData) setAuditLogs(logData);
     if (delData) setDeletionRequests(delData);
