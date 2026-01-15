@@ -2192,6 +2192,9 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 <div>
                   <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
                   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+                  {student.is_adult_student && (
+                    <span className="inline-block mt-1 bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium">🔒 18+ Adult Student (FERPA)</span>
+                  )}
                 </div>
               </div>
             </div>
