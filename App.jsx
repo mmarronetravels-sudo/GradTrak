@@ -2192,9 +2192,16 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 <div>
                   <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
                   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
-                  {student.is_adult_student && (
-                    <span className="inline-block mt-1 bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium">🔒 18+ Adult Student (FERPA)</span>
-                  )}
+                  <button 
+                    onClick={async () => {
+                      const newValue = !student.is_adult_student;
+                      await supabase.from('profiles').update({ is_adult_student: newValue }).eq('id', student.id);
+                      setSelectedStudent({ ...student, is_adult_student: newValue });
+                    }}
+                    className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all ${student.is_adult_student ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'}`}
+                  >
+                    {student.is_adult_student ? '🔒 18+ Adult Student (FERPA)' : '+ Mark as 18+ Adult'}
+                  </button>
                 </div>
               </div>
             </div>
