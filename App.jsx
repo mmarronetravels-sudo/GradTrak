@@ -1081,7 +1081,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [showPathwayModal, setShowPathwayModal] = useState(false);
   const [showMappingsModal, setShowMappingsModal] = useState(false);
   const [courseMappings, setCourseMappings] = useState([]);
-  const [categories, setCategories] = useState([]);  const [editingItem, setEditingItem] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
