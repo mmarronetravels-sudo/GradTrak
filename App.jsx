@@ -1610,15 +1610,26 @@ function AdminDashboard({ user, profile, onLogout }) {
               <div className="text-center py-8">
                 <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-slate-400">Processing...</p>
-              </div>
+             </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Course Mappings Modal */}
+      {showMappingsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl w-full max-w-2xl border border-slate-700 p-6">
+            <h2 className="text-xl font-bold text-white mb-4">📚 Course Mappings</h2>
+            <button onClick={() => setShowMappingsModal(false)} className="w-full bg-slate-800 text-slate-300 py-3 rounded-xl">
+              Close
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
-
 // Category Edit Modal
 function CategoryModal({ isOpen, onClose, onSave, initialData }) {
   const [formData, setFormData] = useState({
