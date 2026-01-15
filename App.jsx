@@ -210,6 +210,48 @@ function CircularProgress({ percentage, size = 120, strokeWidth = 10, color = '#
   );
 }
 
+function YearlyProgressChart({ yearlyProgress }) {
+  const maxCredits = 8;
+  return (
+    <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">📈</span>
+        <h2 className="text-lg font-bold text-white">Annual Progress</h2>
+      </div>
+      <div className="flex items-end justify-between gap-2 h-32">
+        {yearlyProgress.map((year, i) => {
+          const heightPercent = Math.min((year.earned / maxCredits) * 100, 100);
+          const expectedHeight = (year.expected / maxCredits) * 100;
+          const isOnTrack = year.earned >= year.expected;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-2">
+              <div className="w-full h-24 bg-slate-700/30 rounded-lg relative flex items-end">
+                <div 
+                  className={`w-full rounded-lg transition-all ${year.isCurrent ? 'bg-indigo-500' : year.isPast ? (isOnTrack ? 'bg-emerald-500' : 'bg-amber-500') : 'bg-slate-600'}`}
+                  style={{ height: `${heightPercent}%` }}
+                />
+                <div 
+                  className="absolute w-full border-t-2 border-dashed border-slate-400/50"
+                  style={{ bottom: `${expectedHeight}%` }}
+                />
+              </div>
+              <div className="text-center">
+                <p className="text-white text-sm font-medium">{year.earned}</p>
+                <p className="text-slate-400 text-xs">{year.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-center gap-4 mt-4 text-xs text-slate-400">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 bg-emerald-500 rounded" /> On Track</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 bg-amber-500 rounded" /> Behind</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 bg-indigo-500 rounded" /> Current</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 border-t-2 border-dashed border-slate-400" /> Expected</span>
+      </div>
+    </div>
+  );
+}
 function ProgressBar({ earned, required, color }) {
   const percentage = required > 0 ? Math.min((earned / required) * 100, 100) : 0;
   return (
