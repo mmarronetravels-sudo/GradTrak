@@ -1762,6 +1762,7 @@ function PathwayModal({ isOpen, onClose, onSave, initialData }) {
         </form>
       </div>
 
+      {console.log('showMappingsModal:', showMappingsModal)}
       {showMappingsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 rounded-3xl w-full max-w-2xl border border-slate-700 p-6">
