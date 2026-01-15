@@ -2454,6 +2454,9 @@ function CounselorDashboard({ user, profile, onLogout }) {
                       {student.alerts.some(a => a.type === 'critical') && (
                         <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
                       )}
+                      {student.is_adult_student && (
+                        <span className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium">18+ FERPA</span>
+                      )}
                     </div>
                     <p className="text-slate-400 text-sm">Grade {student.grade || 'N/A'} • Class of {student.graduation_year || 'N/A'}</p>
                     <p className="text-slate-500 text-xs mt-1">{student.courses.length} courses • {student.stats.totalEarned} credits earned</p>
