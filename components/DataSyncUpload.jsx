@@ -6,7 +6,7 @@ import { supabase } from '../supabase';
 export default function DataSyncUpload({ schoolId }) {
   const [uploadState, setUploadState] = useState({
     file: null,
-    status: 'idle', // idle, uploading, success, error
+    status: 'idle',
     result: null,
   });
 
@@ -60,49 +60,151 @@ export default function DataSyncUpload({ schoolId }) {
   };
 
   const syncStudents = async (students) => {
-    const records = students.map(s => ({
-      school_id: schoolId,
-      email: s.email?.trim().toLowerCase(),
-      full_name: s.full_name?.trim(),
-      grade: parseInt(s.grade, 10),
-      graduation_year: parseInt(s.graduation_year, 10),
-    })).filter(s => s.email && s.full_name);
+    const errors = [];
+    let count = 0;
 
-    if (records.length === 0) return { count: 0, errors: [] };
+    for (const s of students) {
+      const email = s.email?.trim().toLowerCase();
+      const fullName = s.full_name?.trim();
+      const grade = parseInt(s.grade, 10);
+      const graduationYear = parseInt(s.graduation_year, 10);
 
-    const { error } = await supabase
-      .from('students')
-      .upsert(records, { onConflict: 'school_id,email' });
+      if (!email || !fullName) continue;
 
-    if (error) {
-      return { count: 0, errors: [error.message] };
+      // Check if student exists
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('school_id', schoolId)
+        .eq('email', email)
+        .single();
+
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from('profiles')
+          .update({ full_name: fullName, grade, graduation_year: graduationYear })
+          .eq('id', existing.id);
+        
+        if (error) errors.push(`Update ${email}: ${error.message}`);
+        else count++;
+      } else {
+        // Insert new student
+        const { error } = await supabase
+          .from('profiles')
+          .insert({
+            school_id: schoolId,
+            email,
+            full_name: fullName,
+            grade,
+            graduation_year: graduationYear,
+            role: 'student'
+          });
+        
+        if (error) errors.push(`Insert ${email}: ${error.message}`);
+        else count++;
+      }
     }
-    return { count: records.length, errors: [] };
+
+    return { count, errors };
   };
 
   const syncCourses = async (courses) => {
-    const records = courses.map(c => ({
-      school_id: schoolId,
-      student_email: c.student_email?.trim().toLowerCase(),
-      course_name: c.course_name?.trim(),
-      credits: parseFloat(c.credits),
-      category: c.category?.trim(),
-      term: c.term?.trim(),
-      grade: c.grade?.trim() || null,
-      is_dual_credit: ['yes', 'true', '1'].includes(c.is_dual_credit?.toLowerCase() || ''),
-      dual_credit_type: c.dual_credit_type?.trim() || null,
-    })).filter(c => c.student_email && c.course_name && c.category);
+    const errors = [];
+    let count = 0;
 
-    if (records.length === 0) return { count: 0, errors: [] };
+    // Get all categories for this school to map names to IDs
+    const { data: categories } = await supabase
+      .from('credit_categories')
+      .select('id, name')
+      .eq('school_id', schoolId);
 
-    const { error } = await supabase
-      .from('student_courses')
-      .upsert(records, { onConflict: 'school_id,student_email,course_name,term' });
+    const categoryMap = {};
+    categories?.forEach(c => {
+      categoryMap[c.name.toLowerCase()] = c.id;
+    });
 
-    if (error) {
-      return { count: 0, errors: [error.message] };
+    // Get all student profiles to map emails to IDs
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('school_id', schoolId);
+
+    const studentMap = {};
+    profiles?.forEach(p => {
+      studentMap[p.email.toLowerCase()] = p.id;
+    });
+
+    for (const c of courses) {
+      const studentEmail = c.student_email?.trim().toLowerCase();
+      const courseName = c.course_name?.trim();
+      const credits = parseFloat(c.credits);
+      const category = c.category?.trim().toLowerCase();
+      const term = c.term?.trim();
+      const grade = c.grade?.trim() || null;
+      const isDualCredit = ['yes', 'true', '1'].includes(c.is_dual_credit?.toLowerCase() || '');
+      const dualCreditType = c.dual_credit_type?.trim() || null;
+
+      if (!studentEmail || !courseName) continue;
+
+      const studentId = studentMap[studentEmail];
+      const categoryId = categoryMap[category];
+
+      if (!studentId) {
+        errors.push(`Student not found: ${studentEmail}`);
+        continue;
+      }
+
+      if (!categoryId) {
+        errors.push(`Category not found: ${c.category}`);
+        continue;
+      }
+
+      // Check if course already exists for this student/term
+      const { data: existing } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('name', courseName)
+        .eq('term', term)
+        .single();
+
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from('courses')
+          .update({
+            category_id: categoryId,
+            credits,
+            grade,
+            is_dual_credit: isDualCredit,
+            dual_credit_type: dualCreditType
+          })
+          .eq('id', existing.id);
+        
+        if (error) errors.push(`Update course ${courseName}: ${error.message}`);
+        else count++;
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from('courses')
+          .insert({
+            student_id: studentId,
+            name: courseName,
+            category_id: categoryId,
+            credits,
+            term,
+            grade,
+            is_dual_credit: isDualCredit,
+            dual_credit_type: dualCreditType
+          });
+        
+        if (error) errors.push(`Insert course ${courseName}: ${error.message}`);
+        else count++;
+      }
     }
-    return { count: records.length, errors: [] };
+
+    return { count, errors };
   };
 
   const handleUpload = async () => {
@@ -113,14 +215,24 @@ export default function DataSyncUpload({ schoolId }) {
     try {
       const { students, courses } = await parseExcel(uploadState.file);
       
-      const studentResult = await syncStudents(students);
-      const courseResult = await syncCourses(courses);
+      let studentResult = { count: 0, errors: [] };
+      let courseResult = { count: 0, errors: [] };
+
+      // Sync students first (so they exist for course sync)
+      if (students.length > 0) {
+        studentResult = await syncStudents(students);
+      }
+
+      // Then sync courses
+      if (courses.length > 0) {
+        courseResult = await syncCourses(courses);
+      }
 
       const allErrors = [...studentResult.errors, ...courseResult.errors];
 
       setUploadState(prev => ({
         ...prev,
-        status: allErrors.length > 0 ? 'error' : 'success',
+        status: allErrors.length > 0 && (studentResult.count === 0 && courseResult.count === 0) ? 'error' : 'success',
         result: {
           studentsProcessed: studentResult.count,
           coursesProcessed: courseResult.count,
@@ -224,6 +336,19 @@ export default function DataSyncUpload({ schoolId }) {
                 <p>✓ {uploadState.result.studentsProcessed} students processed</p>
                 <p>✓ {uploadState.result.coursesProcessed} course records processed</p>
               </div>
+              {uploadState.result.errors?.length > 0 && (
+                <div className="mt-3 p-2 bg-amber-900/30 rounded border border-amber-700">
+                  <p className="text-amber-400 text-sm font-medium">⚠️ {uploadState.result.errors.length} warnings:</p>
+                  <ul className="text-slate-400 text-xs mt-1 max-h-32 overflow-y-auto">
+                    {uploadState.result.errors.slice(0, 10).map((err, i) => (
+                      <li key={i}>• {err}</li>
+                    ))}
+                    {uploadState.result.errors.length > 10 && (
+                      <li>• ...and {uploadState.result.errors.length - 10} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
               <button onClick={resetUpload} className="mt-3 text-sm text-emerald-400 hover:text-emerald-300 underline">
                 Upload another file
               </button>
