@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabase';
+import DataSyncUpload from './components/DataSyncUpload';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -1287,6 +1288,10 @@ function AdminDashboard({ user, profile, onLogout }) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📋 Audit Log
           </button>
+          <button onClick={() => setActiveTab('sync')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+            📤 Data Sync
+          </button>
         </div>
 
         {/* Categories Tab */}
@@ -1365,6 +1370,11 @@ function AdminDashboard({ user, profile, onLogout }) {
           </div>
         )}
 
+        {/* Data Sync Tab */}
+        {activeTab === 'sync' && (
+          <DataSyncUpload schoolId={profile?.school_id} />
+        )}
+        
         {/* Privacy/FERPA Tab */}
         {activeTab === 'privacy' && (
           <div className="space-y-6">
