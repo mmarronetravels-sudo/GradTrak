@@ -1272,7 +1272,7 @@ function AdminDashboard({ user, profile, onLogout }) {
 <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Tab Navigation */}      
       
-        <div className="flex gap-2 bg-slate-900 p-1 rounded-xl overflow-x-auto">
+       <div className="flex gap-2 bg-slate-900 p-1 rounded-xl overflow-x-auto">
           <button onClick={() => setActiveTab('dashboard')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📊 Dashboard
@@ -1285,7 +1285,7 @@ function AdminDashboard({ user, profile, onLogout }) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             🎯 CTE Pathways
           </button>
-        </div>        <button onClick={() => setActiveTab('privacy')}
+          <button onClick={() => setActiveTab('privacy')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'privacy' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             🔒 FERPA
           </button>
@@ -1293,7 +1293,7 @@ function AdminDashboard({ user, profile, onLogout }) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📋 Audit Log
           </button>
-          <button onClick={() => setActiveTab('sync')}
+        </div>          <button onClick={() => setActiveTab('sync')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📤 Data Sync
           </button>
