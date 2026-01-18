@@ -1273,12 +1273,11 @@ function AdminDashboard({ user, profile, onLogout }) {
         {/* Tab Navigation */}      
       <div className={"flex gap-2 bg-slate-900 p-1 rounded-xl overflow-x-auto">
           <button onClick={() => setActiveTab('dashboard')}
-            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-            📊 Dashboard
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>            📊 Dashboard
           </button>
           <button onClick={() => setActiveTab('categories')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'categories' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-            📚 Requirements
+        📚 Requirements
           </button>
           <button onClick={() => setActiveTab('pathways')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
