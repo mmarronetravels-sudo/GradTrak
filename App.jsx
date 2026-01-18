@@ -1293,7 +1293,7 @@ function AdminDashboard({ user, profile, onLogout }) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📋 Audit Log
           </button>
-        </div>          <button onClick={() => setActiveTab('sync')}
+          <button onClick={() => setActiveTab('sync')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📤 Data Sync
           </button>
