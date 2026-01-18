@@ -1019,13 +1019,37 @@ function AuthScreen({ onLogin }) {
               </>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                placeholder="you@school.edu" />
-            </div>
-
+           <div>
+  <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
+    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+    placeholder="••••••••" />
+  {mode === 'login' && (
+    <button 
+      type="button"
+      onClick={async () => {
+        if (!email) {
+          setError('Please enter your email address first');
+          return;
+        }
+        setLoading(true);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin
+        });
+        setLoading(false);
+        if (error) {
+          setError(error.message);
+        } else {
+          setError('');
+          alert('Password reset email sent! Check your inbox.');
+        }
+      }}
+      className="text-sm text-indigo-400 hover:text-indigo-300 mt-2 block"
+    >
+      Forgot password?
+    </button>
+  )}
+</div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
