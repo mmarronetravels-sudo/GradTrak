@@ -1299,6 +1299,26 @@ function AdminDashboard({ user, profile, onLogout }) {
           </button>
         </div>
 
+  {/* Admin Dashboard Tab */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-white">Admin Dashboard</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+                <p className="text-slate-400 text-sm">Total Students</p>
+                <p className="text-3xl font-bold text-white">{students?.length || 0}</p>
+              </div>
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+                <p className="text-slate-400 text-sm">Categories</p>
+                <p className="text-3xl font-bold text-white">{categories?.length || 0}</p>
+              </div>
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+                <p className="text-slate-400 text-sm">CTE Pathways</p>
+                <p className="text-3xl font-bold text-white">{pathways?.length || 0}</p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Categories Tab */}
         {activeTab === 'categories' && (
           <div className="space-y-4">
