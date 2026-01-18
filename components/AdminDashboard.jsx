@@ -7,14 +7,14 @@ import {
   RefreshCw, 
   ChevronDown,
   Building2,
-  TrendingUp,
   Calendar,
   UserCheck,
   UserX,
-  ArrowRight
+  ArrowRight,
+  LogOut
 } from 'lucide-react';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ user, profile, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState(null);
   const [counselors, setCounselors] = useState([]);
@@ -27,25 +27,16 @@ export default function AdminDashboard() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (profile?.school_id) {
+      fetchDashboardData();
+    }
+  }, [profile]);
 
   async function fetchDashboardData() {
     setLoading(true);
     setError(null);
     
     try {
-      // Get current user's school_id
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('school_id')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Profile not found');
       const schoolId = profile.school_id;
 
       // Fetch subscription status
@@ -150,13 +141,6 @@ export default function AdminDashboard() {
     setSuccessMessage('');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('school_id')
-        .eq('id', user.id)
-        .single();
-
       // Upsert the assignment
       const { error } = await supabase
         .from('counselor_assignments')
@@ -212,9 +196,18 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
-          <p className="text-slate-400">Manage your school's subscription and counselor assignments</p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <p className="text-slate-400">Welcome, {profile?.full_name}</p>
+          </div>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600/50 rounded-lg text-slate-300 hover:text-white transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
         </div>
 
         {/* Error Display */}
