@@ -1083,6 +1083,8 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [showMappingsModal, setShowMappingsModal] = useState(false);
   const [courseMappings, setCourseMappings] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [caseloads, setCaseloads] = useState([]);  
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
@@ -1125,8 +1127,23 @@ function AdminDashboard({ user, profile, onLogout }) {
     if (pathData) setPathways(pathData);
     if (logData) setAuditLogs(logData);
     if (delData) setDeletionRequests(delData);
-    setLoading(false);
     
+    // Fetch subscription status
+    const { data: subData } = await supabase
+      .from('school_subscription_status')
+      .select('*')
+      .eq('id', profile.school_id)
+      .single();
+    if (subData) setSubscription(subData);
+    
+    // Fetch counselor caseloads
+    const { data: caseloadData } = await supabase
+      .from('counselor_caseload_summary')
+      .select('*')
+      .eq('school_id', profile.school_id);
+    if (caseloadData) setCaseloads(caseloadData);
+    
+    setLoading(false);    
     // Log admin dashboard access
     await logAudit('view_admin_dashboard', 'admin', null);
   }
@@ -1303,7 +1320,37 @@ function AdminDashboard({ user, profile, onLogout }) {
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-white">Admin Dashboard</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* Subscription Status */}
+            {subscription && (
+              <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 rounded-2xl p-5 border border-indigo-500/30">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">Subscription Status</h3>
+                  <span className="px-3 py-1 bg-indigo-500/30 text-indigo-300 rounded-full text-sm capitalize">{subscription.plan_type}</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-slate-400 text-sm">Current Students</p>
+                    <p className="text-2xl font-bold text-white">{subscription.current_students}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm">Max Students</p>
+                    <p className="text-2xl font-bold text-white">{subscription.max_students}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm">Usage</p>
+                    <p className="text-2xl font-bold text-white">{subscription.usage_percentage}%</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm">Can Add Students</p>
+                    <p className="text-2xl font-bold text-white">{subscription.can_add_students ? '✓ Yes' : '✗ No'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
                 <p className="text-slate-400 text-sm">Categories</p>
                 <p className="text-3xl font-bold text-white">{categories?.length || 0}</p>
@@ -1312,10 +1359,38 @@ function AdminDashboard({ user, profile, onLogout }) {
                 <p className="text-slate-400 text-sm">CTE Pathways</p>
                 <p className="text-3xl font-bold text-white">{pathways?.length || 0}</p>
               </div>
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+                <p className="text-slate-400 text-sm">Course Mappings</p>
+                <p className="text-3xl font-bold text-white">{courseMappings?.length || 0}</p>
+              </div>
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+                <p className="text-slate-400 text-sm">Counselors</p>
+                <p className="text-3xl font-bold text-white">{caseloads?.length || 0}</p>
+              </div>
             </div>
+            
+            {/* Counselor Caseloads */}
+            {caseloads?.length > 0 && (
+              <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+                <h3 className="text-lg font-semibold text-white mb-4">Counselor Caseloads</h3>
+                <div className="space-y-3">
+                  {caseloads.map(c => (
+                    <div key={c.counselor_id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl">
+                      <div>
+                        <p className="text-white font-medium">{c.counselor_name}</p>
+                        <p className="text-slate-400 text-sm">{c.counselor_email}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-white">{c.assigned_students}</p>
+                        <p className="text-slate-400 text-sm">students</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-        {/* Categories Tab */}
+        )}        {/* Categories Tab */}
         {activeTab === 'categories' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
