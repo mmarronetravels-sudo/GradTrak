@@ -1080,11 +1080,15 @@ function AuthScreen({ onLogin }) {
         </div>
 
         {/* FERPA Badge */}
-        <div className="mt-4 text-center">
+       <div className="mt-4 text-center">
           <span className="inline-flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-800">
             <span className="text-emerald-400">🔒</span>
             <span className="text-slate-400 text-xs">FERPA Compliant</span>
           </span>
+          <div className="mt-3 flex justify-center gap-4">
+            <a href="https://scholarpathsystems.org/privacy" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 text-xs">Privacy Policy</a>
+            <a href="https://scholarpathsystems.org/terms" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 text-xs">Terms of Service</a>
+          </div>
         </div>
       </div>
     </div>
