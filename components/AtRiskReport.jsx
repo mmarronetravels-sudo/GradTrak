@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Download, Search, ChevronUp, ChevronDown, Eye } from 'lucide-react';
+import { Download, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '../supabase';
 
 // ============================================
 // AT-RISK STUDENT REPORT COMPONENT
 // ============================================
 
-export default function AtRiskReport({ schoolId, counselorId = null }) {
+export default function AtRiskReport({ schoolId, counselorId = null, onSelectStudent }) {
   // State
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -362,7 +362,7 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
     
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
     
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
@@ -380,6 +380,12 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
     if (t === 1) return 'Fall';
     if (t === 2) return 'Winter';
     return 'Spring';
+  };
+
+  const handleStudentClick = (student) => {
+    if (onSelectStudent) {
+      onSelectStudent(student);
+    }
   };
 
   // ============================================
@@ -403,58 +409,56 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
   }
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">At-Risk Student Report</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h2 className="text-xl font-bold text-white">At-Risk Student Report</h2>
+          <p className="text-sm text-slate-400 mt-1">
             {getTrimesterName()} Trimester, {new Date().getFullYear()}-{(new Date().getFullYear() + 1).toString().slice(-2)}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <Download size={16} />
-            Export CSV
-          </button>
-        </div>
+        <button
+          onClick={exportToCSV}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm font-medium text-white hover:bg-slate-600"
+        >
+          <Download size={16} />
+          Export CSV
+        </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl p-4 border border-gray-200 border-l-4 border-l-slate-700">
-          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">My Caseload</div>
-          <div className="text-3xl font-bold text-slate-800">{summaryStats.total}</div>
-          <div className="text-xs text-gray-500">students assigned</div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+          <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">My Caseload</div>
+          <div className="text-3xl font-bold text-white">{summaryStats.total}</div>
+          <div className="text-xs text-slate-500">students assigned</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 border-l-4 border-l-red-600">
-          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Critical</div>
-          <div className="text-3xl font-bold text-red-600">{summaryStats.critical}</div>
-          <div className="text-xs text-gray-500">3+ credits behind</div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 border-l-4 border-l-red-500">
+          <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Critical</div>
+          <div className="text-3xl font-bold text-red-500">{summaryStats.critical}</div>
+          <div className="text-xs text-slate-500">3+ credits behind</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 border-l-4 border-l-amber-500">
-          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">At-Risk</div>
-          <div className="text-3xl font-bold text-amber-600">{summaryStats.atRisk}</div>
-          <div className="text-xs text-gray-500">1.5–2.9 credits behind</div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 border-l-4 border-l-amber-500">
+          <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">At-Risk</div>
+          <div className="text-3xl font-bold text-amber-500">{summaryStats.atRisk}</div>
+          <div className="text-xs text-slate-500">1.5–2.9 credits behind</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200 border-l-4 border-l-blue-500">
-          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Watch</div>
-          <div className="text-3xl font-bold text-blue-600">{summaryStats.watch}</div>
-          <div className="text-xs text-gray-500">0.5–1.4 credits behind</div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 border-l-4 border-l-blue-500">
+          <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Watch</div>
+          <div className="text-3xl font-bold text-blue-500">{summaryStats.watch}</div>
+          <div className="text-xs text-slate-500">0.5–1.4 credits behind</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl p-4 border border-gray-200 mb-4 flex flex-wrap items-end gap-4">
+      <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Risk Level</label>
+          <label className="text-xs uppercase tracking-wide text-slate-400">Risk Level</label>
           <select
             value={riskFilter}
             onChange={(e) => setRiskFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
           >
             <option value="all">All Levels</option>
             <option value="critical">Critical Only</option>
@@ -465,11 +469,11 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
         </div>
         
         <div className="flex flex-col gap-1">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Grade</label>
+          <label className="text-xs uppercase tracking-wide text-slate-400">Grade</label>
           <select
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
           >
             <option value="all">All Grades</option>
             <option value="9">9th Grade</option>
@@ -480,11 +484,11 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
         </div>
         
         <div className="flex flex-col gap-1">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Category Behind</label>
+          <label className="text-xs uppercase tracking-wide text-slate-400">Category Behind</label>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
           >
             <option value="all">All Categories</option>
             {categories.map(cat => (
@@ -494,11 +498,11 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
         </div>
         
         <div className="flex flex-col gap-1">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Flags</label>
+          <label className="text-xs uppercase tracking-wide text-slate-400">Flags</label>
           <select
             value={flagFilter}
             onChange={(e) => setFlagFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
           >
             <option value="all">All Students</option>
             <option value="iep">IEP</option>
@@ -508,120 +512,124 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
         </div>
         
         <div className="flex flex-col gap-1">
-          <label className="text-xs uppercase tracking-wide text-gray-500">Search</label>
+          <label className="text-xs uppercase tracking-wide text-slate-400">Search</label>
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search by name or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm w-52"
+              className="pl-9 pr-3 py-1.5 border border-slate-600 rounded-md text-sm w-48 bg-slate-700 text-white placeholder-slate-400"
             />
           </div>
         </div>
         
         <div className="flex-1"></div>
         
-        <div className="text-sm text-gray-500">
-          Showing <strong className="text-gray-700">{filteredStudents.length}</strong> of {summaryStats.critical + summaryStats.atRisk + summaryStats.watch} students
+        <div className="text-sm text-slate-400">
+          Showing <strong className="text-white">{filteredStudents.length}</strong> of {summaryStats.critical + summaryStats.atRisk + summaryStats.watch} students
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full min-w-max text-sm">
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-slate-800 border-b border-slate-700">
               <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
                 onClick={() => handleSort('name')}
               >
                 Student {sortField === 'name' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
                 onClick={() => handleSort('grade')}
               >
-                Grade {sortField === 'grade' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
+                Gr {sortField === 'grade' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide">
                 Flags
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
                 onClick={() => handleSort('riskLevel')}
               >
-                Risk Level {sortField === 'riskLevel' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
+                Risk {sortField === 'riskLevel' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
                 onClick={() => handleSort('progress')}
               >
                 Progress {sortField === 'progress' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
                 onClick={() => handleSort('creditsBehind')}
               >
                 Behind {sortField === 'creditsBehind' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                Categories Short
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide">
+                Short
               </th>
               <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
                 onClick={() => handleSort('lastNote')}
               >
-                Last Note {sortField === 'lastNote' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
-              </th>
+                Note {sortField === 'lastNote' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
             </tr>
           </thead>
           <tbody>
             {filteredStudents.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                   No at-risk students found matching your filters.
                 </td>
               </tr>
             ) : (
               filteredStudents.map((student) => (
-                <tr key={student.id} className="border-b border-gray-100 hover:bg-blue-50/50">
+                <tr key={student.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{student.full_name}</div>
-                    <div className="text-xs text-gray-400 font-mono">{student.engage_id || student.id.slice(0, 8)}</div>
+                    <button
+                      onClick={() => handleStudentClick(student)}
+                      className="text-left hover:text-indigo-400 transition-colors"
+                    >
+                      <div className="font-medium text-white">{student.full_name}</div>
+                      <div className="text-xs text-slate-500 font-mono">{student.engage_id || student.id.slice(0, 8)}</div>
+                    </button>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{student.grade}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 text-slate-300">{student.grade}</td>
+                  <td className="px-3 py-3">
                     <div className="flex gap-1 flex-wrap">
                       {student.is_iep && (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-pink-100 text-pink-700">IEP</span>
+                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-pink-500/20 text-pink-400">IEP</span>
                       )}
                       {student.is_504 && (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700">504</span>
+                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-500/20 text-purple-400">504</span>
                       )}
                       {student.is_ell && (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">ELL</span>
+                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-500/20 text-blue-400">ELL</span>
                       )}
                       {!student.is_iep && !student.is_504 && !student.is_ell && (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-slate-600">—</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <span className={`px-2 py-1 text-xs font-semibold uppercase rounded ${
-                      student.risk.level === 'critical' ? 'bg-red-100 text-red-700' :
-                      student.risk.level === 'at-risk' ? 'bg-amber-100 text-amber-700' :
-                      student.risk.level === 'watch' ? 'bg-blue-100 text-blue-700' :
-                      'bg-green-100 text-green-700'
+                      student.risk.level === 'critical' ? 'bg-red-500/20 text-red-400' :
+                      student.risk.level === 'at-risk' ? 'bg-amber-500/20 text-amber-400' :
+                      student.risk.level === 'watch' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-green-500/20 text-green-400'
                     }`}>
                       {student.risk.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden w-20">
+                      <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden w-16">
                         <div 
                           className={`h-full rounded-full ${
                             student.risk.level === 'critical' ? 'bg-red-500' :
@@ -632,40 +640,39 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
                           style={{ width: `${Math.min(student.stats.percentage, 100)}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-gray-600 w-10 text-right font-mono">
+                      <span className="text-xs font-medium text-slate-400 w-8 text-right font-mono">
                         {student.stats.percentage}%
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-red-600">
+                  <td className="px-3 py-3">
+                    <span className="font-mono font-medium text-red-400">
                       -{student.risk.creditsBehind.toFixed(1)}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div className="flex gap-1 flex-wrap">
-                      {student.categoriesShort.slice(0, 3).map((cat, i) => (
-                        <span key={i} className="px-2 py-0.5 text-xs font-medium rounded bg-red-50 text-red-700">
-                          {cat.length > 10 ? cat.slice(0, 10) + '...' : cat}
+                      {student.categoriesShort.slice(0, 2).map((cat, i) => (
+                        <span key={i} className="px-1.5 py-0.5 text-xs font-medium rounded bg-red-500/20 text-red-400">
+                          {cat.length > 8 ? cat.slice(0, 8) + '..' : cat}
                         </span>
                       ))}
-                      {student.categoriesShort.length > 3 && (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600">
-                          +{student.categoriesShort.length - 3}
+                      {student.categoriesShort.length > 2 && (
+                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-600 text-slate-300">
+                          +{student.categoriesShort.length - 2}
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <span className={`text-xs ${
-                      getDateStaleness(student.lastNote) === 'very-stale' ? 'text-red-600 font-medium' :
-                      getDateStaleness(student.lastNote) === 'stale' ? 'text-amber-600' :
-                      'text-gray-500'
+                      getDateStaleness(student.lastNote) === 'very-stale' ? 'text-red-400 font-medium' :
+                      getDateStaleness(student.lastNote) === 'stale' ? 'text-amber-400' :
+                      'text-slate-400'
                     }`}>
                       {formatDate(student.lastNote)}
                     </span>
                   </td>
-                  
                 </tr>
               ))
             )}
@@ -673,8 +680,8 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
         </table>
         
         {/* Table Footer */}
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-500">
+        <div className="px-4 py-3 bg-slate-800 border-t border-slate-700 flex items-center justify-between">
+          <div className="text-sm text-slate-400">
             Showing {filteredStudents.length} students
           </div>
         </div>
