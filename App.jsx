@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabase';
 import DataSyncUpload from './components/DataSyncUpload';
+import AtRiskReport from './components/AtRiskReport';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -1342,7 +1343,10 @@ function AdminDashboard({ user, profile, onLogout }) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📤 Data Sync
           </button>
-        </div>
+         <button onClick={() => setActiveTab('at-risk')}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'at-risk' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                ⚠️ At-Risk
+              </button>        </div>
 
   {/* Admin Dashboard Tab */}
         {activeTab === 'dashboard' && (
@@ -1498,6 +1502,12 @@ function AdminDashboard({ user, profile, onLogout }) {
         {activeTab === 'sync' && (
           <DataSyncUpload schoolId={profile?.school_id} />
         )}
+  {activeTab === 'at-risk' && (
+            <AtRiskReport 
+              schoolId={profile.school_id} 
+              counselorId={profile.role === 'counselor' ? profile.id : null}
+            />
+          )}
         
         {/* Privacy/FERPA Tab */}
         {activeTab === 'privacy' && (
