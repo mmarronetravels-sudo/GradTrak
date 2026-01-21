@@ -1118,8 +1118,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
   const [selectedStudent, setSelectedStudent] = useState(null);  
-  const [selectedStudent, setSelectedStudent] = useState(null);
-
+  
   useEffect(() => {
     fetchData();
   }, [profile]);
