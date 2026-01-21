@@ -1117,6 +1117,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -1503,10 +1504,14 @@ function AdminDashboard({ user, profile, onLogout }) {
           <DataSyncUpload schoolId={profile?.school_id} />
         )}
   {activeTab === 'at-risk' && (
-            <AtRiskReport 
-              schoolId={profile.school_id} 
-              counselorId={profile.role === 'counselor' ? profile.id : null}
-            />
+            <AtRiskReport
+  schoolId={profile.school_id}
+  counselorId={profile.role === 'counselor' ? profile.id : null}
+  onSelectStudent={(student) => {
+    setSelectedStudent(student);
+    setActiveTab('student-detail');
+  }}
+/>
           )}
         
         {/* Privacy/FERPA Tab */}
