@@ -2956,11 +2956,19 @@ function CounselorDashboard({ user, profile, onLogout }) {
               </button>
             ))
           )}
-        </div>
               </>
             )}
 
             {mainView === 'at-risk' && (
+              <AtRiskReport
+                schoolId={profile.school_id}
+                counselorId={profile.id}
+                onSelectStudent={(student) => {
+                  setSelectedStudent(student);
+                }}
+              />
+            )}
+          </div>
               <AtRiskReport
                 schoolId={profile.school_id}
                 counselorId={profile.id}
