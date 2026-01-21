@@ -2969,14 +2969,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
               />
             )}
           </div>
-              <AtRiskReport
-                schoolId={profile.school_id}
-                counselorId={profile.id}
-                onSelectStudent={(student) => {
-                  setSelectedStudent(student);
-                }}
-              />
-            )}      </main>
+        </main>
 
       {/* Link Parent Modal */}
       {showLinkParentModal && (
