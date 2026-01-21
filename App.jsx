@@ -2523,6 +2523,12 @@ function CounselorDashboard({ user, profile, onLogout }) {
             >
               📝 Notes
             </button>
+            <button
+  onClick={() => setActiveTab('at-risk')}
+  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'at-risk' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+>
+  ⚠️ At-Risk
+</button>
           </div>
         </header>
         <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -2719,6 +2725,15 @@ function CounselorDashboard({ user, profile, onLogout }) {
               )}
             </div>
           </div>
+          )}
+          {activeTab === 'at-risk' && (
+            <AtRiskReport
+              schoolId={profile.school_id}
+              counselorId={profile.id}
+              onSelectStudent={(student) => {
+                setSelectedStudent(student);
+              }}
+            />
           )}
 
           {activeTab === 'courses' && (
