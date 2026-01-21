@@ -2915,7 +2915,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
             </div>
 
             {mainView === 'students' && (
-          <h2 className="text-xl font-bold text-white">Students</h2>
+              <>
+                <h2 className="text-xl font-bold text-white">Students</h2>
           {students.length === 0 ? (
             <div className="text-center py-12 text-slate-400">No students have signed up yet.</div>
           ) : (
@@ -2956,7 +2957,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
             ))
           )}
         </div>
-        )}
+              </>
+            )}
 
             {mainView === 'at-risk' && (
               <AtRiskReport
