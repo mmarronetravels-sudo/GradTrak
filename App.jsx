@@ -2457,7 +2457,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   // Student Detail View
   if (selectedStudent) {
     const student = selectedStudent;
-    const coursesByTerm = student.courses.reduce((acc, course) => {
+    const coursesByTerm = (student.courses || []).reduce((acc, course) => {
       if (!acc[course.term]) acc[course.term] = [];
       acc[course.term].push(course);
       return acc;
