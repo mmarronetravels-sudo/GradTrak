@@ -2278,6 +2278,9 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [showLinkParentModal, setShowLinkParentModal] = useState(false);
   const [showAddCourseModal, setShowAddCourseModal] = useState(false);
   const [parents, setParents] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [newNote, setNewNote] = useState('');
+  const [editingNote, setEditingNote] = useState(null);
   const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
   const displayName = getDisplayName(profile);
 
@@ -2345,6 +2348,14 @@ function CounselorDashboard({ user, profile, onLogout }) {
     setLoading(false);
   }
 
+  async function fetchNotes(studentId) {
+  const { data } = await supabase
+    .from('student_notes')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false });
+  if (data) setNotes(data);
+}
   const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
   const getPathwaysForCourse = (course, studentCoursePathways) => {
     const pathwayIds = studentCoursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
@@ -2491,7 +2502,116 @@ function CounselorDashboard({ user, profile, onLogout }) {
             </div>
           )}
 
-          {/* Courses by Term */}
+          {/* Counselor Notes */}
+          <div className="bg-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
+            <h3 className="text-lg font-semibold text-white mb-4">📝 Counselor Notes</h3>
+            
+            {/* Add New Note */}
+            <div className="mb-4">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Add a note about this student..."
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"
+                rows={3}
+              />
+              <button
+                onClick={async () => {
+                  if (!newNote.trim()) return;
+                  const { error } = await supabase.from('student_notes').insert([{
+                    student_id: student.id,
+                    counselor_id: profile.id,
+                    school_id: profile.school_id,
+                    note: newNote.trim()
+                  }]);
+                  if (!error) {
+                    setNewNote('');
+                    fetchNotes(student.id);
+                  } else {
+                    alert('Error saving note: ' + error.message);
+                  }
+                }}
+                className="mt-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all text-sm font-medium"
+              >
+                Save Note
+              </button>
+            </div>
+
+            {/* Notes List */}
+            <div className="space-y-3">
+              {notes.length === 0 ? (
+                <p className="text-slate-400 text-sm">No notes yet.</p>
+              ) : (
+                notes.map(note => (
+                  <div key={note.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                    {editingNote === note.id ? (
+                      <div>
+                        <textarea
+                          defaultValue={note.note}
+                          id={`edit-note-${note.id}`}
+                          className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white resize-none"
+                          rows={3}
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={async () => {
+                              const textarea = document.getElementById(`edit-note-${note.id}`);
+                              const { error } = await supabase
+                                .from('student_notes')
+                                .update({ note: textarea.value, updated_at: new Date().toISOString() })
+                                .eq('id', note.id);
+                              if (!error) {
+                                setEditingNote(null);
+                                fetchNotes(student.id);
+                              }
+                            }}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded-lg text-sm"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingNote(null)}
+                            className="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1 rounded-lg text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-white text-sm whitespace-pre-wrap">{note.note}</p>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-slate-500 text-xs">
+                            {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            {note.updated_at !== note.created_at && ' (edited)'}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setEditingNote(note.id)}
+                              className="text-slate-400 hover:text-white text-xs"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm('Delete this note?')) {
+                                  await supabase.from('student_notes').delete().eq('id', note.id);
+                                  fetchNotes(student.id);
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-300 text-xs"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>          {/* Courses by Term */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
             {Object.entries(coursesByTerm).sort((a, b) => b[0].localeCompare(a[0])).map(([term, termCourses]) => (
@@ -2653,7 +2773,10 @@ function CounselorDashboard({ user, profile, onLogout }) {
             students.map(student => (
               <button 
                 key={student.id} 
-                onClick={() => setSelectedStudent(student)}
+                onClick={() => {
+  setSelectedStudent(student);
+  fetchNotes(student.id);
+}}
                 className="w-full bg-slate-900/80 rounded-2xl p-5 border border-slate-800 hover:bg-slate-800/80 hover:border-indigo-500/30 transition-all text-left"
               >
                 <div className="flex items-center gap-4">
