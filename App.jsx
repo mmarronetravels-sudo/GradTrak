@@ -2725,9 +2725,6 @@ function CounselorDashboard({ user, profile, onLogout }) {
             <AtRiskReport
               schoolId={profile.school_id}
               counselorId={profile.id}
-              onSelectStudent={(student) => {
-                setSelectedStudent(student);
-              }}
             />
           )}
 
