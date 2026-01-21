@@ -2365,6 +2365,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [activeTab, setActiveTab] = useState('progress');
   const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
   const displayName = getDisplayName(profile);
+  const [mainView, setMainView] = useState('students');
 
   useEffect(() => {
     fetchData();
@@ -2897,6 +2898,23 @@ function CounselorDashboard({ user, profile, onLogout }) {
         </div>
 
         <div className="space-y-3">
+          {/* Main View Tabs */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setMainView('students')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'students' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+              >
+                👥 Students
+              </button>
+              <button
+                onClick={() => setMainView('at-risk')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'at-risk' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+              >
+                ⚠️ At-Risk Report
+              </button>
+            </div>
+
+            {mainView === 'students' && (
           <h2 className="text-xl font-bold text-white">Students</h2>
           {students.length === 0 ? (
             <div className="text-center py-12 text-slate-400">No students have signed up yet.</div>
@@ -2938,7 +2956,17 @@ function CounselorDashboard({ user, profile, onLogout }) {
             ))
           )}
         </div>
-      </main>
+        )}
+
+            {mainView === 'at-risk' && (
+              <AtRiskReport
+                schoolId={profile.school_id}
+                counselorId={profile.id}
+                onSelectStudent={(student) => {
+                  setSelectedStudent(student);
+                }}
+              />
+            )}      </main>
 
       {/* Link Parent Modal */}
       {showLinkParentModal && (
