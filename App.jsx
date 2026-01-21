@@ -2523,8 +2523,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'notes' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
             >
               📝 Notes
-            
-          </div>
+            </button>
+          </div>        
         </header>
         <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
           {/* Alerts */}
