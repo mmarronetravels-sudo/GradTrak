@@ -2554,7 +2554,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
             <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {categories.map(cat => {
-                const earned = student.stats.creditsByCategory[cat.id] || 0;
+                const earned = student.stats?.creditsByCategory?.[cat.id] || 0;
                 const required = Number(cat.credits_required);
                 const isComplete = earned >= required;
                 return (
@@ -2750,12 +2750,12 @@ function CounselorDashboard({ user, profile, onLogout }) {
                 </div>
               </div>
             ))}
-            {student.courses.length === 0 && (
+            {(student.courses?.length || 0) === 0 && (
               <div className="text-center py-8 text-slate-400">
                 <p>No courses recorded yet.</p>
               </div>
             )}
-         {student.courses.length === 0 && (
+         {(student.courses?.length || 0) === 0 && (
               <div className="text-center py-8 text-slate-400">
                 <p>No courses recorded yet.</p>
               </div>
@@ -3193,7 +3193,7 @@ function ParentDashboard({ user, profile, onLogout }) {
             <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {categories.map(cat => {
-                const earned = student.stats.creditsByCategory[cat.id] || 0;
+                const earned = student.stats?.creditsByCategory?.[cat.id] || 0;
                 const required = Number(cat.credits_required);
                 return (
                   <div key={cat.id} className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/50">
