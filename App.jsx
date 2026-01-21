@@ -1117,6 +1117,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
+  const [selectedStudent, setSelectedStudent] = useState(null);  
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   useEffect(() => {
@@ -1347,7 +1348,14 @@ function AdminDashboard({ user, profile, onLogout }) {
          <button onClick={() => setActiveTab('at-risk')}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'at-risk' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
                 ⚠️ At-Risk
-              </button>        </div>
+              </button>
+              {selectedStudent && (
+                <button onClick={() => setActiveTab('student-detail')}
+                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'student-detail' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  👤 {selectedStudent.full_name}
+                </button>
+              )}
+            </div>
 
   {/* Admin Dashboard Tab */}
         {activeTab === 'dashboard' && (
@@ -1513,7 +1521,62 @@ function AdminDashboard({ user, profile, onLogout }) {
   }}
 />
           )}
-        
+  {activeTab === 'student-detail' && selectedStudent && (
+            <div className="space-y-6">
+              {/* Back Button */}
+              <button
+                onClick={() => {
+                  setSelectedStudent(null);
+                  setActiveTab('at-risk');
+                }}
+                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+              >
+                ← Back to At-Risk Report
+              </button>
+
+              {/* Student Header */}
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+                <h2 className="text-2xl font-bold text-white mb-2">{selectedStudent.full_name}</h2>
+                <div className="flex gap-4 text-slate-400">
+                  <span>Grade {selectedStudent.grade}</span>
+                  <span>{selectedStudent.email}</span>
+                  {selectedStudent.engage_id && <span>ID: {selectedStudent.engage_id}</span>}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
+                  {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
+                  {selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
+                </div>
+              </div>
+
+              {/* Progress Summary */}
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+                <h3 className="text-lg font-semibold text-white mb-4">Graduation Progress</h3>
+                <div className="flex items-center gap-4">
+                  <div className="text-4xl font-bold text-white">{selectedStudent.stats?.percentage || 0}%</div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${
+                          selectedStudent.risk?.level === 'critical' ? 'bg-red-500' :
+                          selectedStudent.risk?.level === 'at-risk' ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(selectedStudent.stats?.percentage || 0, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-slate-400 mt-2">
+                  {selectedStudent.stats?.totalEarned || 0} of {selectedStudent.stats?.totalRequired || 24} credits earned
+                </p>
+                {selectedStudent.risk?.creditsBehind > 0 && (
+                  <p className="text-red-400 mt-1">
+                    {selectedStudent.risk.creditsBehind.toFixed(1)} credits behind expected pace
+                  </p>
+                )}
+              </div>
+            </div>
+          )}        
         {/* Privacy/FERPA Tab */}
         {activeTab === 'privacy' && (
           <div className="space-y-6">
