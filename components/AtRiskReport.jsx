@@ -575,8 +575,6 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
               >
                 Last Note {sortField === 'lastNote' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                Action
               </th>
             </tr>
           </thead>
@@ -667,17 +665,7 @@ export default function AtRiskReport({ schoolId, counselorId = null }) {
                       {formatDate(student.lastNote)}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <button 
-                      className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 hover:border-blue-400 hover:text-blue-600 transition-colors"
-                      onClick={() => {
-                        // Navigate to student detail - you can customize this
-                        window.location.hash = `student/${student.id}`;
-                      }}
-                    >
-                      View
-                    </button>
-                  </td>
+                  
                 </tr>
               ))
             )}
