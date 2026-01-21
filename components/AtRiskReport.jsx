@@ -2,12 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Download, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '../supabase';
 
-// ============================================
-// AT-RISK STUDENT REPORT COMPONENT
-// ============================================
-
 export default function AtRiskReport({ schoolId, counselorId = null, onSelectStudent }) {
-  // State
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -15,34 +10,25 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Filters
   const [riskFilter, setRiskFilter] = useState('all');
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [flagFilter, setFlagFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Sorting
   const [sortField, setSortField] = useState('riskLevel');
   const [sortDirection, setSortDirection] = useState('desc');
 
-  // ============================================
-  // DATA FETCHING
-  // ============================================
-  
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
         
-        // Fetch students (with optional counselor filter)
         let studentsQuery = supabase
           .from('profiles')
           .select('*')
           .eq('school_id', schoolId)
           .eq('role', 'student');
         
-        // If counselorId provided, filter by counselor's caseload
         if (counselorId) {
           const { data: assignments } = await supabase
             .from('counselor_assignments')
@@ -58,7 +44,6 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
         const { data: studentsData, error: studentsError } = await studentsQuery;
         if (studentsError) throw studentsError;
         
-        // Fetch courses for these students
         const studentIds = studentsData.map(s => s.id);
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
@@ -66,14 +51,12 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
           .in('student_id', studentIds);
         if (coursesError) throw coursesError;
         
-        // Fetch credit categories
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('credit_categories')
           .select('*')
           .eq('school_id', schoolId);
         if (categoriesError) throw categoriesError;
         
-        // Fetch most recent note for each student
         const { data: notesData, error: notesError } = await supabase
           .from('student_notes')
           .select('student_id, created_at')
@@ -99,19 +82,13 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     }
   }, [schoolId, counselorId]);
 
-  // ============================================
-  // CALCULATION FUNCTIONS
-  // ============================================
-  
-  // Get current trimester (Summit Learning Charter schedule)
   const getCurrentTrimester = () => {
-    const month = new Date().getMonth() + 1; // 1-12
-    if (month >= 8 && month <= 11) return 1; // Fall: Aug-Nov
-    if (month === 12 || month <= 2) return 2; // Winter: Dec-Feb
-    return 3; // Spring: Mar-Jun (July is summer)
+    const month = new Date().getMonth() + 1;
+    if (month >= 8 && month <= 11) return 1;
+    if (month === 12 || month <= 2) return 2;
+    return 3;
   };
   
-  // Expected progress by grade and trimester (percentage of 24 credits)
   const getExpectedProgress = (grade, trimester) => {
     const expectations = {
       9:  { 1: 0,  2: 8,  3: 17 },
@@ -122,20 +99,12 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     return expectations[grade]?.[trimester] || 0;
   };
   
-  // Calculate student stats
   const calculateStudentStats = (studentId) => {
     const studentCourses = courses.filter(c => c.student_id === studentId);
-    
-    // Total credits earned
     const totalEarned = studentCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
-    
-    // Total required (24 credits)
     const totalRequired = 24;
-    
-    // Percentage complete
     const percentage = Math.round((totalEarned / totalRequired) * 100);
     
-    // Credits by category
     const creditsByCategory = {};
     categories.forEach(cat => {
       creditsByCategory[cat.id] = studentCourses
@@ -143,7 +112,6 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
         .reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
     });
     
-    // Find deficiencies (categories where student is behind)
     const deficiencies = categories
       .map(cat => {
         const earned = creditsByCategory[cat.id] || 0;
@@ -155,22 +123,12 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
       })
       .filter(Boolean);
     
-    return {
-      totalEarned,
-      totalRequired,
-      percentage,
-      creditsByCategory,
-      deficiencies
-    };
+    return { totalEarned, totalRequired, percentage, creditsByCategory, deficiencies };
   };
   
-  // Determine risk level based on credits behind
   const getRiskLevel = (student, stats) => {
     const trimester = getCurrentTrimester();
     const expectedPercent = getExpectedProgress(student.grade, trimester);
-    const actualPercent = stats.percentage;
-    
-    // Convert percentage gap to credits
     const expectedCredits = (expectedPercent / 100) * 24;
     const actualCredits = stats.totalEarned;
     const creditsBehind = expectedCredits - actualCredits;
@@ -181,43 +139,23 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     return { level: 'on-track', creditsBehind: 0, label: 'On Track' };
   };
   
-  // Get most recent note date for a student
   const getLastNoteDate = (studentId) => {
     const note = studentNotes.find(n => n.student_id === studentId);
     return note ? new Date(note.created_at) : null;
   };
 
-  // ============================================
-  // PROCESS STUDENTS DATA
-  // ============================================
-  
   const processedStudents = useMemo(() => {
     return students.map(student => {
       const stats = calculateStudentStats(student.id);
       const risk = getRiskLevel(student, stats);
       const lastNote = getLastNoteDate(student.id);
-      
-      return {
-        ...student,
-        stats,
-        risk,
-        lastNote,
-        categoriesShort: stats.deficiencies.map(d => d.category.name)
-      };
+      return { ...student, stats, risk, lastNote };
     });
   }, [students, courses, categories, studentNotes]);
 
-  // ============================================
-  // FILTERING & SORTING
-  // ============================================
-  
   const filteredStudents = useMemo(() => {
-    let result = processedStudents;
+    let result = processedStudents.filter(s => s.risk.level !== 'on-track');
     
-    // Only show students who are behind (not on-track)
-    result = result.filter(s => s.risk.level !== 'on-track');
-    
-    // Risk filter
     if (riskFilter !== 'all') {
       if (riskFilter === 'critical-at-risk') {
         result = result.filter(s => s.risk.level === 'critical' || s.risk.level === 'at-risk');
@@ -226,26 +164,16 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
       }
     }
     
-    // Grade filter
     if (gradeFilter !== 'all') {
       result = result.filter(s => s.grade === parseInt(gradeFilter));
     }
     
-    // Category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter(s => 
-        s.categoriesShort.some(cat => cat.toLowerCase().includes(categoryFilter.toLowerCase()))
-      );
-    }
-    
-    // Flag filter
     if (flagFilter !== 'all') {
       if (flagFilter === 'iep') result = result.filter(s => s.is_iep);
       if (flagFilter === '504') result = result.filter(s => s.is_504);
       if (flagFilter === 'ell') result = result.filter(s => s.is_ell);
     }
     
-    // Search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(s => 
@@ -255,54 +183,25 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
       );
     }
     
-    // Sorting
     result.sort((a, b) => {
       let aVal, bVal;
-      
       switch (sortField) {
-        case 'name':
-          aVal = a.full_name || '';
-          bVal = b.full_name || '';
-          break;
-        case 'grade':
-          aVal = a.grade || 0;
-          bVal = b.grade || 0;
-          break;
+        case 'name': aVal = a.full_name || ''; bVal = b.full_name || ''; break;
+        case 'grade': aVal = a.grade || 0; bVal = b.grade || 0; break;
         case 'riskLevel':
           const riskOrder = { critical: 3, 'at-risk': 2, watch: 1, 'on-track': 0 };
-          aVal = riskOrder[a.risk.level];
-          bVal = riskOrder[b.risk.level];
-          break;
-        case 'progress':
-          aVal = a.stats.percentage;
-          bVal = b.stats.percentage;
-          break;
-        case 'creditsBehind':
-          aVal = a.risk.creditsBehind;
-          bVal = b.risk.creditsBehind;
-          break;
-        case 'lastNote':
-          aVal = a.lastNote ? a.lastNote.getTime() : 0;
-          bVal = b.lastNote ? b.lastNote.getTime() : 0;
-          break;
-        default:
-          aVal = 0;
-          bVal = 0;
+          aVal = riskOrder[a.risk.level]; bVal = riskOrder[b.risk.level]; break;
+        case 'progress': aVal = a.stats.percentage; bVal = b.stats.percentage; break;
+        case 'creditsBehind': aVal = a.risk.creditsBehind; bVal = b.risk.creditsBehind; break;
+        case 'lastNote': aVal = a.lastNote ? a.lastNote.getTime() : 0; bVal = b.lastNote ? b.lastNote.getTime() : 0; break;
+        default: aVal = 0; bVal = 0;
       }
-      
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      }
-      return aVal < bVal ? 1 : -1;
+      return sortDirection === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
     });
     
     return result;
-  }, [processedStudents, riskFilter, gradeFilter, categoryFilter, flagFilter, searchTerm, sortField, sortDirection]);
+  }, [processedStudents, riskFilter, gradeFilter, flagFilter, searchTerm, sortField, sortDirection]);
 
-  // ============================================
-  // SUMMARY STATS
-  // ============================================
-  
   const summaryStats = useMemo(() => {
     const atRiskStudents = processedStudents.filter(s => s.risk.level !== 'on-track');
     return {
@@ -313,26 +212,14 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     };
   }, [processedStudents]);
 
-  // ============================================
-  // EXPORT FUNCTIONS
-  // ============================================
-  
   const exportToCSV = () => {
-    const headers = ['Name', 'Grade', 'Email', 'Risk Level', 'Progress %', 'Credits Behind', 'Categories Short', 'IEP', '504', 'ELL', 'Last Note'];
+    const headers = ['Name', 'Grade', 'Email', 'Risk Level', 'Progress %', 'Credits Behind', 'IEP', '504', 'ELL', 'Last Note'];
     const rows = filteredStudents.map(s => [
-      s.full_name,
-      s.grade,
-      s.email,
-      s.risk.label,
-      s.stats.percentage + '%',
-      s.risk.creditsBehind.toFixed(1),
-      s.categoriesShort.join('; '),
-      s.is_iep ? 'Yes' : 'No',
-      s.is_504 ? 'Yes' : 'No',
-      s.is_ell ? 'Yes' : 'No',
+      s.full_name, s.grade, s.email, s.risk.label,
+      s.stats.percentage + '%', s.risk.creditsBehind.toFixed(1),
+      s.is_iep ? 'Yes' : 'No', s.is_504 ? 'Yes' : 'No', s.is_ell ? 'Yes' : 'No',
       s.lastNote ? s.lastNote.toLocaleDateString() : 'Never'
     ]);
-    
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -342,10 +229,6 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     a.click();
   };
 
-  // ============================================
-  // HELPER FUNCTIONS
-  // ============================================
-  
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -357,13 +240,10 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
   
   const formatDate = (date) => {
     if (!date) return 'Never';
-    const now = new Date();
-    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-    
+    const diffDays = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays}d ago`;
-    
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
   
@@ -388,21 +268,17 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     }
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
-  
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
         Error loading data: {error}
       </div>
     );
@@ -428,26 +304,22 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-          <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">My Caseload</div>
+          <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Caseload</div>
           <div className="text-3xl font-bold text-white">{summaryStats.total}</div>
-          <div className="text-xs text-slate-500">students assigned</div>
         </div>
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 border-l-4 border-l-red-500">
           <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Critical</div>
           <div className="text-3xl font-bold text-red-500">{summaryStats.critical}</div>
-          <div className="text-xs text-slate-500">3+ credits behind</div>
         </div>
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 border-l-4 border-l-amber-500">
           <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">At-Risk</div>
           <div className="text-3xl font-bold text-amber-500">{summaryStats.atRisk}</div>
-          <div className="text-xs text-slate-500">1.5–2.9 credits behind</div>
         </div>
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 border-l-4 border-l-blue-500">
           <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">Watch</div>
           <div className="text-3xl font-bold text-blue-500">{summaryStats.watch}</div>
-          <div className="text-xs text-slate-500">0.5–1.4 credits behind</div>
         </div>
       </div>
 
@@ -455,58 +327,35 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
       <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
           <label className="text-xs uppercase tracking-wide text-slate-400">Risk Level</label>
-          <select
-            value={riskFilter}
-            onChange={(e) => setRiskFilter(e.target.value)}
-            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
-          >
+          <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)}
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white">
             <option value="all">All Levels</option>
-            <option value="critical">Critical Only</option>
+            <option value="critical">Critical</option>
             <option value="critical-at-risk">Critical + At-Risk</option>
-            <option value="at-risk">At-Risk Only</option>
-            <option value="watch">Watch Only</option>
+            <option value="at-risk">At-Risk</option>
+            <option value="watch">Watch</option>
           </select>
         </div>
         
         <div className="flex flex-col gap-1">
           <label className="text-xs uppercase tracking-wide text-slate-400">Grade</label>
-          <select
-            value={gradeFilter}
-            onChange={(e) => setGradeFilter(e.target.value)}
-            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
-          >
-            <option value="all">All Grades</option>
-            <option value="9">9th Grade</option>
-            <option value="10">10th Grade</option>
-            <option value="11">11th Grade</option>
-            <option value="12">12th Grade</option>
-          </select>
-        </div>
-        
-        <div className="flex flex-col gap-1">
-          <label className="text-xs uppercase tracking-wide text-slate-400">Category Behind</label>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
-          >
-            <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.name}>{cat.name}</option>
-            ))}
+          <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white">
+            <option value="all">All</option>
+            <option value="9">9th</option>
+            <option value="10">10th</option>
+            <option value="11">11th</option>
+            <option value="12">12th</option>
           </select>
         </div>
         
         <div className="flex flex-col gap-1">
           <label className="text-xs uppercase tracking-wide text-slate-400">Flags</label>
-          <select
-            value={flagFilter}
-            onChange={(e) => setFlagFilter(e.target.value)}
-            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white"
-          >
-            <option value="all">All Students</option>
+          <select value={flagFilter} onChange={(e) => setFlagFilter(e.target.value)}
+            className="px-3 py-1.5 border border-slate-600 rounded-md text-sm bg-slate-700 text-white">
+            <option value="all">All</option>
             <option value="iep">IEP</option>
-            <option value="504">504 Plan</option>
+            <option value="504">504</option>
             <option value="ell">ELL</option>
           </select>
         </div>
@@ -515,20 +364,15 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
           <label className="text-xs uppercase tracking-wide text-slate-400">Search</label>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name or ID..."
-              value={searchTerm}
+            <input type="text" placeholder="Name or ID..." value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 border border-slate-600 rounded-md text-sm w-48 bg-slate-700 text-white placeholder-slate-400"
-            />
+              className="pl-9 pr-3 py-1.5 border border-slate-600 rounded-md text-sm w-40 bg-slate-700 text-white placeholder-slate-400" />
           </div>
         </div>
         
         <div className="flex-1"></div>
-        
         <div className="text-sm text-slate-400">
-          Showing <strong className="text-white">{filteredStudents.length}</strong> of {summaryStats.critical + summaryStats.atRisk + summaryStats.watch} students
+          <strong className="text-white">{filteredStudents.length}</strong> students
         </div>
       </div>
 
@@ -537,138 +381,85 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-800 border-b border-slate-700">
-              <th 
-                className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
-                onClick={() => handleSort('name')}
-              >
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-700"
+                onClick={() => handleSort('name')}>
                 Student {sortField === 'name' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th 
-                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
-                onClick={() => handleSort('grade')}
-              >
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-700"
+                onClick={() => handleSort('grade')}>
                 Gr {sortField === 'grade' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide">
-                Flags
-              </th>
-              <th 
-                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
-                onClick={() => handleSort('riskLevel')}
-              >
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase">Flags</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-700"
+                onClick={() => handleSort('riskLevel')}>
                 Risk {sortField === 'riskLevel' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th 
-                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
-                onClick={() => handleSort('progress')}
-              >
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-700"
+                onClick={() => handleSort('progress')}>
                 Progress {sortField === 'progress' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th 
-                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
-                onClick={() => handleSort('creditsBehind')}
-              >
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-700"
+                onClick={() => handleSort('creditsBehind')}>
                 Behind {sortField === 'creditsBehind' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide">
-                Short
-              </th>
-              <th 
-                className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wide cursor-pointer hover:bg-slate-700"
-                onClick={() => handleSort('lastNote')}
-              >
-                Note {sortField === 'lastNote' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
+              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-700"
+                onClick={() => handleSort('lastNote')}>
+                Last Note {sortField === 'lastNote' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
             </tr>
           </thead>
           <tbody>
             {filteredStudents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                  No at-risk students found matching your filters.
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  No at-risk students found.
                 </td>
               </tr>
             ) : (
               filteredStudents.map((student) => (
                 <tr key={student.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleStudentClick(student)}
-                      className="text-left hover:text-indigo-400 transition-colors"
-                    >
+                    <button onClick={() => handleStudentClick(student)} className="text-left hover:text-indigo-400">
                       <div className="font-medium text-white">{student.full_name}</div>
-                      <div className="text-xs text-slate-500 font-mono">{student.engage_id || student.id.slice(0, 8)}</div>
+                      <div className="text-xs text-slate-500">{student.engage_id || student.id.slice(0, 8)}</div>
                     </button>
                   </td>
                   <td className="px-3 py-3 text-slate-300">{student.grade}</td>
                   <td className="px-3 py-3">
-                    <div className="flex gap-1 flex-wrap">
-                      {student.is_iep && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-pink-500/20 text-pink-400">IEP</span>
-                      )}
-                      {student.is_504 && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-500/20 text-purple-400">504</span>
-                      )}
-                      {student.is_ell && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-500/20 text-blue-400">ELL</span>
-                      )}
-                      {!student.is_iep && !student.is_504 && !student.is_ell && (
-                        <span className="text-slate-600">—</span>
-                      )}
+                    <div className="flex gap-1">
+                      {student.is_iep && <span className="px-1.5 py-0.5 text-xs rounded bg-pink-500/20 text-pink-400">IEP</span>}
+                      {student.is_504 && <span className="px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-400">504</span>}
+                      {student.is_ell && <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">ELL</span>}
+                      {!student.is_iep && !student.is_504 && !student.is_ell && <span className="text-slate-600">—</span>}
                     </div>
                   </td>
                   <td className="px-3 py-3">
                     <span className={`px-2 py-1 text-xs font-semibold uppercase rounded ${
                       student.risk.level === 'critical' ? 'bg-red-500/20 text-red-400' :
                       student.risk.level === 'at-risk' ? 'bg-amber-500/20 text-amber-400' :
-                      student.risk.level === 'watch' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-green-500/20 text-green-400'
+                      'bg-blue-500/20 text-blue-400'
                     }`}>
                       {student.risk.label}
                     </span>
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden w-16">
-                        <div 
-                          className={`h-full rounded-full ${
-                            student.risk.level === 'critical' ? 'bg-red-500' :
-                            student.risk.level === 'at-risk' ? 'bg-amber-500' :
-                            student.risk.level === 'watch' ? 'bg-blue-500' :
-                            'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(student.stats.percentage, 100)}%` }}
-                        />
+                      <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${
+                          student.risk.level === 'critical' ? 'bg-red-500' :
+                          student.risk.level === 'at-risk' ? 'bg-amber-500' : 'bg-blue-500'
+                        }`} style={{ width: `${Math.min(student.stats.percentage, 100)}%` }} />
                       </div>
-                      <span className="text-xs font-medium text-slate-400 w-8 text-right font-mono">
-                        {student.stats.percentage}%
-                      </span>
+                      <span className="text-xs text-slate-400 w-8">{student.stats.percentage}%</span>
                     </div>
                   </td>
                   <td className="px-3 py-3">
-                    <span className="font-mono font-medium text-red-400">
-                      -{student.risk.creditsBehind.toFixed(1)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex gap-1 flex-wrap">
-                      {student.categoriesShort.slice(0, 2).map((cat, i) => (
-                        <span key={i} className="px-1.5 py-0.5 text-xs font-medium rounded bg-red-500/20 text-red-400">
-                          {cat.length > 8 ? cat.slice(0, 8) + '..' : cat}
-                        </span>
-                      ))}
-                      {student.categoriesShort.length > 2 && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-slate-600 text-slate-300">
-                          +{student.categoriesShort.length - 2}
-                        </span>
-                      )}
-                    </div>
+                    <span className="font-mono text-red-400">-{student.risk.creditsBehind.toFixed(1)}</span>
                   </td>
                   <td className="px-3 py-3">
                     <span className={`text-xs ${
-                      getDateStaleness(student.lastNote) === 'very-stale' ? 'text-red-400 font-medium' :
-                      getDateStaleness(student.lastNote) === 'stale' ? 'text-amber-400' :
-                      'text-slate-400'
+                      getDateStaleness(student.lastNote) === 'very-stale' ? 'text-red-400' :
+                      getDateStaleness(student.lastNote) === 'stale' ? 'text-amber-400' : 'text-slate-400'
                     }`}>
                       {formatDate(student.lastNote)}
                     </span>
@@ -678,13 +469,6 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
             )}
           </tbody>
         </table>
-        
-        {/* Table Footer */}
-        <div className="px-4 py-3 bg-slate-800 border-t border-slate-700 flex items-center justify-between">
-          <div className="text-sm text-slate-400">
-            Showing {filteredStudents.length} students
-          </div>
-        </div>
       </div>
     </div>
   );
