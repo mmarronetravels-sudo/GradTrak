@@ -2913,6 +2913,7 @@ if (studentData) {
         <div className="space-y-3">
           {/* Main View Tabs */}
             <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-4">
               <button
                 onClick={() => setMainView('students')}
                 className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'students' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
@@ -2921,7 +2922,8 @@ if (studentData) {
               </button>
               <button
                 onClick={() => setMainView('at-risk')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'students' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'at-risk' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+              >
                 ⚠️ At-Risk Report
               </button>
             </div>
