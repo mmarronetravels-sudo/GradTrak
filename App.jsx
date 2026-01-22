@@ -1534,13 +1534,28 @@ function AdminDashboard({ user, profile, onLogout }) {
               </button>
 
               {/* Student Header */}
-              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-                <h2 className="text-2xl font-bold text-white mb-2">{selectedStudent.full_name}</h2>
-                <div className="flex gap-4 text-slate-400">
-                  <span>Grade {selectedStudent.grade}</span>
-                  <span>{selectedStudent.email}</span>
-                  {selectedStudent.engage_id && <span>ID: {selectedStudent.engage_id}</span>}
-                </div>
+<div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+  <h2 className="text-2xl font-bold text-white mb-2">{selectedStudent.full_name}</h2>
+  <div className="flex flex-wrap gap-4 text-slate-400">
+    <span>Grade {selectedStudent.grade}</span>
+    <span>{selectedStudent.email}</span>
+    {selectedStudent.engage_id && <span>ID: {selectedStudent.engage_id}</span>}
+    {selectedStudent.graduation_year && <span>Class of {selectedStudent.graduation_year}</span>}
+  </div>
+  {/* Diploma Type */}
+  {selectedStudent.diploma_types && (
+    <div className="mt-3">
+      <span className="px-3 py-1 text-sm rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+        🎓 {selectedStudent.diploma_types.name}
+      </span>
+    </div>
+  )}
+  <div className="flex gap-2 mt-3">
+    {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
+    {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
+    {selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
+  </div>
+</div>
                 <div className="flex gap-2 mt-3">
                   {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
                   {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
