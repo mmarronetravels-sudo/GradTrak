@@ -2410,7 +2410,6 @@ function CounselorDashboard({ user, profile, onLogout }) {
   .eq('school_id', profile.school_id)
   .eq('role', 'student');
 
-console.log('Student data with diploma_types:', studentData);
 
 if (studentData) {
   const studentIds = studentData.map(s => s.id);
