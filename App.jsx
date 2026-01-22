@@ -2492,10 +2492,15 @@ function CounselorDashboard({ user, profile, onLogout }) {
                   </svg>
                 </button>
                 <div>
-                  <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
-                  <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
-                  <button 
-                    onClick={async () => {
+  <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
+  <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+  {student.diploma_types && (
+    <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+      🎓 {student.diploma_types.name}
+    </span>
+  )}
+  <button 
+    onClick={async () => {
                       const newValue = !student.is_adult_student;
                       await supabase.from('profiles').update({ is_adult_student: newValue }).eq('id', student.id);
                       setSelectedStudent({ ...student, is_adult_student: newValue });
