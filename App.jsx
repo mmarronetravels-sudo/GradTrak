@@ -2398,10 +2398,17 @@ function CounselorDashboard({ user, profile, onLogout }) {
       .order('display_order');
 
     const { data: studentData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('school_id', profile.school_id)
-      .eq('role', 'student');
+  .from('profiles')
+  .select(`
+    *,
+    diploma_types (
+      id,
+      code,
+      name
+    )
+  `)
+  .eq('school_id', profile.school_id)
+  .eq('role', 'student');
 
     if (studentData) {
       const studentIds = studentData.map(s => s.id);
