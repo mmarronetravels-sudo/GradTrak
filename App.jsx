@@ -3086,9 +3086,8 @@ if (studentData) {
         </div>
       )}
     </div>
-      }
+  );
 }
-
 // ============================================
 // PARENT DASHBOARD
 function ParentDashboard({ user, profile, onLogout }) {
