@@ -2397,20 +2397,34 @@ function CounselorDashboard({ user, profile, onLogout }) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
+    // Get assigned students for this counselor
+    const { data: assignmentData } = await supabase
+      .from('counselor_assignments')
+      .select('student_id')
+      .eq('counselor_id', profile.id);
+
+    const assignedStudentIds = assignmentData?.map(a => a.student_id) || [];
+
+    // If no assignments, show empty list
+    if (assignedStudentIds.length === 0) {
+      setStudents([]);
+      if (catData) setCategories(catData);
+      if (pathData) setPathways(pathData);
+      setLoading(false);
+      return;
+    }
+
     const { data: studentData } = await supabase
-  .from('counselor_assignments')
-  .select(`
-    student_id,
-    profiles!counselor_assignments_student_id_fkey (
-      *,
-      diploma_types (
-        id,
-        code,
-        name
-      )
-    )
-  `)
-  .eq('counselor_id', profile.id);
+      .from('profiles')
+      .select(`
+        *,
+        diploma_types (
+          id,
+          code,
+          name
+        )
+      `)
+      .in('id', assignedStudentIds);
 
 // Then flatten the data
 const flatStudentData = studentData?.map(row => row.profiles) || [];
