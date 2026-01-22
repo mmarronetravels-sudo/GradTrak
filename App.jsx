@@ -2398,17 +2398,22 @@ function CounselorDashboard({ user, profile, onLogout }) {
       .order('display_order');
 
     const { data: studentData } = await supabase
-  .from('profiles')
+  .from('counselor_assignments')
   .select(`
-    *,
-    diploma_types (
-      id,
-      code,
-      name
+    student_id,
+    profiles!counselor_assignments_student_id_fkey (
+      *,
+      diploma_types (
+        id,
+        code,
+        name
+      )
     )
   `)
-  .eq('school_id', profile.school_id)
-  .eq('role', 'student');
+  .eq('counselor_id', profile.id);
+
+// Then flatten the data
+const flatStudentData = studentData?.map(row => row.profiles) || [];
 
 
 if (studentData) {
