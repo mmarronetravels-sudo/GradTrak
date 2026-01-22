@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
-import { supabase } from '../supabase';
+import { supabase, getDiplomaTypes } from '../supabase';
 
 export default function DataSyncUpload({ schoolId }) {
   const [uploadState, setUploadState] = useState({
@@ -9,6 +9,44 @@ export default function DataSyncUpload({ schoolId }) {
     status: 'idle',
     result: null,
   });
+  
+  // NEW: State for diploma types
+  const [diplomaTypes, setDiplomaTypes] = useState([]);
+  const [diplomaTypesLoaded, setDiplomaTypesLoaded] = useState(false);
+
+  // NEW: Fetch diploma types when component loads
+  useEffect(() => {
+    async function loadDiplomaTypes() {
+      if (schoolId) {
+        const types = await getDiplomaTypes(schoolId);
+        setDiplomaTypes(types);
+        setDiplomaTypesLoaded(true);
+        console.log('Loaded diploma types:', types);
+      }
+    }
+    loadDiplomaTypes();
+  }, [schoolId]);
+
+  // NEW: Function to determine the right diploma type for a student
+  const getDefaultDiplomaType = (graduationYear) => {
+    if (!diplomaTypes.length) return null;
+    
+    // Determine if student uses 2026 or 2027+ requirements
+    const requirementYear = graduationYear <= 2026 ? '2026' : '2027';
+    
+    // Find the Standard diploma for their requirement year
+    const standardDiploma = diplomaTypes.find(d => 
+      d.code?.includes('STANDARD') && d.code?.includes(requirementYear)
+    );
+    
+    // Fallback: find any diploma that matches the year
+    const anyMatchingDiploma = diplomaTypes.find(d => 
+      d.code?.includes(requirementYear)
+    );
+    
+    // Fallback: just use the first diploma
+    return standardDiploma || anyMatchingDiploma || diplomaTypes[0] || null;
+  };
 
   const onDrop = useCallback((acceptedFiles) => {
     const file = acceptedFiles[0];
@@ -59,6 +97,7 @@ export default function DataSyncUpload({ schoolId }) {
     return { students, courses };
   };
 
+  // UPDATED: syncStudents now assigns diploma types
   const syncStudents = async (students) => {
     const errors = [];
     let count = 0;
@@ -70,6 +109,10 @@ export default function DataSyncUpload({ schoolId }) {
       const graduationYear = parseInt(s.graduation_year, 10);
 
       if (!email || !fullName) continue;
+
+      // NEW: Determine the diploma type for this student
+      const diplomaType = getDefaultDiplomaType(graduationYear);
+      const diplomaTypeId = diplomaType?.id || null;
 
       // Check if student exists
       const { data: existing } = await supabase
@@ -83,7 +126,12 @@ export default function DataSyncUpload({ schoolId }) {
         // Update existing
         const { error } = await supabase
           .from('profiles')
-          .update({ full_name: fullName, grade, graduation_year: graduationYear })
+          .update({ 
+            full_name: fullName, 
+            grade, 
+            graduation_year: graduationYear,
+            diploma_type_id: diplomaTypeId  // NEW: Update diploma type
+          })
           .eq('id', existing.id);
         
         if (error) errors.push(`Update ${email}: ${error.message}`);
@@ -98,7 +146,8 @@ export default function DataSyncUpload({ schoolId }) {
             full_name: fullName,
             grade,
             graduation_year: graduationYear,
-            role: 'student'
+            role: 'student',
+            diploma_type_id: diplomaTypeId  // NEW: Set diploma type
           });
         
         if (error) errors.push(`Insert ${email}: ${error.message}`);
@@ -209,6 +258,16 @@ export default function DataSyncUpload({ schoolId }) {
 
   const handleUpload = async () => {
     if (!uploadState.file) return;
+    
+    // NEW: Wait for diploma types to load
+    if (!diplomaTypesLoaded) {
+      setUploadState(prev => ({
+        ...prev,
+        status: 'error',
+        result: { errors: ['Diploma types not loaded yet. Please wait and try again.'] },
+      }));
+      return;
+    }
 
     setUploadState(prev => ({ ...prev, status: 'uploading' }));
 
@@ -253,74 +312,73 @@ export default function DataSyncUpload({ schoolId }) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-2">Import Student Data</h2>
-        <p className="text-slate-400">
-          Upload a CSV or Excel file exported from Engage to sync student and course data.
-        </p>
-      </div>
-
-      {/* Dropzone */}
-      <div
-        {...getRootProps()}
-        className={`
-          border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200
-          ${isDragActive ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-600 hover:border-slate-500 bg-slate-800/50'}
-          ${uploadState.file ? 'border-indigo-500' : ''}
-        `}
-      >
-        <input {...getInputProps()} />
-        
-        {uploadState.file ? (
-          <div className="flex flex-col items-center">
-            <div className="text-4xl mb-3">📊</div>
-            <p className="text-white font-medium">{uploadState.file.name}</p>
-            <p className="text-slate-400 text-sm mt-1">
-              {(uploadState.file.size / 1024).toFixed(1)} KB
-            </p>
-            <button
-              onClick={(e) => { e.stopPropagation(); resetUpload(); }}
-              className="mt-3 text-sm text-slate-400 hover:text-white underline"
-            >
-              Choose different file
-            </button>
-          </div>
+    <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+      <h3 className="text-lg font-semibold text-white mb-4">📤 Data Sync Upload</h3>
+      
+      {/* NEW: Show diploma types status */}
+      <div className="mb-4 text-sm">
+        {diplomaTypesLoaded ? (
+          <span className="text-emerald-400">✓ {diplomaTypes.length} diploma types loaded</span>
         ) : (
-          <div className="flex flex-col items-center">
-            <div className="text-4xl mb-3">📁</div>
-            <p className="text-white font-medium">
-              {isDragActive ? 'Drop your file here' : 'Drag & drop your file here'}
-            </p>
-            <p className="text-slate-400 text-sm mt-1">or click to browse</p>
-            <p className="text-slate-500 text-xs mt-3">Supports CSV and Excel files up to 10MB</p>
-          </div>
+          <span className="text-amber-400">⏳ Loading diploma types...</span>
         )}
       </div>
-
-      {/* Format Info */}
-      <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-        <h4 className="text-sm font-medium text-slate-300 mb-2">📋 Expected File Format</h4>
-        <div className="text-xs text-slate-400 space-y-1">
-          <p><strong className="text-slate-300">Students:</strong> email, full_name, grade, graduation_year</p>
-          <p><strong className="text-slate-300">Courses:</strong> student_email, course_name, credits, category, term, grade, is_dual_credit, dual_credit_type</p>
-        </div>
-      </div>
-
-      {/* Upload Button */}
-      {uploadState.file && uploadState.status === 'idle' && (
-        <button
-          onClick={handleUpload}
-          className="mt-6 w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold rounded-xl transition-all duration-200"
+      
+      {/* Dropzone */}
+      {uploadState.status === 'idle' && (
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+            isDragActive
+              ? 'border-indigo-500 bg-indigo-500/10'
+              : 'border-slate-600 hover:border-slate-500'
+          }`}
         >
-          Sync Data
-        </button>
+          <input {...getInputProps()} />
+          <div className="text-4xl mb-3">📁</div>
+          {isDragActive ? (
+            <p className="text-indigo-400">Drop your file here...</p>
+          ) : (
+            <>
+              <p className="text-slate-300">Drag & drop an Excel or CSV file here</p>
+              <p className="text-slate-500 text-sm mt-1">or click to browse</p>
+            </>
+          )}
+        </div>
       )}
 
-      {/* Loading */}
+      {/* File selected */}
+      {uploadState.file && uploadState.status === 'idle' && (
+        <div className="mt-4">
+          <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
+            <span className="text-2xl">📄</span>
+            <div className="flex-1">
+              <p className="text-white font-medium">{uploadState.file.name}</p>
+              <p className="text-slate-400 text-sm">
+                {(uploadState.file.size / 1024).toFixed(1)} KB
+              </p>
+            </div>
+            <button
+              onClick={resetUpload}
+              className="text-slate-400 hover:text-red-400 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <button
+            onClick={handleUpload}
+            disabled={!diplomaTypesLoaded}
+            className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+          >
+            {diplomaTypesLoaded ? '🚀 Start Sync' : '⏳ Loading...'}
+          </button>
+        </div>
+      )}
+
+      {/* Uploading */}
       {uploadState.status === 'uploading' && (
-        <div className="mt-6 p-4 bg-slate-800 rounded-xl flex items-center justify-center gap-3">
-          <div className="animate-spin h-5 w-5 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
+        <div className="mt-4 text-center py-8">
+          <div className="animate-spin text-4xl mb-3">⚙️</div>
           <span className="text-slate-300">Processing your file...</span>
         </div>
       )}
@@ -349,7 +407,10 @@ export default function DataSyncUpload({ schoolId }) {
                   </ul>
                 </div>
               )}
-              <button onClick={resetUpload} className="mt-3 text-sm text-emerald-400 hover:text-emerald-300 underline">
+              <button
+                onClick={resetUpload}
+                className="mt-3 text-sm text-emerald-400 hover:text-emerald-300 underline"
+              >
                 Upload another file
               </button>
             </div>
@@ -364,10 +425,15 @@ export default function DataSyncUpload({ schoolId }) {
             <span className="text-2xl">❌</span>
             <div>
               <h4 className="text-red-400 font-semibold">Sync Failed</h4>
-              {uploadState.result.errors?.map((err, i) => (
-                <p key={i} className="text-slate-300 text-sm mt-1">{err}</p>
-              ))}
-              <button onClick={resetUpload} className="mt-3 text-sm text-red-400 hover:text-red-300 underline">
+              <ul className="text-slate-400 text-sm mt-2">
+                {uploadState.result.errors?.map((err, i) => (
+                  <li key={i}>• {err}</li>
+                ))}
+              </ul>
+              <button
+                onClick={resetUpload}
+                className="mt-3 text-sm text-red-400 hover:text-red-300 underline"
+              >
                 Try again
               </button>
             </div>
