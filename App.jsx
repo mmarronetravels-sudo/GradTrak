@@ -1556,13 +1556,7 @@ function AdminDashboard({ user, profile, onLogout }) {
     {selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
   </div>
 </div>
-                <div className="flex gap-2 mt-3">
-                  {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
-                  {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
-                  {selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
-                </div>
-              </div>
-
+                
               {/* Progress Summary */}
               <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
                 <h3 className="text-lg font-semibold text-white mb-4">Graduation Progress</h3>
