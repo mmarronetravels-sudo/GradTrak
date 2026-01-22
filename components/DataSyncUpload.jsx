@@ -97,22 +97,44 @@ export default function DataSyncUpload({ schoolId }) {
     return { students, courses };
   };
 
-  // UPDATED: syncStudents now assigns diploma types
+  // UPDATED: syncStudents now assigns diploma types AND counselors
   const syncStudents = async (students) => {
     const errors = [];
     let count = 0;
+
+    // NEW: Get all counselors for this school to map emails to IDs
+    const { data: counselors } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('school_id', schoolId)
+      .eq('role', 'counselor');
+
+    const counselorMap = {};
+    counselors?.forEach(c => {
+      counselorMap[c.email.toLowerCase()] = c.id;
+    });
+
+    // NEW: Get current user for assigned_by field
+    const { data: { user } } = await supabase.auth.getUser();
 
     for (const s of students) {
       const email = s.email?.trim().toLowerCase();
       const fullName = s.full_name?.trim();
       const grade = parseInt(s.grade, 10);
       const graduationYear = parseInt(s.graduation_year, 10);
+      const counselorEmail = s.counselor_email?.trim().toLowerCase();  // NEW
 
       if (!email || !fullName) continue;
 
-      // NEW: Determine the diploma type for this student
+      // Determine the diploma type for this student
       const diplomaType = getDefaultDiplomaType(graduationYear);
       const diplomaTypeId = diplomaType?.id || null;
+
+      // NEW: Look up counselor ID
+      const counselorId = counselorEmail ? counselorMap[counselorEmail] : null;
+      if (counselorEmail && !counselorId) {
+        errors.push(`Counselor not found: ${counselorEmail} (for student ${email})`);
+      }
 
       // Check if student exists
       const { data: existing } = await supabase
@@ -122,6 +144,8 @@ export default function DataSyncUpload({ schoolId }) {
         .eq('email', email)
         .single();
 
+      let studentId = existing?.id;
+
       if (existing) {
         // Update existing
         const { error } = await supabase
@@ -130,7 +154,7 @@ export default function DataSyncUpload({ schoolId }) {
             full_name: fullName, 
             grade, 
             graduation_year: graduationYear,
-            diploma_type_id: diplomaTypeId  // NEW: Update diploma type
+            diploma_type_id: diplomaTypeId
           })
           .eq('id', existing.id);
         
@@ -138,7 +162,7 @@ export default function DataSyncUpload({ schoolId }) {
         else count++;
       } else {
         // Insert new student
-        const { error } = await supabase
+        const { data: newStudent, error } = await supabase
           .from('profiles')
           .insert({
             school_id: schoolId,
@@ -147,109 +171,45 @@ export default function DataSyncUpload({ schoolId }) {
             grade,
             graduation_year: graduationYear,
             role: 'student',
-            diploma_type_id: diplomaTypeId  // NEW: Set diploma type
-          });
-        
-        if (error) errors.push(`Insert ${email}: ${error.message}`);
-        else count++;
-      }
-    }
-
-    return { count, errors };
-  };
-
-  const syncCourses = async (courses) => {
-    const errors = [];
-    let count = 0;
-
-    // Get all categories for this school to map names to IDs
-    const { data: categories } = await supabase
-      .from('credit_categories')
-      .select('id, name')
-      .eq('school_id', schoolId);
-
-    const categoryMap = {};
-    categories?.forEach(c => {
-      categoryMap[c.name.toLowerCase()] = c.id;
-    });
-
-    // Get all student profiles to map emails to IDs
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, email')
-      .eq('school_id', schoolId);
-
-    const studentMap = {};
-    profiles?.forEach(p => {
-      studentMap[p.email.toLowerCase()] = p.id;
-    });
-
-    for (const c of courses) {
-      const studentEmail = c.student_email?.trim().toLowerCase();
-      const courseName = c.course_name?.trim();
-      const credits = parseFloat(c.credits);
-      const category = c.category?.trim().toLowerCase();
-      const term = c.term?.trim();
-      const grade = c.grade?.trim() || null;
-      const isDualCredit = ['yes', 'true', '1'].includes(c.is_dual_credit?.toLowerCase() || '');
-      const dualCreditType = c.dual_credit_type?.trim() || null;
-
-      if (!studentEmail || !courseName) continue;
-
-      const studentId = studentMap[studentEmail];
-      const categoryId = categoryMap[category];
-
-      if (!studentId) {
-        errors.push(`Student not found: ${studentEmail}`);
-        continue;
-      }
-
-      if (!categoryId) {
-        errors.push(`Category not found: ${c.category}`);
-        continue;
-      }
-
-      // Check if course already exists for this student/term
-      const { data: existing } = await supabase
-        .from('courses')
-        .select('id')
-        .eq('student_id', studentId)
-        .eq('name', courseName)
-        .eq('term', term)
-        .single();
-
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
-          .from('courses')
-          .update({
-            category_id: categoryId,
-            credits,
-            grade,
-            is_dual_credit: isDualCredit,
-            dual_credit_type: dualCreditType
+            diploma_type_id: diplomaTypeId
           })
-          .eq('id', existing.id);
+          .select('id')
+          .single();
         
-        if (error) errors.push(`Update course ${courseName}: ${error.message}`);
-        else count++;
-      } else {
-        // Insert new
-        const { error } = await supabase
-          .from('courses')
-          .insert({
-            student_id: studentId,
-            name: courseName,
-            category_id: categoryId,
-            credits,
-            term,
-            grade,
-            is_dual_credit: isDualCredit,
-            dual_credit_type: dualCreditType
-          });
-        
-        if (error) errors.push(`Insert course ${courseName}: ${error.message}`);
-        else count++;
+        if (error) {
+          errors.push(`Insert ${email}: ${error.message}`);
+        } else {
+          studentId = newStudent.id;
+          count++;
+        }
+      }
+
+      // NEW: Assign counselor if provided and student was created/updated successfully
+      if (studentId && counselorId) {
+        // Check if assignment already exists
+        const { data: existingAssignment } = await supabase
+          .from('counselor_assignments')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('counselor_id', counselorId)
+          .single();
+
+        if (!existingAssignment) {
+          // Create new assignment
+          const { error: assignError } = await supabase
+            .from('counselor_assignments')
+            .insert({
+              student_id: studentId,
+              counselor_id: counselorId,
+              school_id: schoolId,
+              assigned_by: user?.id || null,
+              assigned_at: new Date().toISOString()
+            });
+
+          if (assignError) {
+            errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
+          }
+        }
       }
     }
 
