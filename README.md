@@ -47,3 +47,4 @@ This app is configured for easy deployment on Vercel:
 ## License
 
 MIT
+
