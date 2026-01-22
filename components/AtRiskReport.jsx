@@ -24,10 +24,17 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
         setLoading(true);
         
         let studentsQuery = supabase
-          .from('profiles')
-          .select('*')
-          .eq('school_id', schoolId)
-          .eq('role', 'student');
+  .from('profiles')
+  .select(`
+    *,
+    diploma_types (
+      id,
+      code,
+      name
+    )
+  `)
+  .eq('school_id', schoolId)
+  .eq('role', 'student');
         
         if (counselorId) {
           const { data: assignments } = await supabase
