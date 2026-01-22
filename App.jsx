@@ -2915,7 +2915,9 @@ if (studentData) {
             <div className="flex gap-2 mb-4">
               <button
                 onClick={() => setMainView('students')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'students' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}                👥 Students
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'students' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+              >
+                👥 Students
               </button>
               <button
                 onClick={() => setMainView('at-risk')}
