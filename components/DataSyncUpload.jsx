@@ -10,42 +10,97 @@ export default function DataSyncUpload({ schoolId }) {
     result: null,
   });
   
-  // NEW: State for diploma types
   const [diplomaTypes, setDiplomaTypes] = useState([]);
   const [diplomaTypesLoaded, setDiplomaTypesLoaded] = useState(false);
+  const [creditCategories, setCreditCategories] = useState([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
 
-  // NEW: Fetch diploma types when component loads
+  // Fetch diploma types when component loads
   useEffect(() => {
     async function loadDiplomaTypes() {
       if (schoolId) {
         const types = await getDiplomaTypes(schoolId);
         setDiplomaTypes(types);
         setDiplomaTypesLoaded(true);
-        console.log('Loaded diploma types:', types);
       }
     }
     loadDiplomaTypes();
   }, [schoolId]);
 
-  // NEW: Function to determine the right diploma type for a student
+  // Fetch credit categories when component loads
+  useEffect(() => {
+    async function loadCategories() {
+      if (schoolId) {
+        const { data } = await supabase
+          .from('credit_categories')
+          .select('*')
+          .eq('school_id', schoolId);
+        setCreditCategories(data || []);
+        setCategoriesLoaded(true);
+      }
+    }
+    loadCategories();
+  }, [schoolId]);
+
+  // Map Credit Type codes to category IDs
+  const getCategoryByCode = (creditTypeCode) => {
+    if (!creditTypeCode) return null;
+    const code = creditTypeCode.toUpperCase().trim();
+    
+    // Map Engage credit type codes to category names
+    const codeToName = {
+      'MA': 'Mathematics',
+      'LA': 'English Language Arts',
+      'SC': 'Science',
+      'SS': 'Social Studies',
+      'CV': 'Civics',
+      'PE': 'Physical Education',
+      'HE': 'Health',
+      'RE': 'CTE/Art/Language',
+      'PF': 'Personal Financial Education',
+      'CC': 'Higher Ed & Career Path Skills',
+      'EL': 'Electives',
+      'MS': null, // Middle School - don't count
+    };
+
+    const categoryName = codeToName[code];
+    if (!categoryName) return null;
+
+    return creditCategories.find(c => 
+      c.name?.toLowerCase() === categoryName.toLowerCase()
+    );
+  };
+
+  // Determine the right diploma type for a student
   const getDefaultDiplomaType = (graduationYear) => {
     if (!diplomaTypes.length) return null;
     
-    // Determine if student uses 2026 or 2027+ requirements
     const requirementYear = graduationYear <= 2026 ? '2026' : '2027';
     
-    // Find the Standard diploma for their requirement year
     const standardDiploma = diplomaTypes.find(d => 
       d.code?.includes('STANDARD') && d.code?.includes(requirementYear)
     );
     
-    // Fallback: find any diploma that matches the year
     const anyMatchingDiploma = diplomaTypes.find(d => 
       d.code?.includes(requirementYear)
     );
     
-    // Fallback: just use the first diploma
     return standardDiploma || anyMatchingDiploma || diplomaTypes[0] || null;
+  };
+
+  // Calculate graduation year from grade level
+  const calculateGraduationYear = (grade) => {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth(); // 0-11
+    
+    // If we're in the fall (Aug-Dec), use current school year; otherwise, use previous
+    const schoolYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+    
+    const gradeNum = parseInt(grade, 10);
+    if (isNaN(gradeNum) || gradeNum < 9 || gradeNum > 12) return null;
+    
+    // Grade 9 = 4 years to graduation, Grade 12 = 1 year
+    return schoolYear + (13 - gradeNum);
   };
 
   const onDrop = useCallback((acceptedFiles) => {
@@ -74,22 +129,46 @@ export default function DataSyncUpload({ schoolId }) {
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
+      // Skip instruction/reference sheets
+      if (sheetName.toLowerCase().includes('instruction') || 
+          sheetName.toLowerCase().includes('credit type')) {
+        continue;
+      }
+      
       const data = XLSX.utils.sheet_to_json(sheet, { defval: '' });
       
-      const normalized = data.map(row => {
+      // Skip header description row (row 2 in template)
+      const filteredData = data.filter(row => {
+        const firstValue = Object.values(row)[0]?.toString().toLowerCase() || '';
+        return !firstValue.includes('required') && !firstValue.includes('optional');
+      });
+
+      const normalized = filteredData.map(row => {
         const newRow = {};
         for (const [key, value] of Object.entries(row)) {
-          newRow[key.toLowerCase().trim().replace(/\s+/g, '_')] = String(value);
+          // Normalize column names: lowercase, trim, replace spaces with underscores
+          const normalizedKey = key.toLowerCase().trim().replace(/\s+/g, '_');
+          newRow[normalizedKey] = String(value).trim();
         }
         return newRow;
       });
 
       if (normalized.length > 0) {
         const columns = Object.keys(normalized[0]);
-        if (columns.includes('student_email') || columns.includes('course_name')) {
-          courses = normalized;
-        } else if (columns.includes('email') || columns.includes('full_name')) {
+        
+        // Detect sheet type by column names
+        const isStudentSheet = columns.some(c => 
+          c === 'student_id' || c === 'student_email' || c === 'first_name'
+        ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
+        
+        const isCourseSheet = columns.some(c => 
+          c === 'class' || c === 'credit_amount' || c === 'credit_type'
+        );
+
+        if (sheetName.toLowerCase() === 'students' || isStudentSheet) {
           students = normalized;
+        } else if (sheetName.toLowerCase() === 'courses' || isCourseSheet) {
+          courses = normalized;
         }
       }
     }
@@ -97,46 +176,68 @@ export default function DataSyncUpload({ schoolId }) {
     return { students, courses };
   };
 
-  // UPDATED: syncStudents now assigns diploma types AND counselors
+  // Sync students from the Students sheet
   const syncStudents = async (students) => {
     const errors = [];
     let count = 0;
+    const studentIdMap = {}; // Maps Student_ID to profile UUID
 
-    // NEW: Get all counselors for this school to map emails to IDs
+    // Get all counselors for this school
     const { data: counselors } = await supabase
       .from('profiles')
-      .select('id, email')
+      .select('id, email, full_name')
       .eq('school_id', schoolId)
       .eq('role', 'counselor');
 
-    const counselorMap = {};
+    // Create maps for counselor lookup (by email and by name)
+    const counselorEmailMap = {};
+    const counselorNameMap = {};
     counselors?.forEach(c => {
-      counselorMap[c.email.toLowerCase()] = c.id;
+      counselorEmailMap[c.email.toLowerCase()] = c.id;
+      if (c.full_name) {
+        counselorNameMap[c.full_name.toLowerCase()] = c.id;
+      }
     });
 
-    // NEW: Get current user for assigned_by field
     const { data: { user } } = await supabase.auth.getUser();
 
     for (const s of students) {
-      const email = s.email?.trim().toLowerCase();
-      const fullName = s.full_name?.trim();
+      // Map Engage field names to our fields
+      const studentIdLocal = s.student_id?.trim();
+      const email = (s.student_email || s.email)?.trim().toLowerCase();
+      const firstName = s.first_name?.trim();
+      const lastName = s.last_name?.trim();
+      const fullName = s.full_name?.trim() || `${firstName} ${lastName}`.trim();
       const grade = parseInt(s.grade, 10);
-      const graduationYear = parseInt(s.graduation_year, 10);
-      const counselorEmail = s.counselor_email?.trim().toLowerCase();  // NEW
+      
+      // Calculate graduation year if not provided
+      let graduationYear = parseInt(s.graduation_year, 10);
+      if (isNaN(graduationYear) && !isNaN(grade)) {
+        graduationYear = calculateGraduationYear(grade);
+      }
+      
+      // Look up advisor/counselor (can be email or name)
+      const advisorField = (s.advisor || s.counselor_email || '')?.trim().toLowerCase();
+      let counselorId = counselorEmailMap[advisorField] || counselorNameMap[advisorField] || null;
 
-      if (!email || !fullName) continue;
+      // Skip rows without required fields
+      if (!email || !fullName || fullName === ' ') {
+        if (studentIdLocal) {
+          errors.push(`Skipped Student_ID ${studentIdLocal}: missing email or name`);
+        }
+        continue;
+      }
 
-      // Determine the diploma type for this student
+      // Skip middle school students (grades below 9)
+      if (grade < 9) {
+        continue;
+      }
+
+      // Determine diploma type
       const diplomaType = getDefaultDiplomaType(graduationYear);
       const diplomaTypeId = diplomaType?.id || null;
 
-      // NEW: Look up counselor ID
-      const counselorId = counselorEmail ? counselorMap[counselorEmail] : null;
-      if (counselorEmail && !counselorId) {
-        errors.push(`Counselor not found: ${counselorEmail} (for student ${email})`);
-      }
-
-      // Check if student exists
+      // Check if student exists (by email)
       const { data: existing } = await supabase
         .from('profiles')
         .select('id')
@@ -144,22 +245,27 @@ export default function DataSyncUpload({ schoolId }) {
         .eq('email', email)
         .single();
 
-      let studentId = existing?.id;
+      let studentProfileId = existing?.id;
 
       if (existing) {
-        // Update existing
+        // Update existing student
         const { error } = await supabase
           .from('profiles')
           .update({ 
             full_name: fullName, 
             grade, 
             graduation_year: graduationYear,
-            diploma_type_id: diplomaTypeId
+            diploma_type_id: diplomaTypeId,
+            student_id_local: studentIdLocal,
           })
           .eq('id', existing.id);
         
-        if (error) errors.push(`Update ${email}: ${error.message}`);
-        else count++;
+        if (error) {
+          errors.push(`Update ${email}: ${error.message}`);
+        } else {
+          count++;
+          studentProfileId = existing.id;
+        }
       } else {
         // Insert new student
         const { data: newStudent, error } = await supabase
@@ -171,7 +277,8 @@ export default function DataSyncUpload({ schoolId }) {
             grade,
             graduation_year: graduationYear,
             role: 'student',
-            diploma_type_id: diplomaTypeId
+            diploma_type_id: diplomaTypeId,
+            student_id_local: studentIdLocal,
           })
           .select('id')
           .single();
@@ -179,36 +286,155 @@ export default function DataSyncUpload({ schoolId }) {
         if (error) {
           errors.push(`Insert ${email}: ${error.message}`);
         } else {
-          studentId = newStudent.id;
           count++;
+          studentProfileId = newStudent.id;
         }
       }
 
-      // NEW: Assign counselor if provided and student was created/updated successfully
-      if (studentId && counselorId) {
-        // Check if assignment already exists
+      // Store mapping from local Student_ID to profile UUID
+      if (studentIdLocal && studentProfileId) {
+        studentIdMap[studentIdLocal] = studentProfileId;
+      }
+
+      // Assign counselor if found
+      if (studentProfileId && counselorId) {
         const { data: existingAssignment } = await supabase
           .from('counselor_assignments')
           .select('id')
-          .eq('student_id', studentId)
+          .eq('student_id', studentProfileId)
           .eq('counselor_id', counselorId)
           .single();
 
         if (!existingAssignment) {
-          // Create new assignment
           const { error: assignError } = await supabase
             .from('counselor_assignments')
             .insert({
-              student_id: studentId,
+              student_id: studentProfileId,
               counselor_id: counselorId,
               school_id: schoolId,
               assigned_by: user?.id || null,
               assigned_at: new Date().toISOString()
             });
 
-          if (assignError) {
+          if (assignError && !assignError.message.includes('duplicate')) {
             errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
           }
+        }
+      }
+    }
+
+    return { count, errors, studentIdMap };
+  };
+
+  // Sync courses from the Courses sheet
+  const syncCourses = async (courses, studentIdMap = {}) => {
+    const errors = [];
+    let count = 0;
+
+    // Build a map of student_id_local to profile id if not provided
+    if (Object.keys(studentIdMap).length === 0) {
+      const { data: students } = await supabase
+        .from('profiles')
+        .select('id, student_id_local')
+        .eq('school_id', schoolId)
+        .eq('role', 'student')
+        .not('student_id_local', 'is', null);
+
+      students?.forEach(s => {
+        if (s.student_id_local) {
+          studentIdMap[s.student_id_local] = s.id;
+        }
+      });
+    }
+
+    for (const c of courses) {
+      // Map Engage field names
+      const studentIdLocal = (c.student_id || c['student id'])?.trim();
+      const courseName = (c.class || c.course_name)?.trim();
+      const creditAmount = parseFloat(c.credit_amount || c.credits || 0);
+      const creditType = (c.credit_type || c.category)?.trim().toUpperCase();
+      const term = (c.term || '')?.trim();
+      const year = (c.year || '')?.trim();
+      const finalGrade = (c.final_grade || c.grade || '')?.trim();
+      const datePosted = (c.date_posted || '')?.trim();
+
+      // Skip if missing required fields
+      if (!studentIdLocal || !courseName) {
+        continue;
+      }
+
+      // Skip middle school courses
+      if (creditType === 'MS') {
+        continue;
+      }
+
+      // Skip courses with no credit (W, I with 0 credits)
+      if (creditAmount === 0 || isNaN(creditAmount)) {
+        continue;
+      }
+
+      // Find student profile ID
+      const studentProfileId = studentIdMap[studentIdLocal];
+      if (!studentProfileId) {
+        errors.push(`Course "${courseName}": Student ID ${studentIdLocal} not found`);
+        continue;
+      }
+
+      // Find credit category
+      const category = getCategoryByCode(creditType);
+      if (!category) {
+        errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
+        continue;
+      }
+
+      // Format term (e.g., "T1 25/26" or "T1")
+      const termFormatted = year ? `${term} ${year}` : term;
+
+      // Check if course already exists (same student, course name, term)
+      const { data: existingCourse } = await supabase
+        .from('courses')
+        .select('id')
+        .eq('student_id', studentProfileId)
+        .eq('course_name', courseName)
+        .eq('term', termFormatted)
+        .single();
+
+      if (existingCourse) {
+        // Update existing course
+        const { error } = await supabase
+          .from('courses')
+          .update({
+            credits: creditAmount,
+            category_id: category.id,
+            grade: finalGrade,
+            status: 'completed',
+          })
+          .eq('id', existingCourse.id);
+
+        if (error) {
+          errors.push(`Update course "${courseName}": ${error.message}`);
+        } else {
+          count++;
+        }
+      } else {
+        // Insert new course
+        const { error } = await supabase
+          .from('courses')
+          .insert({
+            student_id: studentProfileId,
+            school_id: schoolId,
+            course_name: courseName,
+            credits: creditAmount,
+            category_id: category.id,
+            term: termFormatted,
+            grade: finalGrade,
+            status: 'completed',
+          });
+
+        if (error) {
+          errors.push(`Insert course "${courseName}": ${error.message}`);
+        } else {
+          count++;
         }
       }
     }
@@ -219,12 +445,11 @@ export default function DataSyncUpload({ schoolId }) {
   const handleUpload = async () => {
     if (!uploadState.file) return;
     
-    // NEW: Wait for diploma types to load
-    if (!diplomaTypesLoaded) {
+    if (!diplomaTypesLoaded || !categoriesLoaded) {
       setUploadState(prev => ({
         ...prev,
         status: 'error',
-        result: { errors: ['Diploma types not loaded yet. Please wait and try again.'] },
+        result: { errors: ['Still loading configuration. Please wait and try again.'] },
       }));
       return;
     }
@@ -234,17 +459,17 @@ export default function DataSyncUpload({ schoolId }) {
     try {
       const { students, courses } = await parseExcel(uploadState.file);
       
-      let studentResult = { count: 0, errors: [] };
+      let studentResult = { count: 0, errors: [], studentIdMap: {} };
       let courseResult = { count: 0, errors: [] };
 
-      // Sync students first (so they exist for course sync)
+      // Sync students first
       if (students.length > 0) {
         studentResult = await syncStudents(students);
       }
 
-      // Then sync courses
+      // Then sync courses (passing the student ID map)
       if (courses.length > 0) {
-        courseResult = await syncCourses(courses);
+        courseResult = await syncCourses(courses, studentResult.studentIdMap);
       }
 
       const allErrors = [...studentResult.errors, ...courseResult.errors];
@@ -271,17 +496,31 @@ export default function DataSyncUpload({ schoolId }) {
     setUploadState({ file: null, status: 'idle', result: null });
   };
 
+  const isReady = diplomaTypesLoaded && categoriesLoaded;
+
   return (
     <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
       <h3 className="text-lg font-semibold text-white mb-4">📤 Data Sync Upload</h3>
       
-      {/* NEW: Show diploma types status */}
-      <div className="mb-4 text-sm">
-        {diplomaTypesLoaded ? (
-          <span className="text-emerald-400">✓ {diplomaTypes.length} diploma types loaded</span>
-        ) : (
-          <span className="text-amber-400">⏳ Loading diploma types...</span>
-        )}
+      {/* Status indicators */}
+      <div className="mb-4 text-sm space-y-1">
+        <div className={diplomaTypesLoaded ? 'text-emerald-400' : 'text-amber-400'}>
+          {diplomaTypesLoaded ? '✓' : '⏳'} {diplomaTypes.length} diploma types {diplomaTypesLoaded ? 'loaded' : 'loading...'}
+        </div>
+        <div className={categoriesLoaded ? 'text-emerald-400' : 'text-amber-400'}>
+          {categoriesLoaded ? '✓' : '⏳'} {creditCategories.length} credit categories {categoriesLoaded ? 'loaded' : 'loading...'}
+        </div>
+      </div>
+
+      {/* Template download link */}
+      <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
+        <p className="text-slate-300 text-sm">
+          📋 Use the <strong>GradTrack Engage Import Template</strong> with two sheets:
+        </p>
+        <ul className="text-slate-400 text-xs mt-1 ml-4 list-disc">
+          <li><strong>Students</strong>: Student_ID, Last_Name, First_Name, Student Email, Grade, Advisor</li>
+          <li><strong>Courses</strong>: Student ID, Class, Credit Amount, Credit Type, Term, Year, Final Grade</li>
+        </ul>
       </div>
       
       {/* Dropzone */}
@@ -300,7 +539,7 @@ export default function DataSyncUpload({ schoolId }) {
             <p className="text-indigo-400">Drop your file here...</p>
           ) : (
             <>
-              <p className="text-slate-300">Drag & drop an Excel or CSV file here</p>
+              <p className="text-slate-300">Drag & drop an Excel file here</p>
               <p className="text-slate-500 text-sm mt-1">or click to browse</p>
             </>
           )}
@@ -327,10 +566,10 @@ export default function DataSyncUpload({ schoolId }) {
           </div>
           <button
             onClick={handleUpload}
-            disabled={!diplomaTypesLoaded}
+            disabled={!isReady}
             className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
-            {diplomaTypesLoaded ? '🚀 Start Sync' : '⏳ Loading...'}
+            {isReady ? '🚀 Start Import' : '⏳ Loading...'}
           </button>
         </div>
       )}
@@ -349,7 +588,7 @@ export default function DataSyncUpload({ schoolId }) {
           <div className="flex items-start gap-3">
             <span className="text-2xl">✅</span>
             <div>
-              <h4 className="text-emerald-400 font-semibold">Sync Complete!</h4>
+              <h4 className="text-emerald-400 font-semibold">Import Complete!</h4>
               <div className="text-slate-300 text-sm mt-2 space-y-1">
                 <p>✓ {uploadState.result.studentsProcessed} students processed</p>
                 <p>✓ {uploadState.result.coursesProcessed} course records processed</p>
@@ -384,7 +623,7 @@ export default function DataSyncUpload({ schoolId }) {
           <div className="flex items-start gap-3">
             <span className="text-2xl">❌</span>
             <div>
-              <h4 className="text-red-400 font-semibold">Sync Failed</h4>
+              <h4 className="text-red-400 font-semibold">Import Failed</h4>
               <ul className="text-slate-400 text-sm mt-2">
                 {uploadState.result.errors?.map((err, i) => (
                   <li key={i}>• {err}</li>
