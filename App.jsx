@@ -60,7 +60,7 @@ function calculateStudentStats(courses, categories) {
     return acc;
   }, {});
 
-  const totalEarned = courses.reduce((sum, c) => sum + Number(c.credits), 0);
+  const totalEarned = Math.round(courses.reduce((sum, c) => sum + Number(c.credits), 0) * 10) / 10;
   const percentage = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
 
   const dualCreditCourses = courses.filter(c => c.is_dual_credit);
