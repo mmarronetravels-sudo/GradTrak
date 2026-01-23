@@ -2629,14 +2629,6 @@ const flatStudentData = studentData?.map(row => row.profiles) || [];
   const { data: cpData } = await supabase
     .from('course_pathways')
     .select('*');
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .in('student_id', studentIds);
-
-      const { data: cpData } = await supabase
-        .from('course_pathways')
-        .select('*');
 
       const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
