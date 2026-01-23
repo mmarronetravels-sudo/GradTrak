@@ -1119,6 +1119,9 @@ function AdminDashboard({ user, profile, onLogout }) {
   const displayName = getDisplayName(profile);
   const [selectedStudent, setSelectedStudent] = useState(null); 
   const [counselors, setCounselors] = useState([]);
+  const [counselors, setCounselors] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [studentSearch, setStudentSearch] = useState('');
   
   useEffect(() => {
     fetchData();
@@ -2232,9 +2235,6 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
   const [coursePathways, setCoursePathways] = useState([]);
-  const [counselors, setCounselors] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
-  const [studentSearch, setStudentSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
