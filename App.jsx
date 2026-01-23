@@ -1180,8 +1180,37 @@ const { data: counselorData } = await supabase
   .eq('school_id', profile.school_id)
   .eq('role', 'counselor')
   .order('full_name');
-if (counselorData) setCounselors(counselorData);    
-    setLoading(false);    
+if (counselorData) setCounselors(counselorData);
+    // Fetch all students for admin management
+const { data: studentData } = await supabase
+  .from('profiles')
+  .select('id, full_name, email, grade, graduation_year')
+  .eq('school_id', profile.school_id)
+  .eq('role', 'student')
+  .order('full_name');
+
+// Get counselor assignments for each student
+if (studentData) {
+  const { data: assignments } = await supabase
+    .from('counselor_assignments')
+    .select('student_id, counselor_id, profiles!counselor_assignments_counselor_id_fkey(full_name)');
+  
+  const assignmentMap = {};
+  assignments?.forEach(a => {
+    assignmentMap[a.student_id] = {
+      counselor_id: a.counselor_id,
+      counselor_name: a.profiles?.full_name
+    };
+  });
+  
+  const studentsWithCounselors = studentData.map(s => ({
+    ...s,
+    counselor_id: assignmentMap[s.id]?.counselor_id || null,
+    counselor_name: assignmentMap[s.id]?.counselor_name || 'Unassigned'
+  }));
+  
+  setAllStudents(studentsWithCounselors);
+}    setLoading(false);    
     // Log admin dashboard access
     await logAudit('view_admin_dashboard', 'admin', null);
   }
@@ -1356,6 +1385,10 @@ if (counselorData) setCounselors(counselorData);
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'at-risk' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
                 ⚠️ At-Risk
               </button>
+         <button onClick={() => setActiveTab('students')}
+      className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+      👥 Students
+</button>
               {selectedStudent && (
                 <button onClick={() => setActiveTab('student-detail')}
                   className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'student-detail' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -1518,6 +1551,97 @@ if (counselorData) setCounselors(counselorData);
         {activeTab === 'sync' && (
           <DataSyncUpload schoolId={profile?.school_id} />
         )}
+  {/* Students Tab */}
+{activeTab === 'students' && (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <h2 className="text-xl font-bold text-white">👥 All Students</h2>
+      <p className="text-slate-400 text-sm">{allStudents.length} students</p>
+    </div>
+    
+    {/* Search */}
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="Search by name or email..."
+        value={studentSearch}
+        onChange={(e) => setStudentSearch(e.target.value)}
+        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 pl-10 text-white placeholder-slate-500"
+      />
+      <svg className="absolute left-3 top-3.5 w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    </div>
+    
+    {/* Student List */}
+    <div className="space-y-2">
+      {allStudents
+        .filter(s => 
+          s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
+          s.email?.toLowerCase().includes(studentSearch.toLowerCase())
+        )
+        .slice(0, 50)
+        .map(student => (
+          <div key={student.id} className="bg-slate-900/80 rounded-xl p-4 border border-slate-800 flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-white font-medium">{student.full_name}</p>
+              <p className="text-slate-400 text-sm">{student.email}</p>
+              <p className="text-slate-500 text-xs">Grade {student.grade} • Class of {student.graduation_year}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                value={student.counselor_id || ''}
+                onChange={async (e) => {
+                  const newCounselorId = e.target.value;
+                  if (!newCounselorId) return;
+                  
+                  const { data: existing } = await supabase
+                    .from('counselor_assignments')
+                    .select('id')
+                    .eq('student_id', student.id)
+                    .single();
+                  
+                  if (existing) {
+                    await supabase
+                      .from('counselor_assignments')
+                      .update({ counselor_id: newCounselorId })
+                      .eq('student_id', student.id);
+                  } else {
+                    await supabase
+                      .from('counselor_assignments')
+                      .insert({ student_id: student.id, counselor_id: newCounselorId });
+                  }
+                  
+                  await logAudit('reassign_counselor', 'counselor_assignments', student.id, { new_counselor_id: newCounselorId });
+                  
+                  // Update local state
+                  const newCounselor = counselors.find(c => c.id === newCounselorId);
+                  setAllStudents(allStudents.map(s => 
+                    s.id === student.id 
+                      ? { ...s, counselor_id: newCounselorId, counselor_name: newCounselor?.full_name }
+                      : s
+                  ));
+                }}
+              >
+                <option value="">Unassigned</option>
+                {counselors.map(c => (
+                  <option key={c.id} value={c.id}>{c.full_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ))}
+    </div>
+    
+    {allStudents.filter(s => 
+      s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
+      s.email?.toLowerCase().includes(studentSearch.toLowerCase())
+    ).length > 50 && (
+      <p className="text-slate-500 text-sm text-center">Showing first 50 results. Use search to find specific students.</p>
+    )}
+  </div>
+)}
   {activeTab === 'at-risk' && (
             <AtRiskReport
   schoolId={profile.school_id}
@@ -2109,6 +2233,8 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [pathways, setPathways] = useState([]);
   const [coursePathways, setCoursePathways] = useState([]);
   const [counselors, setCounselors] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [studentSearch, setStudentSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
