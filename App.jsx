@@ -2389,10 +2389,10 @@ function StudentDashboard({ user, profile, onLogout }) {
                 <div>
                   <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
                   <p className="text-slate-300">
-                    <span className="text-2xl font-bold text-white">{stats.totalEarned}</span>
+                   <span className="text-2xl font-bold text-white">{parseFloat((stats.totalEarned || 0).toFixed(2))}</span>
                     <span className="text-slate-400"> / {stats.totalRequired} credits</span>
                   </p>
-                  <p className="text-slate-400 text-sm mt-1">{stats.totalRequired - stats.totalEarned} credits remaining</p>
+                  <p className="text-slate-400 text-sm mt-1">{parseFloat((stats.totalRequired - stats.totalEarned).toFixed(2))} credits remaining</p>
                 </div>
               </div>
             </div>
