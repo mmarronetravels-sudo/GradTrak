@@ -1117,7 +1117,8 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
-  const [selectedStudent, setSelectedStudent] = useState(null);  
+  const [selectedStudent, setSelectedStudent] = useState(null); 
+  const [counselors, setCounselors] = useState([]);
   
   useEffect(() => {
     fetchData();
@@ -1172,7 +1173,14 @@ function AdminDashboard({ user, profile, onLogout }) {
       .select('*')
       .eq('school_id', profile.school_id);
     if (caseloadData) setCaseloads(caseloadData);
-    
+    // Fetch counselors for reassignment dropdown
+const { data: counselorData } = await supabase
+  .from('profiles')
+  .select('id, full_name, email')
+  .eq('school_id', profile.school_id)
+  .eq('role', 'counselor')
+  .order('full_name');
+if (counselorData) setCounselors(counselorData);    
     setLoading(false);    
     // Log admin dashboard access
     await logAudit('view_admin_dashboard', 'admin', null);
@@ -1554,6 +1562,53 @@ function AdminDashboard({ user, profile, onLogout }) {
     {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
     {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
     {selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
+  </div>
+
+  {/* Counselor Assignment */}
+  <div className="mt-4 pt-4 border-t border-slate-700">
+    <label className="text-slate-400 text-sm block mb-2">Assigned Counselor</label>
+    <div className="flex gap-3 items-center">
+      <select
+        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white"
+        value={selectedStudent.counselor_id || ''}
+        onChange={async (e) => {
+          const newCounselorId = e.target.value;
+          if (!newCounselorId) return;
+          
+          const { data: existing } = await supabase
+            .from('counselor_assignments')
+            .select('id')
+            .eq('student_id', selectedStudent.id)
+            .single();
+          
+          if (existing) {
+            await supabase
+              .from('counselor_assignments')
+              .update({ counselor_id: newCounselorId })
+              .eq('student_id', selectedStudent.id);
+          } else {
+            await supabase
+              .from('counselor_assignments')
+              .insert({ student_id: selectedStudent.id, counselor_id: newCounselorId });
+          }
+          
+          await logAudit('reassign_counselor', 'counselor_assignments', selectedStudent.id, { new_counselor_id: newCounselorId });
+          
+          const newCounselor = counselors.find(c => c.id === newCounselorId);
+          setSelectedStudent({ ...selectedStudent, counselor_id: newCounselorId, counselor_name: newCounselor?.full_name });
+          
+          fetchData();
+        }}
+      >
+        <option value="">Select Counselor...</option>
+        {counselors.map(c => (
+          <option key={c.id} value={c.id}>{c.full_name}</option>
+        ))}
+      </select>
+    </div>
+    {selectedStudent.counselor_name && (
+      <p className="text-slate-500 text-xs mt-2">Currently: {selectedStudent.counselor_name}</p>
+    )}
   </div>
 </div>
                 
