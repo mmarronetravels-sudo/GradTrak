@@ -2613,10 +2613,11 @@ if (studentData) {
   let allCourses = [];
   for (let i = 0; i < studentIds.length; i += batchSize) {
     const batch = studentIds.slice(i, i + batchSize);
-    const { data: courseData } = await supabase
-      .from('courses')
-      .select('*')
-      .in('student_id', batch);
+   const { data: courseData } = await supabase
+  .from('courses')
+  .select('*')
+  .in('student_id', batch)
+  .limit(5000);
     if (courseData) {
       allCourses = allCourses.concat(courseData);
     }
