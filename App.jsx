@@ -2609,7 +2609,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
 if (studentData) {
   // Fetch courses in batches of 50 to avoid URL length limits
   const studentIds = studentData.map(s => s.id);
-  const batchSize = 50;
+  const batchSize = 20;
   let allCourses = [];
   for (let i = 0; i < studentIds.length; i += batchSize) {
     const batch = studentIds.slice(i, i + batchSize);
