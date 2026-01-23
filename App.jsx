@@ -1119,7 +1119,6 @@ function AdminDashboard({ user, profile, onLogout }) {
   const displayName = getDisplayName(profile);
   const [selectedStudent, setSelectedStudent] = useState(null); 
   const [counselors, setCounselors] = useState([]);
-  const [counselors, setCounselors] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   
