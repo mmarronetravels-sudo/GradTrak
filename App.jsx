@@ -2606,12 +2606,9 @@ function CounselorDashboard({ user, profile, onLogout }) {
       `)
       .in('id', assignedStudentIds);
 
-// Then flatten the data
-const flatStudentData = studentData?.map(row => row.profiles) || [];
-
-
-// Fetch courses in batches of 50 to avoid URL length limits
-  const studentIds = flatStudentData.map(s => s.id);
+if (studentData) {
+  // Fetch courses in batches of 50 to avoid URL length limits
+  const studentIds = studentData.map(s => s.id);
   const batchSize = 50;
   let allCourses = [];
   for (let i = 0; i < studentIds.length; i += batchSize) {
