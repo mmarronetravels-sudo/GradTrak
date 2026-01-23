@@ -2670,11 +2670,24 @@ if (studentData) {
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
-  const summaryStats = {
+ // Calculate expected credits based on grade and current trimester (Winter/T2)
+const getExpectedCredits = (grade) => {
+  const expectedByGrade = { 9: 2, 10: 8, 11: 14, 12: 20 }; // Winter T2 expectations (24 total credits)
+  return expectedByGrade[grade] || 0;
+};
+
+const isStudentAtRisk = (student) => {
+  const expected = getExpectedCredits(student.grade);
+  const earned = student.stats?.totalEarned || 0;
+  const behind = expected - earned;
+  return behind >= 0.5; // Critical, At-Risk, or Watch
+};
+
+const summaryStats = {
   total: students.length,
-  atRisk: students.filter(s => s.stats.percentage < 50).length,
-  onTrack: students.filter(s => s.stats.percentage >= 50).length,
-  avgProgress: students.length > 0 ? Math.round(students.reduce((sum, s) => sum + s.stats.percentage, 0) / students.length) : 0
+  atRisk: students.filter(s => isStudentAtRisk(s)).length,
+  onTrack: students.filter(s => !isStudentAtRisk(s)).length,
+  avgProgress: students.length > 0 ? Math.round(students.reduce((sum, s) => sum + (s.stats?.percentage || 0), 0) / students.length) : 0
 };
   // Student Detail View
   if (selectedStudent) {
