@@ -2610,8 +2610,25 @@ function CounselorDashboard({ user, profile, onLogout }) {
 const flatStudentData = studentData?.map(row => row.profiles) || [];
 
 
-if (studentData) {
-  const studentIds = studentData.map(s => s.id);
+// Fetch courses in batches of 50 to avoid URL length limits
+  const studentIds = flatStudentData.map(s => s.id);
+  const batchSize = 50;
+  let allCourses = [];
+  for (let i = 0; i < studentIds.length; i += batchSize) {
+    const batch = studentIds.slice(i, i + batchSize);
+    const { data: courseData } = await supabase
+      .from('courses')
+      .select('*')
+      .in('student_id', batch);
+    if (courseData) {
+      allCourses = allCourses.concat(courseData);
+    }
+  }
+  const courseData = allCourses;
+
+  const { data: cpData } = await supabase
+    .from('course_pathways')
+    .select('*');
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
