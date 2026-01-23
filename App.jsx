@@ -2671,12 +2671,11 @@ if (studentData) {
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
   const summaryStats = {
-    total: students.length,
-    atRisk: students.filter(s => s.alerts.some(a => a.type === 'critical')).length,
-    onTrack: students.filter(s => s.stats.percentage >= 50).length,
-    avgProgress: students.length > 0 ? Math.round(students.reduce((sum, s) => sum + s.stats.percentage, 0) / students.length) : 0
-  };
-
+  total: students.length,
+  atRisk: students.filter(s => s.stats.percentage < 50).length,
+  onTrack: students.filter(s => s.stats.percentage >= 50).length,
+  avgProgress: students.length > 0 ? Math.round(students.reduce((sum, s) => sum + s.stats.percentage, 0) / students.length) : 0
+};
   // Student Detail View
   if (selectedStudent) {
     const student = selectedStudent;
