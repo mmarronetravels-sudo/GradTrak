@@ -52,11 +52,21 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
         if (studentsError) throw studentsError;
         
         const studentIds = studentsData.map(s => s.id);
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .in('student_id', studentIds);
-        if (coursesError) throw coursesError;
+const batchSize = 20;
+let allCourses = [];
+for (let i = 0; i < studentIds.length; i += batchSize) {
+  const batch = studentIds.slice(i, i + batchSize);
+  const { data: courseData, error: coursesError } = await supabase
+    .from('courses')
+    .select('*')
+    .in('student_id', batch)
+    .limit(5000);
+  if (coursesError) throw coursesError;
+  if (courseData) {
+    allCourses = allCourses.concat(courseData);
+  }
+}
+const coursesData = allCourses;
         
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('credit_categories')
