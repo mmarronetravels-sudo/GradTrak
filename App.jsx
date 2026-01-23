@@ -743,7 +743,7 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathwa
           <h2>Graduation Progress</h2>
           <div class="progress-grid">
             <div class="progress-item"><div class="number">${stats.percentage}%</div><div class="label">Complete</div></div>
-            <div class="progress-item"><div class="number">${stats.totalEarned}</div><div class="label">Credits Earned</div></div>
+            <div class="progress-item"><div class="number">${parseFloat(stats.totalEarned.toFixed(2))}</div><div class="label">Credits Earned</div></div>
             <div class="progress-item"><div class="number">${stats.totalRequired}</div><div class="label">Credits Required</div></div>
             <div class="progress-item"><div class="number">${stats.totalRequired - stats.totalEarned}</div><div class="label">Remaining</div></div>
           </div>
@@ -1575,7 +1575,7 @@ function AdminDashboard({ user, profile, onLogout }) {
                   </div>
                 </div>
                 <p className="text-slate-400 mt-2">
-                  {selectedStudent.stats?.totalEarned || 0} of {selectedStudent.stats?.totalRequired || 24} credits earned
+                  {parseFloat((selectedStudent.stats?.totalEarned || 0).toFixed(2))} of {selectedStudent.stats?.totalRequired || 24} credits earned
                 </p>
                 {selectedStudent.risk?.creditsBehind > 0 && (
                   <p className="text-red-400 mt-1">
@@ -2582,7 +2582,7 @@ if (studentData) {
               <div>
                 <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
                 <p className="text-slate-300">
-                  <span className="text-2xl font-bold text-white">{student.stats.totalEarned}</span>
+                  <span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(2))}</span>
                   <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
                 </p>
                 <p className="text-slate-400 text-sm mt-1">{student.stats.totalRequired - student.stats.totalEarned} credits remaining</p>
@@ -3223,7 +3223,7 @@ function ParentDashboard({ user, profile, onLogout }) {
               </div>
               <div>
                 <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
-                <p className="text-slate-300"><span className="text-2xl font-bold text-white">{student.stats.totalEarned}</span><span className="text-slate-400"> / {student.stats.totalRequired} credits</span></p>
+                <p className="text-slate-300"><span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(2))}</span><span className="text-slate-400"> / {student.stats.totalRequired} credits</span></p>
               </div>
             </div>
           </div>
