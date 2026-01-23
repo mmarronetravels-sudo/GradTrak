@@ -3328,11 +3328,6 @@ function ParentDashboard({ user, profile, onLogout }) {
         .eq('school_id', profile.school_id)
         .order('display_order');
 
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .in('student_id', studentIds);
-
       if (studentData) {
         const studentsWithStats = studentData.map(student => {
           const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
