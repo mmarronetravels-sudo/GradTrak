@@ -1118,7 +1118,6 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [counselors, setCounselors] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
@@ -2583,6 +2582,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
   const displayName = getDisplayName(profile);
   const [mainView, setMainView] = useState('students');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchData();
