@@ -3199,8 +3199,9 @@ fetchNotes(student.id);
                 schoolId={profile.school_id}
                 counselorId={profile.id}
                 onSelectStudent={(student) => {
-                  setSelectedStudent(student);
-                }}
+  const fullStudent = students.find(s => s.id === student.id) || student;
+  setSelectedStudent(fullStudent);
+}}
               />
             )}
           </div>
