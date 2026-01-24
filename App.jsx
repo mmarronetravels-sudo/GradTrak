@@ -3160,7 +3160,8 @@ const summaryStats = {
                 key={student.id} 
                 onClick={() => {
   setSelectedStudent(student);
-  fetchNotes(student.id);
+console.log('Selected student:', student.full_name, 'courses:', student.courses?.length);
+fetchNotes(student.id);
 }}
                 className="w-full bg-slate-900/80 rounded-2xl p-5 border border-slate-800 hover:bg-slate-800/80 hover:border-indigo-500/30 transition-all text-left"
               >
