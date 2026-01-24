@@ -2623,6 +2623,7 @@ if (studentData) {
     }
   }
   const courseData = allCourses;
+  console.log('Total courses fetched:', courseData.length, 'for', studentIds.length, 'students');
 
   const { data: cpData } = await supabase
     .from('course_pathways')
