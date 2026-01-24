@@ -2797,7 +2797,7 @@ const filteredStudents = students
                   <span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(2))}</span>
                   <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
                 </p>
-                <p className="text-slate-400 text-sm mt-1">{student.stats.totalRequired - student.stats.totalEarned} credits remaining</p>
+                <p className="text-slate-400 text-sm mt-1">{Math.round((student.stats.totalRequired - student.stats.totalEarned) * 10) / 10} credits remaining</p>
               </div>
             </div>
           </div>
