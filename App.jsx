@@ -2391,7 +2391,7 @@ const getPathwaysForCourse = (course) => {
                    <span className="text-2xl font-bold text-white">{parseFloat((stats.totalEarned || 0).toFixed(2))}</span>
                     <span className="text-slate-400"> / {stats.totalRequired} credits</span>
                   </p>
-                  <p className="text-slate-400 text-sm mt-1">{parseFloat((stats.totalRequired - stats.totalEarned).toFixed(2))} credits remaining</p>
+                  <p className="text-slate-400 text-sm mt-1">{Math.round((stats.totalRequired - stats.totalEarned) * 10) / 10} credits remaining</p>
                 </div>
               </div>
             </div>
