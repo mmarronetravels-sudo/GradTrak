@@ -3622,9 +3622,7 @@ export default function App() {
     );
   }
 
-  if (!user || !profile) {
-    return <AuthScreen onLogin={(user) => { setUser(user); fetchProfile(user.id); }} />;
-  }
+  if (!user || !profile) { return <AuthScreen onLogin={(user) => { setUser(user); }} />; }
 
   if (profile.role === 'admin') {
     return <AdminDashboard user={user} profile={profile} onLogout={handleLogout} />;
