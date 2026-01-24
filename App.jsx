@@ -3161,8 +3161,7 @@ const filteredStudents = students
 
             {mainView === 'students' && (
               <>
-                <h2 className="text-xl font-bold text-white">Students</h2>
-            
+                            
 {/* Search Bar */}
 <div className="mb-4 mt-4">
   <div className="relative">
@@ -3526,7 +3525,6 @@ function ParentDashboard({ user, profile, onLogout }) {
         </div>
       </header>
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <h2 className="text-xl font-bold text-white mb-4">My Students</h2>
         <div className="space-y-3">
           {linkedStudents.map(student => (
             <button key={student.id} onClick={() => setSelectedStudent(student)}
