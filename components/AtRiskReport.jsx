@@ -76,6 +76,10 @@ const { data: notesData, error: notesError } = await supabase
   .order('created_at', { ascending: false });
 if (notesError) throw notesError;
 
+const filteredNotes = (notesData || []).filter(note => 
+  studentIds.includes(note.student_id)
+);
+
 // Filter to only students in our list
 const filteredNotes = (notesData || []).filter(note => 
   studentIds.includes(note.student_id)
