@@ -2629,7 +2629,9 @@ if (studentData) {
     .from('course_pathways')
     .select('*');
 
-      const studentsWithCourses = studentData.map(student => {
+      const bellasCourses = courseData.filter(c => c.student_id === '9a0b98a9-1077-4383-be87-aa9e1f52ed62');
+console.log('Bellas courses in fetched data:', bellasCourses.length);      
+  const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
         const stats = calculateStudentStats(studentCourses, catData || []);
         const alerts = generateAlerts(student, stats);
