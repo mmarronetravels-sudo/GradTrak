@@ -2332,12 +2332,11 @@ function StudentDashboard({ user, profile, onLogout }) {
     setCoursePathways(coursePathways.filter(cp => cp.course_id !== id));
   };
 
-  const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
-  const getPathwaysForCourse = (course) => {
-    const pathwayIds = coursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
-    return pathways.filter(p => pathwayIds.includes(p.id));
-  };
-
+  const getCategoryForCourse = (course) => categories?.find(c => c.id === course.category_id);
+const getPathwaysForCourse = (course) => {
+  const pathwayIds = (coursePathways || []).filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
+  return (pathways || []).filter(p => pathwayIds.includes(p.id));
+};
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
   return (
