@@ -1560,35 +1560,7 @@ if (studentData) {
       <h2 className="text-xl font-bold text-white">👥 All Students</h2>
       <p className="text-slate-400 text-sm">{allStudents.length} students</p>
     </div>
-    {/* Search Bar */}
-<div className="mb-4">
-  <div className="relative">
-    <input
-      type="text"
-      placeholder="Search students by name..."
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      className="w-full md:w-80 px-4 py-2 pl-10 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-    />
-    <svg className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-    {searchTerm && (
-      <button
-        onClick={() => setSearchTerm('')}
-        className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
-      >
-        ✕
-      </button>
-    )}
-  </div>
-  {searchTerm && (
-    <p className="text-sm text-slate-400 mt-2">
-      Showing {filteredStudents.length} of {students.length} students
-    </p>
-  )}
-</div>
-    
+        
     {/* Search */}
     <div className="relative">
       <input
