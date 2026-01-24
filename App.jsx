@@ -3162,8 +3162,7 @@ const filteredStudents = students
             {mainView === 'students' && (
               <>
                 <h2 className="text-xl font-bold text-white">Students</h2>
-                <h2 className="text-xl font-bold text-white">Students</h2>
-
+            
 {/* Search Bar */}
 <div className="mb-4 mt-4">
   <div className="relative">
