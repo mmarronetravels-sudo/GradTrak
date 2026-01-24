@@ -3193,8 +3193,7 @@ const filteredStudents = students
   )}
 </div>
 
-{students.length === 0 ? (
-          {students.length === 0 ? (
+{students.length === 0 ? (       
   <div className="text-center py-12 text-slate-400">No students have signed up yet.</div>
 ) : filteredStudents.length === 0 ? (
   <div className="text-center py-12 text-slate-400">No students match your search.</div>
