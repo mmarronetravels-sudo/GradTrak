@@ -68,11 +68,18 @@ for (let i = 0; i < studentIds.length; i += batchSize) {
 }
 const coursesData = allCourses;
         
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('credit_categories')
-          .select('*')
-          .eq('school_id', schoolId);
-        if (categoriesError) throw categoriesError;
+        // Fetch notes without filter (URL was too long with 768 IDs)
+// Filter client-side instead
+const { data: notesData, error: notesError } = await supabase
+  .from('student_notes')
+  .select('student_id, created_at')
+  .order('created_at', { ascending: false });
+if (notesError) throw notesError;
+
+// Filter to only students in our list
+const filteredNotes = (notesData || []).filter(note => 
+  studentIds.includes(note.student_id)
+);
         
         const { data: notesData, error: notesError } = await supabase
           .from('student_notes')
@@ -84,7 +91,7 @@ const coursesData = allCourses;
         setStudents(studentsData || []);
         setCourses(coursesData || []);
         setCategories(categoriesData || []);
-        setStudentNotes(notesData || []);
+        setStudentNotes(filteredNotes);
         
       } catch (err) {
         console.error('Error fetching data:', err);
