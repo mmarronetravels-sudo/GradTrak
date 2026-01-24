@@ -143,13 +143,14 @@ const coursesData = allCourses;
   };
 
   const processedStudents = useMemo(() => {
-    return students.map(student => {
-      const stats = calculateStudentStats(student.id);
-      const risk = getRiskLevel(student, stats);
-      const lastNote = getLastNoteDate(student.id);
-      return { ...student, stats, risk, lastNote };
-    });
-  }, [students, courses, categories, studentNotes]);
+  return students.map(student => {
+    const studentCourses = courses.filter(c => c.student_id === student.id);
+    const stats = calculateStudentStats(student.id);
+    const risk = getRiskLevel(student, stats);
+    const lastNote = getLastNoteDate(student.id);
+    return { ...student, courses: studentCourses, stats, risk, lastNote };
+  });
+}, [students, courses, categories, studentNotes]);
 
   const filteredStudents = useMemo(() => {
     let result = processedStudents.filter(s => s.risk.level !== 'on-track');
