@@ -3628,13 +3628,37 @@ export default function App() {
       }
       
       if (event === 'SIGNED_IN' && session?.user) {
-        setUser(session.user);
-        const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-        if (mounted) {
-          setProfile(data);
-          setLoading(false);
-        }
-      }
+  setUser(session.user);
+  
+  // First try to find profile by ID (for email/password logins)
+  let { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+  
+  // If not found by ID, try to find by email (for Google SSO)
+  if (!data && session.user.email) {
+    const { data: emailMatch } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', session.user.email)
+      .single();
+    
+    if (emailMatch) {
+      // Update the profile's ID to match the auth user's ID for future logins
+      await supabase
+        .from('profiles')
+        .update({ id: session.user.id })
+        .eq('email', session.user.email);
+      
+      data = { ...emailMatch, id: session.user.id };
+    }
+  }
+  
+  if (mounted) {
+    setProfile(data);
+    setLoading(false);
+  }
+}
+```
+
     });
 
     return () => {
