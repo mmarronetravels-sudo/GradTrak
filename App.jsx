@@ -2711,6 +2711,33 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
+  const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_active: isActive,
+        withdrawal_date: withdrawalDate,
+        withdrawal_reason: withdrawalReason
+      })
+      .eq('id', studentId);
+    if (error) {
+      console.error('Archive error:', error);
+      throw error;
+    }
+    setStudents(prev => prev.map(s => 
+      s.id === studentId 
+        ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
+        : s
+    ));
+    if (selectedStudent?.id === studentId) {
+      setSelectedStudent(prev => ({ 
+        ...prev, 
+        is_active: isActive, 
+        withdrawal_date: withdrawalDate, 
+        withdrawal_reason: withdrawalReason 
+      }));
+    }
+  };
 
   useEffect(() => {
     fetchData();
