@@ -2949,6 +2949,15 @@ const filteredStudents = students
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               Add Course
             </button>
+            <button 
+              onClick={() => {
+                setArchiveTarget(student);
+                setShowArchiveModal(true);
+              }} 
+              className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${student.is_active === false ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30'}`}
+            >
+              {student.is_active === false ? '↩️ Reactivate' : '📦 Archive'}
+            </button>
           </div>
           
           {/* Tabs */}
