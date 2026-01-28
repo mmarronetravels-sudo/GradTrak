@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabase';
 import DataSyncUpload from './components/DataSyncUpload';
 import AtRiskReport from './components/AtRiskReport';
+import ArchiveStudentModal from './components/ArchiveStudentModal';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -1124,11 +1125,22 @@ function AuthScreen({ onLogin }) {
             <a href="https://scholarpathsystems.org/terms" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 text-xs">Terms of Service</a>
           </div>
         </div>
+
+        {/* Archive Student Modal */}
+        <ArchiveStudentModal
+          student={archiveTarget}
+          isOpen={showArchiveModal}
+          onClose={() => {
+            setShowArchiveModal(false);
+            setArchiveTarget(null);
+          }}
+          onArchive={handleArchiveStudent}
+          isReactivating={isReactivating}
+        />
       </div>
     </div>
   );
 }
-
 // ============================================
 // ADMIN DASHBOARD
 // ============================================
@@ -1702,12 +1714,57 @@ if (studentData) {
 
               {/* Student Header */}
 <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-  <h2 className="text-2xl font-bold text-white mb-2">{selectedStudent.full_name}</h2>
-  <div className="flex flex-wrap gap-4 text-slate-400">
-    <span>Grade {selectedStudent.grade}</span>
-    <span>{selectedStudent.email}</span>
-    {selectedStudent.engage_id && <span>ID: {selectedStudent.engage_id}</span>}
-    {selectedStudent.graduation_year && <span>Class of {selectedStudent.graduation_year}</span>}
+  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div>
+      <div className="flex items-center gap-3 mb-2">
+        <h2 className="text-2xl font-bold text-white">{selectedStudent.full_name}</h2>
+        {selectedStudent.is_active === false && (
+          <span className="px-2 py-1 bg-gray-600 text-gray-200 text-xs rounded-full">
+            Archived
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-4 text-slate-400">
+        <span>Grade {selectedStudent.grade}</span>
+        <span>{selectedStudent.email}</span>
+        {selectedStudent.engage_id && <span>ID: {selectedStudent.engage_id}</span>}
+        {selectedStudent.graduation_year && <span>Class of {selectedStudent.graduation_year}</span>}
+        {selectedStudent.is_active === false && selectedStudent.withdrawal_date && (
+          <span className="text-amber-400">
+            Withdrawn: {new Date(selectedStudent.withdrawal_date).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+    </div>
+    
+    {/* Archive/Reactivate Button */}
+    {(profile?.role === 'admin' || profile?.role === 'counselor') && (
+      <div className="flex-shrink-0">
+        {selectedStudent.is_active === false ? (
+          <button
+            onClick={() => {
+              setArchiveTarget(selectedStudent);
+              setIsReactivating(true);
+              setShowArchiveModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+          >
+            <span>↩</span> Reactivate
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setArchiveTarget(selectedStudent);
+              setIsReactivating(false);
+              setShowArchiveModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
+          >
+            <span>📦</span> Archive
+          </button>
+        )}
+      </div>
+    )}
   </div>
   {/* Diploma Type */}
   {selectedStudent.diploma_types && (
@@ -2356,6 +2413,41 @@ function StudentDashboard({ user, profile, onLogout }) {
     }
     if (error) console.error('Error adding course:', error);
   };
+  const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      is_active: isActive,
+      withdrawal_date: withdrawalDate,
+      withdrawal_reason: withdrawalReason
+    })
+    .eq('id', studentId);
+
+  if (error) {
+    console.error('Archive error:', error);
+    throw error;
+  }
+
+  // Update local state
+  setStudents(prev => prev.map(s => 
+    s.id === studentId 
+      ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
+      : s
+  ));
+
+  // Also update selectedStudent if it's the one we just archived
+  if (selectedStudent?.id === studentId) {
+    setSelectedStudent(prev => ({ 
+      ...prev, 
+      is_active: isActive, 
+      withdrawal_date: withdrawalDate, 
+      withdrawal_reason: withdrawalReason 
+    }));
+  }
+
+  setShowArchiveModal(false);
+  setArchiveTarget(null);
+};
 
   const handleDeleteCourse = async (id) => {
     const course = courses.find(c => c.id === id);
@@ -2588,6 +2680,10 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const displayName = getDisplayName(profile);
   const [mainView, setMainView] = useState('students');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [showArchivedStudents, setShowArchivedStudents] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -2626,6 +2722,39 @@ function CounselorDashboard({ user, profile, onLogout }) {
       setLoading(false);
       return;
     }
+    const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_active: isActive,
+        withdrawal_date: withdrawalDate,
+        withdrawal_reason: withdrawalReason
+      })
+      .eq('id', studentId);
+
+    if (error) {
+      console.error('Archive error:', error);
+      throw error;
+    }
+
+    setStudents(prev => prev.map(s => 
+      s.id === studentId 
+        ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
+        : s
+    ));
+
+    if (selectedStudent?.id === studentId) {
+      setSelectedStudent(prev => ({ 
+        ...prev, 
+        is_active: isActive, 
+        withdrawal_date: withdrawalDate, 
+        withdrawal_reason: withdrawalReason 
+      }));
+    }
+
+    setShowArchiveModal(false);
+    setArchiveTarget(null);
+  };
 
     const { data: studentData } = await supabase
       .from('profiles')
@@ -2721,9 +2850,14 @@ const isStudentAtRisk = (student) => {
 
 // Sort and filter students
 const filteredStudents = students
-  .filter(student => 
-    student.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  .filter(student => {
+    // Filter by active status (hide archived unless toggle is on)
+    if (!showArchivedStudents && student.is_active === false) {
+      return false;
+    }
+    // Filter by search term
+    return student.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+  })
   .sort((a, b) => {
     const aLastName = a.full_name?.split(' ').slice(-1)[0] || '';
     const bLastName = b.full_name?.split(' ').slice(-1)[0] || '';
@@ -3197,25 +3331,44 @@ const filteredStudents = students
                             
 {/* Search Bar */}
 <div className="mb-4 mt-4">
-  <div className="relative">
-    <input
-      type="text"
-      placeholder="Search students by name..."
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      className="w-full md:w-80 px-4 py-2 pl-10 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-    />
-    <svg className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-    {searchTerm && (
-      <button
-        onClick={() => setSearchTerm('')}
-        className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
-      >
-        ✕
-      </button>
-    )}
+  <div className="flex flex-col md:flex-row md:items-center gap-4">
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="Search students by name..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full md:w-80 px-4 py-2 pl-10 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+      />
+      <svg className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      {searchTerm && (
+        <button
+          onClick={() => setSearchTerm('')}
+          className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+    
+    {/* Show Archived Toggle */}
+    <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-slate-300">
+      <input
+        type="checkbox"
+        checked={showArchivedStudents}
+        onChange={(e) => setShowArchivedStudents(e.target.checked)}
+        className="rounded border-slate-600 bg-slate-700 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
+      />
+      Show archived
+      {showArchivedStudents && students.filter(s => s.is_active === false).length > 0 && (
+        <span className="text-amber-400">
+          ({students.filter(s => s.is_active === false).length})
+        </span>
+      )}
+    </label>
+  </div>
   </div>
   {searchTerm && (
     <p className="text-sm text-slate-400 mt-2">
@@ -3593,6 +3746,10 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [showArchivedStudents, setShowArchivedStudents] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
 
   useEffect(() => {
     let mounted = true;
