@@ -1300,8 +1300,7 @@ if (studentData) {
     setArchiveTarget(null);
   };
 
-  const handleDeleteCategory = async (id) => {
-
+ 
   const handleDeleteCategory = async (id) => {
     if (!confirm('Delete this category? This cannot be undone.')) return;
     await supabase.from('credit_categories').delete().eq('id', id);
