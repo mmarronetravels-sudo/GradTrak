@@ -66,7 +66,7 @@ export default function ArchiveStudentModal({
         className="absolute inset-0 bg-black/50" 
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-visible">
         <div className={`px-6 py-4 border-b ${isReactivating ? 'bg-green-50' : 'bg-amber-50'}`}>
           <h3 className={`text-lg font-semibold ${isReactivating ? 'text-green-800' : 'text-amber-800'}`}>
             {isReactivating ? '✓ Reactivate Student' : '⚠️ Archive Student'}
@@ -74,7 +74,7 @@ export default function ArchiveStudentModal({
           <p className="text-sm text-gray-600 mt-1">{student.full_name}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="p-6 overflow-visible">
           {isReactivating ? (
             <div className="mb-6">
               <p className="text-gray-700">
