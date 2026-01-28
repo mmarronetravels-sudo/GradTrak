@@ -58,8 +58,10 @@ export default function ArchiveStudentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 relative z-[60]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[9999]" style={{ pointerEvents: 'auto' }}>
+  <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
+  <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
+    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 pointer-events-auto">
         <div className={`px-6 py-4 border-b ${isReactivating ? 'bg-green-50' : 'bg-amber-50'}`}>
           <h3 className={`text-lg font-semibold ${isReactivating ? 'text-green-800' : 'text-amber-800'}`}>
             {isReactivating ? '✓ Reactivate Student' : '⚠️ Archive Student'}
@@ -178,5 +180,6 @@ export default function ArchiveStudentModal({
         </form>
       </div>
     </div>
+  </div>
   );
 }
