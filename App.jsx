@@ -1166,6 +1166,10 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [counselors, setCounselors] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [showArchivedStudents, setShowArchivedStudents] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
   
   useEffect(() => {
     fetchData();
@@ -1261,6 +1265,42 @@ if (studentData) {
     // Log admin dashboard access
     await logAudit('view_admin_dashboard', 'admin', null);
   }
+
+  const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_active: isActive,
+        withdrawal_date: withdrawalDate,
+        withdrawal_reason: withdrawalReason
+      })
+      .eq('id', studentId);
+
+    if (error) {
+      console.error('Archive error:', error);
+      throw error;
+    }
+
+    setAllStudents(prev => prev.map(s => 
+      s.id === studentId 
+        ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
+        : s
+    ));
+
+    if (selectedStudent?.id === studentId) {
+      setSelectedStudent(prev => ({ 
+        ...prev, 
+        is_active: isActive, 
+        withdrawal_date: withdrawalDate, 
+        withdrawal_reason: withdrawalReason 
+      }));
+    }
+
+    setShowArchiveModal(false);
+    setArchiveTarget(null);
+  };
+
+  const handleDeleteCategory = async (id) => {
 
   const handleDeleteCategory = async (id) => {
     if (!confirm('Delete this category? This cannot be undone.')) return;
