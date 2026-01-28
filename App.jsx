@@ -1125,8 +1125,10 @@ function AuthScreen({ onLogin }) {
             <a href="https://scholarpathsystems.org/terms" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 text-xs">Terms of Service</a>
           </div>
         </div>
-        );
-       }
+      </div>
+    </div>
+  );
+}
 // ============================================
 // ADMIN DASHBOARD
 // ============================================
