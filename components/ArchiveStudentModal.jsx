@@ -87,6 +87,62 @@ export default function ArchiveStudentModal({
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
                   <p className="text-gray-500">Previous withdrawal reason:</p>
                   <p className="text-gray-700">{student.withdrawal_reason}</p>
+                  {student.withdrawal_date && (
+                    <p className="text-gray-500 mt-1">
+                      Withdrawn: {new Date(student.withdrawal_date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Withdrawal Date
+                </label>
+                <input
+                  type="date"
+                  value={withdrawalDate}
+                  onChange={(e) => setWithdrawalDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason for Withdrawal
+                </label>
+                <select
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                >
+                  <option value="">Select a reason...</option>
+                  {WITHDRAWAL_REASONS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+
+              {reason === 'Other' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Please specify
+                  </label>
+                  <input
+                    type="text"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Enter withdrawal reason..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+              )}
+
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 mb-4">
                 <strong>Note:</strong> Archived students will be hidden from your active caseload 
                 and reports, but their records will be preserved. You can reactivate them later if needed.
@@ -129,6 +185,5 @@ export default function ArchiveStudentModal({
         </form>
       </div>
     </div>
-  </div>
   );
 }
