@@ -354,10 +354,12 @@ function CourseItem({ course, category, pathways = [], onDelete, showDelete = tr
             {course.grade && <span className="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-300">{course.grade}</span>}
           </div>
           <div className="flex items-center gap-3 mt-2 text-sm text-slate-400">
-            <span>{category?.icon} {category?.name}</span>
-            <span>•</span>
-            <span>{course.term}</span>
-          </div>
+  <span>{category?.icon} {category?.name}</span>
+  <span>•</span>
+  <span>{course.term}</span>
+  <span>•</span>
+  <span>{course.credits} cr</span>
+</div>
           {pathways.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {pathways.map(p => <CTEBadge key={p.id} pathway={p} />)}
