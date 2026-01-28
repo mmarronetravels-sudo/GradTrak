@@ -3818,9 +3818,6 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState(null);
-  const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
 
   useEffect(() => {
