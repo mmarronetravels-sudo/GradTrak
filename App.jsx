@@ -3369,7 +3369,6 @@ const filteredStudents = students
       )}
     </label>
   </div>
-  </div>
   {searchTerm && (
     <p className="text-sm text-slate-400 mt-2">
       Showing {filteredStudents.length} of {students.length} students
