@@ -56,26 +56,22 @@ function calculateStudentStats(courses, categories) {
   const totalRequired = categories.reduce((sum, cat) => sum + Number(cat.credits_required), 0);
   
   const creditsByCategory = categories.reduce((acc, cat) => {
-    acc[cat.id] = courses.filter(c => c.category_id === cat.id).reduce((sum, c) => sum + Number(c.credits), 0);
+    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
     return acc;
   }, {});
-
-  const totalEarned = Math.round(courses.reduce((sum, c) => sum + Number(c.credits), 0) * 10) / 10;
+  const totalEarned = Math.round(courses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
   const percentage = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
-
   const dualCreditCourses = courses.filter(c => c.is_dual_credit);
-  const associateCredits = dualCreditCourses.filter(c => c.dual_credit_type === 'associate' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0);
-  const transferCredits = dualCreditCourses.filter(c => c.dual_credit_type === 'transfer' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0);
-
+  const associateCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'associate' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+  const transferCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'transfer' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
   const deficiencies = categories.map(cat => {
     const earned = creditsByCategory[cat.id] || 0;
     const required = Number(cat.credits_required);
     if (earned < required) {
-      return { category: cat, needed: required - earned, earned, required };
+      return { category: cat, needed: Math.round((required - earned) * 100) / 100, earned, required };
     }
     return null;
   }).filter(Boolean);
-
   return {
     creditsByCategory,
     totalEarned,
@@ -85,7 +81,7 @@ function calculateStudentStats(courses, categories) {
     transferCredits,
     deficiencies,
     isOnTrack: percentage >= 50,
-    totalDualCredits: dualCreditCourses.reduce((sum, c) => sum + Number(c.credits), 0)
+    totalDualCredits: Math.round(dualCreditCourses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100
   };
 }
 
