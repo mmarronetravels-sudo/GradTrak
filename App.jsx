@@ -2440,42 +2440,7 @@ function StudentDashboard({ user, profile, onLogout }) {
     }
     if (error) console.error('Error adding course:', error);
   };
-  const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      is_active: isActive,
-      withdrawal_date: withdrawalDate,
-      withdrawal_reason: withdrawalReason
-    })
-    .eq('id', studentId);
-
-  if (error) {
-    console.error('Archive error:', error);
-    throw error;
-  }
-
-  // Update local state
-  setStudents(prev => prev.map(s => 
-    s.id === studentId 
-      ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
-      : s
-  ));
-
-  // Also update selectedStudent if it's the one we just archived
-  if (selectedStudent?.id === studentId) {
-    setSelectedStudent(prev => ({ 
-      ...prev, 
-      is_active: isActive, 
-      withdrawal_date: withdrawalDate, 
-      withdrawal_reason: withdrawalReason 
-    }));
-  }
-
-  setShowArchiveModal(false);
-  setArchiveTarget(null);
-};
-
+  
   const handleDeleteCourse = async (id) => {
     const course = courses.find(c => c.id === id);
     await supabase.from('courses').delete().eq('id', id);
