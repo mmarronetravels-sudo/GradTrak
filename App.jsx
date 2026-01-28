@@ -1125,22 +1125,8 @@ function AuthScreen({ onLogin }) {
             <a href="https://scholarpathsystems.org/terms" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-300 text-xs">Terms of Service</a>
           </div>
         </div>
-
-        {/* Archive Student Modal */}
-        <ArchiveStudentModal
-          student={archiveTarget}
-          isOpen={showArchiveModal}
-          onClose={() => {
-            setShowArchiveModal(false);
-            setArchiveTarget(null);
-          }}
-          onArchive={handleArchiveStudent}
-          isReactivating={isReactivating}
-        />
-      </div>
-    </div>
-  );
-}
+        );
+       }
 // ============================================
 // ADMIN DASHBOARD
 // ============================================
