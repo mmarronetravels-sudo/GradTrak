@@ -3216,6 +3216,16 @@ const filteredStudents = students
           </div>
           )}
         </main>
+        {/* Archive Student Modal */}
+        <ArchiveStudentModal
+          student={archiveTarget}
+          isOpen={showArchiveModal}
+          onClose={() => {
+            setShowArchiveModal(false);
+            setArchiveTarget(null);
+          }}
+          onArchive={handleArchiveStudent}
+        />
 
         {/* Add Course Modal for Counselors */}
         {showAddCourseModal && (
