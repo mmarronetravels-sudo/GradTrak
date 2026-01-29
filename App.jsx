@@ -3066,10 +3066,12 @@ const summaryStats = {
             
            {/* Student Notes Log */}
             <StudentNotesLog 
-              studentId={student.id}
-              counselorId={profile.id}
-              studentName={`${student.first_name} ${student.last_name}`}
-            />
+  studentId={student.id}
+  counselorId={profile.id}
+  studentName={`${student.first_name} ${student.last_name}`}
+  studentGrade={student.grade_level}
+  counselorName={profile.full_name}
+/>
           </div>
           )}
           {activeTab === 'courses' && (
