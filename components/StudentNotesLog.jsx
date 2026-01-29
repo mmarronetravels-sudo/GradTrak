@@ -181,7 +181,7 @@ const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
         {/* Follow-up date if set */}
         {note.follow_up_date && (
           <div className={`mt-3 flex items-center gap-2 text-xs ${
-            new Date(note.follow_up_date) < new Date() && note.status === 'open'
+            note.follow_up_date < new Date().toLocaleDateString('en-CA') && note.status === 'open'
               ? 'text-red-400'
               : 'text-slate-500'
           }`}>
@@ -193,7 +193,7 @@ const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
               month: 'short',
               day: 'numeric'
             })}
-            {new Date(note.follow_up_date) < new Date() && note.status === 'open' && (
+            note.follow_up_date < new Date().toLocaleDateString('en-CA') && note.status === 'open' && (
               <span className="text-red-400 font-medium">(Overdue)</span>
             )}
           </div>
@@ -301,7 +301,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
           type="date"
           value={followUpDate}
           onChange={(e) => setFollowUpDate(e.target.value)}
-          min={new Date().toISOString().split('T')[0]}
+          min={new Date().toLocaleDateString('en-CA')}
           className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
         />
       </div>
