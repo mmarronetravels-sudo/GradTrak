@@ -647,7 +647,11 @@ const generateMTSSReport = (notes, studentName, studentGrade, counselorName) => 
 
     // Status
     doc.setFontSize(9);
-    doc.setTextColor(note.status === 'open' ? [180, 83, 9] : [22, 163, 74]); // amber-600 or green-600
+    if (note.status === 'open') {
+  doc.setTextColor(180, 83, 9);
+} else {
+  doc.setTextColor(22, 163, 74);
+} // amber-600 or green-600
     doc.text(`Status: ${note.status === 'open' ? 'Open' : 'Completed'}`, margin + 5, yPos);
     
     yPos += 12;
