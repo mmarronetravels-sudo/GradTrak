@@ -193,7 +193,7 @@ const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
               month: 'short',
               day: 'numeric'
             })}
-            note.follow_up_date < new Date().toLocaleDateString('en-CA') && note.status === 'open' && (
+           {note.follow_up_date < new Date().toLocaleDateString('en-CA') && note.status === 'open' && (
               <span className="text-red-400 font-medium">(Overdue)</span>
             )}
           </div>
