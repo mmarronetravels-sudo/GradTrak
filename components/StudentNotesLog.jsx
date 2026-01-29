@@ -8,17 +8,21 @@
  * - Follow-up date scheduling
  * - Status tracking (open/completed)
  * - Filter by note type
+ * - MTSS Documentation Export (PDF)
  * 
  * Usage:
  * <StudentNotesLog 
  *   studentId={student.id} 
  *   counselorId={counselor.id}
  *   studentName="Landon St Aubin"
+ *   studentGrade={12}
+ *   counselorName="Sarah Miller"
  * />
  */
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import jsPDF from 'jspdf';
 
 // Note type configuration with icons and colors
 const NOTE_TYPES = {
@@ -171,7 +175,7 @@ const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
 
         {/* Note content */}
         <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
-          {note.content}
+          {note.content || note.note}
         </p>
 
         {/* Follow-up date if set */}
@@ -389,8 +393,293 @@ const FilterTabs = ({ activeFilter, onFilterChange, noteCounts }) => {
   );
 };
 
+// MTSS Export Button Component
+const MTSSExportButton = ({ notes, studentName, studentGrade, counselorName, onExport }) => {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await onExport();
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  if (notes.length === 0) return null;
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={isExporting}
+      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-medium rounded-lg transition-colors text-sm"
+      title="Export MTSS Documentation Report"
+    >
+      {isExporting ? (
+        <>
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Generating...
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export MTSS Report
+        </>
+      )}
+    </button>
+  );
+};
+
+// Generate MTSS PDF Report
+const generateMTSSReport = (notes, studentName, studentGrade, counselorName) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  let yPos = margin;
+
+  // Helper to add new page if needed
+  const checkNewPage = (requiredSpace = 30) => {
+    if (yPos + requiredSpace > pageHeight - margin) {
+      doc.addPage();
+      yPos = margin;
+      return true;
+    }
+    return false;
+  };
+
+  // Helper to wrap text
+  const splitTextToLines = (text, maxWidth) => {
+    return doc.splitTextToSize(text, maxWidth);
+  };
+
+  // Calculate date range
+  const sortedNotes = [...notes].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const firstDate = sortedNotes.length > 0 ? new Date(sortedNotes[0].created_at) : new Date();
+  const lastDate = sortedNotes.length > 0 ? new Date(sortedNotes[sortedNotes.length - 1].created_at) : new Date();
+  const dateRange = `${firstDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${lastDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+
+  // Calculate tallies
+  const tallies = {
+    total: notes.length,
+    open: notes.filter(n => n.status === 'open').length,
+    completed: notes.filter(n => n.status === 'completed').length,
+    byType: {}
+  };
+  
+  Object.keys(NOTE_TYPES).forEach(type => {
+    tallies.byType[type] = notes.filter(n => (n.note_type || 'general') === type).length;
+  });
+
+  // ============ HEADER ============
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('MTSS Documentation Report', pageWidth / 2, yPos, { align: 'center' });
+  yPos += 10;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  doc.text('Multi-Tiered System of Supports - Student Contact Log', pageWidth / 2, yPos, { align: 'center' });
+  yPos += 15;
+
+  // ============ STUDENT INFO BOX ============
+  doc.setDrawColor(200);
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 35, 3, 3, 'FD');
+  
+  yPos += 8;
+  doc.setTextColor(0);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Student:', margin + 5, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(studentName, margin + 35, yPos);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Grade:', pageWidth / 2, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(String(studentGrade || 'N/A'), pageWidth / 2 + 25, yPos);
+
+  yPos += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Counselor:', margin + 5, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(counselorName || 'N/A', margin + 35, yPos);
+
+  yPos += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date Range:', margin + 5, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(dateRange, margin + 40, yPos);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Generated:', pageWidth / 2, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), pageWidth / 2 + 35, yPos);
+
+  yPos += 20;
+
+  // ============ SUMMARY TABLE ============
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0);
+  doc.text('Contact Summary', margin, yPos);
+  yPos += 8;
+
+  // Table header
+  const colWidths = [80, 40];
+  const tableX = margin;
+  
+  doc.setFillColor(30, 41, 59); // slate-800
+  doc.setTextColor(255);
+  doc.setFontSize(10);
+  doc.rect(tableX, yPos, colWidths[0], 8, 'F');
+  doc.rect(tableX + colWidths[0], yPos, colWidths[1], 8, 'F');
+  doc.text('Contact Type', tableX + 3, yPos + 6);
+  doc.text('Count', tableX + colWidths[0] + 3, yPos + 6);
+  yPos += 8;
+
+  // Table rows
+  doc.setTextColor(0);
+  doc.setFont('helvetica', 'normal');
+  
+  Object.entries(NOTE_TYPES).forEach(([key, config], index) => {
+    const count = tallies.byType[key] || 0;
+    const bgColor = index % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    doc.setFillColor(...bgColor);
+    doc.rect(tableX, yPos, colWidths[0], 7, 'F');
+    doc.rect(tableX + colWidths[0], yPos, colWidths[1], 7, 'F');
+    doc.text(`${config.label}`, tableX + 3, yPos + 5);
+    doc.text(String(count), tableX + colWidths[0] + 3, yPos + 5);
+    yPos += 7;
+  });
+
+  // Total row
+  doc.setFillColor(30, 41, 59);
+  doc.setTextColor(255);
+  doc.setFont('helvetica', 'bold');
+  doc.rect(tableX, yPos, colWidths[0], 8, 'F');
+  doc.rect(tableX + colWidths[0], yPos, colWidths[1], 8, 'F');
+  doc.text('TOTAL CONTACTS', tableX + 3, yPos + 6);
+  doc.text(String(tallies.total), tableX + colWidths[0] + 3, yPos + 6);
+  yPos += 15;
+
+  // Status summary
+  doc.setTextColor(0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Open Items: ${tallies.open}  |  Completed: ${tallies.completed}`, margin, yPos);
+  yPos += 15;
+
+  // ============ DETAILED LOG ============
+  checkNewPage(40);
+  
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Detailed Contact Log', margin, yPos);
+  yPos += 10;
+
+  // Sort notes by date (newest first for the report)
+  const sortedNotesDesc = [...notes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  sortedNotesDesc.forEach((note, index) => {
+    checkNewPage(50);
+
+    const noteType = NOTE_TYPES[note.note_type || 'general'];
+    const noteDate = new Date(note.created_at);
+    const formattedDate = noteDate.toLocaleDateString('en-US', { 
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+    const formattedTime = noteDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    // Entry header
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 8, 2, 2, 'F');
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`${noteType.label}`, margin + 3, yPos + 6);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`${formattedDate} at ${formattedTime}`, pageWidth - margin - 3, yPos + 6, { align: 'right' });
+    yPos += 12;
+
+    // Note content
+    doc.setTextColor(0);
+    doc.setFontSize(10);
+    const noteContent = note.content || note.note || '(No content)';
+    const contentLines = splitTextToLines(noteContent, pageWidth - (margin * 2) - 10);
+    
+    contentLines.forEach(line => {
+      checkNewPage(10);
+      doc.text(line, margin + 5, yPos);
+      yPos += 5;
+    });
+
+    // Follow-up date if exists
+    if (note.follow_up_date) {
+      yPos += 2;
+      doc.setTextColor(100);
+      doc.setFontSize(9);
+      const followUpDate = new Date(note.follow_up_date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+      doc.text(`Follow-up scheduled: ${followUpDate}`, margin + 5, yPos);
+      yPos += 5;
+    }
+
+    // Status
+    doc.setFontSize(9);
+    doc.setTextColor(note.status === 'open' ? [180, 83, 9] : [22, 163, 74]); // amber-600 or green-600
+    doc.text(`Status: ${note.status === 'open' ? 'Open' : 'Completed'}`, margin + 5, yPos);
+    
+    yPos += 12;
+  });
+
+  // ============ FOOTER ============
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(
+      `Page ${i} of ${totalPages} | Generated by GradTrack | ${new Date().toLocaleDateString()}`,
+      pageWidth / 2,
+      pageHeight - 10,
+      { align: 'center' }
+    );
+  }
+
+  // Save the PDF
+  const fileName = `MTSS_Report_${studentName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(fileName);
+};
+
 // Main StudentNotesLog Component
-const StudentNotesLog = ({ studentId, counselorId, studentName = 'Student' }) => {
+const StudentNotesLog = ({ 
+  studentId, 
+  counselorId, 
+  studentName = 'Student',
+  studentGrade = null,
+  counselorName = null 
+}) => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -431,6 +720,7 @@ const StudentNotesLog = ({ studentId, counselorId, studentName = 'Student' }) =>
         .insert([{
           student_id: studentId,
           counselor_id: counselorId,
+          note: noteData.content, // Store in 'note' column for compatibility
           ...noteData
         }])
         .select()
@@ -481,12 +771,18 @@ const StudentNotesLog = ({ studentId, counselorId, studentName = 'Student' }) =>
     }
   };
 
+  // Handle MTSS Export
+  const handleMTSSExport = async () => {
+    generateMTSSReport(notes, studentName, studentGrade, counselorName);
+  };
+
   // Calculate note counts for filters
   const noteCounts = {
     total: notes.length,
     open: notes.filter(n => n.status === 'open').length,
     byType: notes.reduce((acc, note) => {
-      acc[note.note_type] = (acc[note.note_type] || 0) + 1;
+      const type = note.note_type || 'general';
+      acc[type] = (acc[type] || 0) + 1;
       return acc;
     }, {})
   };
@@ -495,7 +791,7 @@ const StudentNotesLog = ({ studentId, counselorId, studentName = 'Student' }) =>
   const filteredNotes = notes.filter(note => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'open') return note.status === 'open';
-    return note.note_type === activeFilter;
+    return (note.note_type || 'general') === activeFilter;
   });
 
   if (loading) {
@@ -509,13 +805,22 @@ const StudentNotesLog = ({ studentId, counselorId, studentName = 'Student' }) =>
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-200">
-          Notes for {studentName}
-        </h3>
-        <span className="text-sm text-slate-500">
-          {notes.length} {notes.length === 1 ? 'entry' : 'entries'}
-        </span>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-200">
+            Notes for {studentName}
+          </h3>
+          <span className="text-sm text-slate-500">
+            {notes.length} {notes.length === 1 ? 'entry' : 'entries'}
+          </span>
+        </div>
+        <MTSSExportButton
+          notes={notes}
+          studentName={studentName}
+          studentGrade={studentGrade}
+          counselorName={counselorName}
+          onExport={handleMTSSExport}
+        />
       </div>
 
       {/* Error display */}
