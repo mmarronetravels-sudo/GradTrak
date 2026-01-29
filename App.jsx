@@ -3070,6 +3070,7 @@ const summaryStats = {
               counselorId={profile.id}
               studentName={`${student.first_name} ${student.last_name}`}
             />
+            )}
           {activeTab === 'courses' && (
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
