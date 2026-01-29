@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 const WITHDRAWAL_REASONS = [
   'Transferred to another school',
   'Moved out of district',
   'Graduated early',
-  'Personal/Family reasons',
-  'Medical reasons',
-  'Enrollment in GED program',
-  'Enrollment in homeschool',
-  'No longer participating',
+  'Dropped out',
+  'Medical withdrawal',
+  'Family circumstances',
+  'Disciplinary action',
+  'Aged out',
+  'Deceased',
   'Other'
 ];
 
@@ -16,41 +18,55 @@ export default function ArchiveStudentModal({
   student, 
   isOpen, 
   onClose, 
-  onArchive,
+  onArchive, 
   isReactivating = false 
 }) {
   const [reason, setReason] = useState('');
   const [customReason, setCustomReason] = useState('');
-  const [withdrawalDate, setWithdrawalDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [withdrawalDate, setWithdrawalDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (isOpen) {
+      setReason('');
+      setCustomReason('');
+      const today = new Date().toISOString().split('T')[0];
+      setWithdrawalDate(today);
+      setError('');
+    }
+  }, [isOpen]);
+
   if (!isOpen || !student) return null;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (!isReactivating) {
+      if (!reason) {
+        setError('Please select a withdrawal reason');
+        return;
+      }
+      if (reason === 'Other' && !customReason.trim()) {
+        setError('Please provide a custom reason');
+        return;
+      }
+    }
+
     setLoading(true);
     setError('');
 
-    if (!isReactivating && !reason) {
-      setError('Please select a withdrawal reason');
-      setLoading(false);
-      return;
-    }
-
-    const finalReason = reason === 'Other' ? customReason : reason;
-
     try {
+      const finalReason = reason === 'Other' ? customReason.trim() : reason;
+      
       await onArchive({
         studentId: student.id,
         isActive: isReactivating,
         withdrawalDate: isReactivating ? null : withdrawalDate,
         withdrawalReason: isReactivating ? null : finalReason
       });
+      
       onClose();
     } catch (err) {
+      console.error('Archive error:', err);
       setError(err.message || 'Failed to update student status');
     } finally {
       setLoading(false);
@@ -59,66 +75,142 @@ export default function ArchiveStudentModal({
 
   return (
     <div 
-      className="fixed inset-0 flex items-center justify-center"
-      style={{ zIndex: 99999 }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div 
-        className="absolute inset-0 bg-black/50" 
-        onClick={onClose}
-      />
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-visible">
-        <div className={`px-6 py-4 border-b ${isReactivating ? 'bg-green-50' : 'bg-amber-50'}`}>
-          <h3 className={`text-lg font-semibold ${isReactivating ? 'text-green-800' : 'text-amber-800'}`}>
-            {isReactivating ? '✓ Reactivate Student' : '⚠️ Archive Student'}
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">{student.full_name}</p>
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          width: '100%',
+          maxWidth: '440px',
+          margin: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          overflow: 'visible'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ 
+          padding: '20px 24px', 
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <span style={{ fontSize: '24px' }}>⚠️</span>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: '20px', 
+            fontWeight: 600, 
+            color: '#111827' 
+          }}>
+            {isReactivating ? 'Reactivate Student' : 'Archive Student'}
+          </h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-visible">
-          {isReactivating ? (
-            <div className="mb-6">
-              <p className="text-gray-700">
-                Are you sure you want to reactivate <strong>{student.full_name}</strong>?
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                This will restore the student to your active caseload and include them in reports.
-              </p>
-              {student.withdrawal_reason && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
-                  <p className="text-gray-500">Previous withdrawal reason:</p>
-                  <p className="text-gray-700">{student.withdrawal_reason}</p>
-                  {student.withdrawal_date && (
-                    <p className="text-gray-500 mt-1">
-                      Withdrawn: {new Date(student.withdrawal_date).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-              )}
+        {/* Body */}
+        <div style={{ padding: '24px', overflow: 'visible' }}>
+          <p style={{ 
+            margin: '0 0 20px 0', 
+            color: '#374151',
+            fontSize: '15px'
+          }}>
+            {student.first_name} {student.last_name}
+          </p>
+
+          {error && (
+            <div style={{
+              marginBottom: '16px',
+              padding: '12px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              color: '#dc2626',
+              fontSize: '14px'
+            }}>
+              {error}
             </div>
-          ) : (
-            <>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+          )}
+
+          {!isReactivating && (
+            <div style={{ overflow: 'visible' }}>
+              {/* Withdrawal Date */}
+              <div style={{ marginBottom: '20px' }}>
+                <label 
+                  htmlFor="archiveDate"
+                  style={{ 
+                    display: 'block', 
+                    marginBottom: '6px', 
+                    fontWeight: 500,
+                    color: '#374151',
+                    fontSize: '14px'
+                  }}
+                >
                   Withdrawal Date
                 </label>
                 <input
                   type="date"
+                  id="archiveDate"
                   value={withdrawalDate}
                   onChange={(e) => setWithdrawalDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    backgroundColor: 'white',
+                    color: '#111827',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer'
+                  }}
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              {/* Withdrawal Reason */}
+              <div style={{ marginBottom: '20px', position: 'relative' }}>
+                <label 
+                  htmlFor="archiveReason"
+                  style={{ 
+                    display: 'block', 
+                    marginBottom: '6px', 
+                    fontWeight: 500,
+                    color: '#374151',
+                    fontSize: '14px'
+                  }}
+                >
                   Reason for Withdrawal
                 </label>
                 <select
+                  id="archiveReason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    backgroundColor: 'white',
+                    color: reason ? '#111827' : '#6b7280',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    appearance: 'menulist'
+                  }}
                 >
                   <option value="">Select a reason...</option>
                   {WITHDRAWAL_REASONS.map((r) => (
@@ -127,62 +219,110 @@ export default function ArchiveStudentModal({
                 </select>
               </div>
 
+              {/* Custom Reason */}
               {reason === 'Other' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div style={{ marginBottom: '20px' }}>
+                  <label 
+                    htmlFor="customReason"
+                    style={{ 
+                      display: 'block', 
+                      marginBottom: '6px', 
+                      fontWeight: 500,
+                      color: '#374151',
+                      fontSize: '14px'
+                    }}
+                  >
                     Please specify
                   </label>
                   <input
                     type="text"
+                    id="customReason"
                     value={customReason}
                     onChange={(e) => setCustomReason(e.target.value)}
                     placeholder="Enter withdrawal reason..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '15px',
+                      backgroundColor: 'white',
+                      boxSizing: 'border-box'
+                    }}
                   />
                 </div>
               )}
 
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 mb-4">
-                <strong>Note:</strong> Archived students will be hidden from your active caseload 
-                and reports, but their records will be preserved. You can reactivate them later if needed.
+              {/* Info Note */}
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#fef3c7',
+                borderRadius: '8px',
+                fontSize: '13px',
+                color: '#92400e'
+              }}>
+                <strong>Note:</strong> Archived students will be hidden from your active caseload and reports, but their records will be preserved. You can reactivate them later if needed.
               </div>
-            </>
-          )}
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
             </div>
           )}
 
-          <div className="flex gap-3 justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`px-4 py-2 text-white rounded-lg font-medium transition-colors ${
-                isReactivating 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : 'bg-amber-600 hover:bg-amber-700'
-              } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {loading 
-                ? 'Processing...' 
-                : isReactivating 
-                  ? 'Reactivate Student' 
-                  : 'Archive Student'
-              }
-            </button>
-          </div>
-        </form>
+          {isReactivating && (
+            <p style={{ color: '#374151', fontSize: '14px' }}>
+              This will restore the student to your active caseload.
+            </p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ 
+          padding: '16px 24px', 
+          borderTop: '1px solid #e5e7eb',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '12px'
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: 500,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: isReactivating ? '#059669' : '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: 500,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1
+            }}
+          >
+            {loading 
+              ? 'Processing...' 
+              : isReactivating 
+                ? 'Reactivate Student' 
+                : 'Archive Student'
+            }
+          </button>
+        </div>
       </div>
     </div>
   );
