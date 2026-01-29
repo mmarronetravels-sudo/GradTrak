@@ -18,7 +18,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { supabase } from './supabase'; // Adjust path as needed
+import { supabase } from '../supabase';
 
 // Note type configuration with icons and colors
 const NOTE_TYPES = {
