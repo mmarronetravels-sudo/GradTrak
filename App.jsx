@@ -2882,11 +2882,12 @@ const filteredStudents = students
     const bLastName = b.full_name?.split(' ').slice(-1)[0] || '';
     return aLastName.localeCompare(bLastName);
   });
-  const summaryStats = {
-  total: students.length,
-  atRisk: students.filter(s => isStudentAtRisk(s)).length,
-  onTrack: students.filter(s => !isStudentAtRisk(s)).length,
-  avgProgress: students.length > 0 ? Math.round(students.reduce((sum, s) => sum + (s.stats?.percentage || 0), 0) / students.length) : 0
+  const activeStudents = students.filter(s => s.is_active !== false);
+const summaryStats = {
+  total: activeStudents.length,
+  atRisk: activeStudents.filter(s => isStudentAtRisk(s)).length,
+  onTrack: activeStudents.filter(s => !isStudentAtRisk(s)).length,
+  avgProgress: activeStudents.length > 0 ? Math.round(activeStudents.reduce((sum, s) => sum + (s.stats?.percentage || 0), 0) / activeStudents.length) : 0
 };
   // Student Detail View
   if (selectedStudent) {
