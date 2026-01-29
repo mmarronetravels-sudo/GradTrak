@@ -716,13 +716,15 @@ const StudentNotesLog = ({
     setIsSubmitting(true);
     try {
       const { data, error } = await supabase
-        .from('student_notes')
-        .insert([{
-          student_id: studentId,
-          counselor_id: counselorId,
-          note: noteData.content, // Store in 'note' column for compatibility
-          ...noteData
-        }])
+  .from('student_notes')
+  .insert([{
+    student_id: studentId,
+    counselor_id: counselorId,
+    note: noteData.content,
+    note_type: noteData.note_type,
+    follow_up_date: noteData.follow_up_date,
+    status: noteData.status
+  }])
         .select()
         .single();
 
