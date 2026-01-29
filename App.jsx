@@ -3068,7 +3068,7 @@ const summaryStats = {
             <StudentNotesLog 
   studentId={student.id}
   counselorId={profile.id}
-  studentName={`${student.first_name} ${student.last_name}`}
+  studentName={student.displayName}
   studentGrade={student.grade_level}
   counselorName={profile.full_name}
 />
