@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import DataSyncUpload from './components/DataSyncUpload';
 import AtRiskReport from './components/AtRiskReport';
 import ArchiveStudentModal from './components/ArchiveStudentModal';
+import StudentNotesLog from './components/StudentNotesLog';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -3063,120 +3064,12 @@ const summaryStats = {
           <div className="bg-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
             <h3 className="text-lg font-semibold text-white mb-4">📝 Counselor Notes</h3>
             
-            {/* Add New Note */}
-            <div className="mb-4">
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Add a note about this student..."
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"
-                rows={3}
-              />
-              <button
-                onClick={async () => {
-                  if (!newNote.trim()) return;
-                  const { error } = await supabase.from('student_notes').insert([{
-                    student_id: student.id,
-                    counselor_id: profile.id,
-                    school_id: profile.school_id,
-                    note: newNote.trim()
-                  }]);
-                  if (!error) {
-                    setNewNote('');
-                    fetchNotes(student.id);
-                  } else {
-                    alert('Error saving note: ' + error.message);
-                  }
-                }}
-                className="mt-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl transition-all text-sm font-medium"
-              >
-                Save Note
-              </button>
-            </div>
-
-            {/* Notes List */}
-            <div className="space-y-3">
-              {notes.length === 0 ? (
-                <p className="text-slate-400 text-sm">No notes yet.</p>
-              ) : (
-                notes.map(note => (
-                  <div key={note.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    {editingNote === note.id ? (
-                      <div>
-                        <textarea
-                          defaultValue={note.note}
-                          id={`edit-note-${note.id}`}
-                          className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-white resize-none"
-                          rows={3}
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={async () => {
-                              const textarea = document.getElementById(`edit-note-${note.id}`);
-                              const { error } = await supabase
-                                .from('student_notes')
-                                .update({ note: textarea.value, updated_at: new Date().toISOString() })
-                                .eq('id', note.id);
-                              if (!error) {
-                                setEditingNote(null);
-                                fetchNotes(student.id);
-                              }
-                            }}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded-lg text-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingNote(null)}
-                            className="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1 rounded-lg text-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-white text-sm whitespace-pre-wrap">{note.note}</p>
-                        <div className="flex items-center justify-between mt-3">
-                          <span className="text-slate-500 text-xs">
-                            {new Date(note.created_at).toLocaleDateString()} at {new Date(note.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            {note.updated_at !== note.created_at && ' (edited)'}
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setEditingNote(note.id)}
-                              className="text-slate-400 hover:text-white text-xs"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (confirm('Delete this note?')) {
-                                  await supabase.from('student_notes').delete().eq('id', note.id);
-                                  fetchNotes(student.id);
-                                }
-                              }}
-                              className="text-red-400 hover:text-red-300 text-xs"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          )}
-          {activeTab === 'at-risk' && (
-            <AtRiskReport
-              schoolId={profile.school_id}
+           {/* Student Notes Log */}
+            <StudentNotesLog 
+              studentId={student.id}
               counselorId={profile.id}
+              studentName={`${student.first_name} ${student.last_name}`}
             />
-          )}
-
           {activeTab === 'courses' && (
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
