@@ -2726,22 +2726,34 @@ function CounselorDashboard({ user, profile, onLogout }) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-    // Get assigned students for this counselor
-    const { data: assignmentData } = await supabase
-      .from('counselor_assignments')
-      .select('student_id')
-      .eq('counselor_id', profile.id);
+// Get students - superusers see all, counselors see assigned only
+let assignedStudentIds = [];
 
-    const assignedStudentIds = assignmentData?.map(a => a.student_id) || [];
+if (profile.is_superuser) {
+  // Superusers see all students in their school
+  const { data: allStudents } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('school_id', profile.school_id)
+    .eq('role', 'student');
+  assignedStudentIds = allStudents?.map(s => s.id) || [];
+} else {
+  // Regular counselors see only assigned students
+  const { data: assignmentData } = await supabase
+    .from('counselor_assignments')
+    .select('student_id')
+    .eq('counselor_id', profile.id);
+  assignedStudentIds = assignmentData?.map(a => a.student_id) || [];
+}
 
-    // If no assignments, show empty list
-    if (assignedStudentIds.length === 0) {
-      setStudents([]);
-      if (catData) setCategories(catData);
-      if (pathData) setPathways(pathData);
-      setLoading(false);
-      return;
-    }
+// If no students, show empty list
+if (assignedStudentIds.length === 0) {
+  setStudents([]);
+  if (catData) setCategories(catData);
+  if (pathData) setPathways(pathData);
+  setLoading(false);
+  return;
+}
     const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
       .from('profiles')
