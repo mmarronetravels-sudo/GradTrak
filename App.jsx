@@ -4,6 +4,7 @@ import DataSyncUpload from './components/DataSyncUpload';
 import AtRiskReport from './components/AtRiskReport';
 import ArchiveStudentModal from './components/ArchiveStudentModal';
 import StudentNotesLog from './components/StudentNotesLog';
+import CTEPathwayReport from './components/CTEPathwayReport';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -1460,6 +1461,10 @@ if (studentData) {
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'at-risk' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
                 ⚠️ At-Risk
               </button>
+         <button onClick={() => setActiveTab('cte-pathways')}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'cte-pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                🎯 CTE Pathways
+              </button>
          <button onClick={() => setActiveTab('students')}
       className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
       👥 Students
@@ -1719,6 +1724,16 @@ if (studentData) {
 )}
   {activeTab === 'at-risk' && (
             <AtRiskReport
+  schoolId={profile.school_id}
+  counselorId={profile.role === 'counselor' ? profile.id : null}
+  onSelectStudent={(student) => {
+    setSelectedStudent(student);
+    setActiveTab('student-detail');
+  }}
+/>
+          )}
+  {activeTab === 'cte-pathways' && (
+            <CTEPathwayReport
   schoolId={profile.school_id}
   counselorId={profile.role === 'counselor' ? profile.id : null}
   onSelectStudent={(student) => {
