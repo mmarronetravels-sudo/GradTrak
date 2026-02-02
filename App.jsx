@@ -3287,6 +3287,12 @@ const summaryStats = {
               >
                 ⚠️ At-Risk Report
               </button>
+              <button
+  onClick={() => setMainView('cte-pathways')}
+  className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'cte-pathways' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+>
+  🎯 CTE Pathways
+</button>
             </div>
 
             {mainView === 'students' && (
@@ -3392,6 +3398,16 @@ fetchNotes(student.id);
   const fullStudent = students.find(s => s.id === student.id) || student;
   setSelectedStudent(fullStudent);
 }}
+                {mainView === 'cte-pathways' && (
+              <CTEPathwayReport
+                schoolId={profile.school_id}
+                counselorId={profile.id}
+                onSelectStudent={(student) => {
+  const fullStudent = students.find(s => s.id === student.id) || student;
+  setSelectedStudent(fullStudent);
+}}
+              />
+            )}
               />
             )}
           </div>
