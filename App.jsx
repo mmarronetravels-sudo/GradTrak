@@ -3396,9 +3396,11 @@ fetchNotes(student.id);
                 counselorId={profile.id}
                 onSelectStudent={(student) => {
   const fullStudent = students.find(s => s.id === student.id) || student;
-  setSelectedStudent(fullStudent);
+ setSelectedStudent(fullStudent);
 }}
-                {mainView === 'cte-pathways' && (
+              />
+            )}
+            {mainView === 'cte-pathways' && (
               <CTEPathwayReport
                 schoolId={profile.school_id}
                 counselorId={profile.id}
