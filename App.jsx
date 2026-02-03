@@ -95,16 +95,16 @@ function calculatePathwayProgress(courses, pathways, coursePathways) {
       .map(cp => cp.course_id);
     
     const pathwayCourses = courses.filter(c => linkedCourseIds.includes(c.id));
-    const earnedCredits = pathwayCourses.reduce((sum, c) => sum + Number(c.credits), 0);
-    const requiredCredits = Number(pathway.credits_required);
-    const percentage = requiredCredits > 0 ? Math.round((earnedCredits / requiredCredits) * 100) : 0;
+    const earnedCourses = pathwayCourses.length;
+    const requiredCourses = Number(pathway.courses_required);
+    const percentage = requiredCourses > 0 ? Math.round((earnedCourses / requiredCourses) * 100) : 0;
     
     return {
       ...pathway,
-      earnedCredits,
-      requiredCredits,
+      earnedCourses,
+      requiredCourses,
       percentage: Math.min(percentage, 100),
-      isComplete: earnedCredits >= requiredCredits,
+      isComplete: earnedCourses >= requiredCourses,
       courses: pathwayCourses
     };
   });
