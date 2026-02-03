@@ -3431,17 +3431,15 @@ const summaryStats = {
               />
             )}
             {mainView === 'cte-pathways' && (
-              <CTEPathwayReport
-                schoolId={profile.school_id}
-                counselorId={profile.id}
-                onSelectStudent={(student) => {
-  const fullStudent = students.find(s => s.id === student.id) || student;
-  setSelectedStudent(fullStudent);
-}}
-              />
-            )}
-              />
-            )}
+  <CTEPathwayReport
+    schoolId={profile.school_id}
+    counselorId={profile.id}
+    onSelectStudent={(student) => {
+      const fullStudent = students.find(s => s.id === student.id) || student;
+      setSelectedStudent(fullStudent);
+    }}
+  />
+)}
           </div>
         </main>
 
