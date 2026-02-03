@@ -2683,7 +2683,6 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState('');
   const [caseManager, setCaseManager] = useState(null);
   const [editingNote, setEditingNote] = useState(null);
   const [activeTab, setActiveTab] = useState('progress');
