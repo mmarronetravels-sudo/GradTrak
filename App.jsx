@@ -326,8 +326,8 @@ function PathwayCard({ pathway }) {
         {pathway.isComplete && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-medium">✓ Complete</span>}
       </div>
       <h3 className="text-white font-semibold mb-1">{pathway.name}</h3>
-      <p className="text-slate-400 text-xs mb-3">{pathway.earnedCredits} / {pathway.requiredCredits} credits</p>
-      <ProgressBar earned={pathway.earnedCredits} required={pathway.requiredCredits} color={pathway.isComplete ? '#10b981' : '#f59e0b'} />
+      <p className="text-slate-400 text-xs mb-3">{pathway.earnedCourses} / {pathway.requiredCourses} courses</p>
+      <ProgressBar earned={pathway.earnedCourses} required={pathway.requiredCourses} color={pathway.isComplete ? '#10b981' : '#f59e0b'} />
       {pathway.courses.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-700">
           <p className="text-slate-500 text-xs mb-2">Courses:</p>
@@ -2543,7 +2543,7 @@ const getPathwaysForCourse = (course) => {
               <div>
                 <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
                 <div className="space-y-3">
-                  {pathwayProgress.filter(p => p.earnedCredits > 0).map(pathway => (
+                  {pathwayProgress.filter(p => p.earnedCourses > 0).map(pathway => (
                     <PathwayCard key={pathway.id} pathway={pathway} />
                   ))}
                 </div>
