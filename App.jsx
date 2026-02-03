@@ -2682,6 +2682,9 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [parents, setParents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
+  const [notes, setNotes] = useState([]);
+  const [newNote, setNewNote] = useState('');
+  const [caseManager, setCaseManager] = useState(null);
   const [editingNote, setEditingNote] = useState(null);
   const [activeTab, setActiveTab] = useState('progress');
   const [schedulingLink, setSchedulingLink] = useState(profile.scheduling_link || '');
@@ -2876,6 +2879,21 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
     .order('created_at', { ascending: false });
   if (data) setNotes(data);
 }
+  async function fetchCaseManager(studentId) {
+  const { data } = await supabase
+    .from('counselor_assignments')
+    .select(`
+      counselor:counselor_id (
+        id,
+        full_name,
+        email
+      )
+    `)
+    .eq('student_id', studentId)
+    .eq('assignment_type', 'case_manager')
+    .single();
+  setCaseManager(data?.counselor || null);
+}
   const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
   const getPathwaysForCourse = (course, studentCoursePathways) => {
     const pathwayIds = studentCoursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
@@ -2950,6 +2968,14 @@ const summaryStats = {
                 <div>
   <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
+  {student.has_iep && caseManager && (
+    <p className="text-slate-400 text-sm">Case Manager: {caseManager.full_name}</p>
+  )}
+  {student.has_iep && (
+    <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30">
+      📋 IEP
+    </span>
+  )}
   {student.diploma_types && (
     <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
       🎓 {student.diploma_types.name}
@@ -3357,22 +3383,26 @@ const summaryStats = {
                 key={student.id} 
                 onClick={() => {
   setSelectedStudent(student);
-console.log('Selected student:', student.full_name, 'courses:', student.courses?.length);
-fetchNotes(student.id);
+  console.log('Selected student:', student.full_name, 'courses:', student.courses?.length);
+  fetchNotes(student.id);
+  fetchCaseManager(student.id);
 }}
                 className="w-full bg-slate-900/80 rounded-2xl p-5 border border-slate-800 hover:bg-slate-800/80 hover:border-indigo-500/30 transition-all text-left"
               >
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-white font-semibold">{student.displayName}</h3>
-                      {student.alerts.some(a => a.type === 'critical') && (
-                        <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
-                      )}
-                      {student.is_adult_student && (
-                        <span className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium">18+ FERPA</span>
-                      )}
-                    </div>
+  <h3 className="text-white font-semibold">{student.displayName}</h3>
+  {student.has_iep && (
+    <span className="bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded-full text-xs font-medium">IEP</span>
+  )}
+  {student.alerts.some(a => a.type === 'critical') && (
+    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
+  )}
+  {student.is_adult_student && (
+    <span className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium">18+ FERPA</span>
+  )}
+</div>
                     <p className="text-slate-400 text-sm">Grade {student.grade || 'N/A'} • Class of {student.graduation_year || 'N/A'}</p>
                     <p className="text-slate-500 text-xs mt-1">{student.courses.length} courses • {student.stats.totalEarned} credits earned</p>
                   </div>
