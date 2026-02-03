@@ -3050,11 +3050,11 @@ const summaryStats = {
           </div>
 
           {/* CTE Pathways */}
-          {student.pathwayProgress && student.pathwayProgress.length > 0 && student.pathwayProgress.some(p => p.earnedCredits > 0) && (
+          {student.pathwayProgress && student.pathwayProgress.length > 0 && student.pathwayProgress.some(p => p.earnedCourses > 0) && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
               <div className="space-y-3">
-                {student.pathwayProgress.filter(p => p.earnedCredits > 0).map(pathway => (
+                {student.pathwayProgress.filter(p => p.earnedCourses > 0).map(pathway => (
                   <PathwayCard key={pathway.id} pathway={pathway} />
                 ))}
               </div>
