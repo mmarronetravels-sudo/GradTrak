@@ -2745,7 +2745,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
 // Get students - superusers see all, counselors see assigned only
 let assignedStudentIds = [];
 
-if (profile.is_superuser) {
+if (profile.is_superuser || profile.role === 'viewer') {
   // Superusers see all students in their school
   const { data: allStudents } = await supabase
     .from('profiles')
@@ -3846,7 +3846,7 @@ export default function App() {
     return <AdminDashboard user={user} profile={profile} onLogout={handleLogout} />;
   }
 
-  if (profile.role === 'counselor' || profile.role === 'case_manager') {
+  if (profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'viewer') {
   return <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
 }
 
