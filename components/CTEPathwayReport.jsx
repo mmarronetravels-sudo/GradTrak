@@ -131,18 +131,18 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
         pathwayCourseNames.includes(c.name?.toLowerCase())
       );
       
-      const earnedCredits = completedCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
-      const requiredCredits = pathway.credits_required || 3.0;
-      const percentage = Math.round((earnedCredits / requiredCredits) * 100);
+      const earnedCourses = completedCourses.length;
+const requiredCourses = pathway.courses_required || 6;
+const percentage = Math.round((earnedCourses / requiredCourses) * 100);
       
-      if (earnedCredits > 0) {
+      if (earnedCourses > 0) {
         results.push({
           pathway,
-          earnedCredits,
-          requiredCredits,
+          earnedCourses,
+          requiredCourses,
           percentage: Math.min(percentage, 100),
           completedCourses,
-          isComplete: earnedCredits >= requiredCredits
+          isComplete: earnedCourses >= requiredCourses
         });
       }
     });
@@ -175,14 +175,14 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
     return students.map(student => {
       const pathwayProgress = calculatePathwayProgress(student.id);
       const primaryPathway = pathwayProgress.length > 0 
-        ? pathwayProgress.reduce((max, p) => p.earnedCredits > max.earnedCredits ? p : max, pathwayProgress[0])
+        ? pathwayProgress.reduce((max, p) => p.earnedCourses > max.earnedCourses ? p : max, pathwayProgress[0])
         : null;
       
       return {
         ...student,
         pathwayProgress,
         primaryPathway,
-        totalCTECredits: pathwayProgress.reduce((sum, p) => sum + p.earnedCredits, 0),
+        totalCTECourses: pathwayProgress.reduce((sum, p) => sum + p.earnedCourses, 0),
         hasPathwayProgress: pathwayProgress.length > 0
       };
     }).filter(s => s.hasPathwayProgress); // Only show students with CTE progress
@@ -240,9 +240,9 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
           bVal = b.primaryPathway?.percentage || 0; 
           break;
         case 'credits':
-          aVal = a.primaryPathway?.earnedCredits || 0;
-          bVal = b.primaryPathway?.earnedCredits || 0;
-          break;
+  aVal = a.primaryPathway?.earnedCourses || 0;
+  bVal = b.primaryPathway?.earnedCourses || 0;
+  break;
         default: 
           aVal = 0; 
           bVal = 0;
@@ -282,7 +282,7 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
 
   // Export to CSV
   const exportToCSV = () => {
-    const headers = ['Name', 'Grade', 'Email', 'Primary Pathway', 'Credits Earned', 'Credits Required', 'Progress %', 'Status', 'Completed Courses'];
+    const headers = ['Name', 'Grade', 'Email', 'Primary Pathway', 'Courses Earned', 'Courses Required', 'Progress %', 'Status', 'Completed Courses'];
     const rows = filteredStudents.map(s => {
       const primary = s.primaryPathway;
       const status = primary ? getPathwayStatus(primary) : { label: 'N/A' };
@@ -292,8 +292,8 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
         s.grade,
         s.email,
         primary?.pathway.name || 'N/A',
-        primary?.earnedCredits.toFixed(1) || '0',
-        primary?.requiredCredits || '3.0',
+        primary?.earnedCourses || '0',
+        primary?.requiredCourses || '6',
         (primary?.percentage || 0) + '%',
         status.label,
         completedCourses
@@ -375,7 +375,7 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
         <div className="bg-emerald-900/30 rounded-xl p-4 border border-emerald-800/50">
           <div className="text-xs uppercase tracking-wide text-emerald-300 mb-1">Pathway Complete</div>
           <div className="text-3xl font-bold text-emerald-400">{summaryStats.complete}</div>
-          <div className="text-xs text-emerald-300/70">3.0+ credits</div>
+          <div className="text-xs text-emerald-300/70">6+ courses</div>
         </div>
         <div className="bg-blue-900/30 rounded-xl p-4 border border-blue-800/50">
           <div className="text-xs uppercase tracking-wide text-blue-300 mb-1">Near Complete</div>
@@ -479,7 +479,7 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
               </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-600"
                 onClick={() => handleSort('credits')}>
-                Credits {sortField === 'credits' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
+                Courses {sortField === 'credits' && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />)}
               </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase cursor-pointer hover:bg-slate-600"
                 onClick={() => handleSort('progress')}>
@@ -524,7 +524,7 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
                       </td>
                       <td className="px-3 py-3">
                         <span className="font-mono text-white">
-                          {primary?.earnedCredits.toFixed(1)} / {primary?.requiredCredits}
+                          {primary?.earnedCourses} / {primary?.requiredCourses}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -605,7 +605,7 @@ export default function CTEPathwayReport({ schoolId, counselorId = null, onSelec
                             <div className="mt-3 pt-3 border-t border-slate-700">
                               <p className="text-sm text-slate-400">
                                 <span className="text-amber-400 font-medium">
-                                  {(primary.requiredCredits - primary.earnedCredits).toFixed(1)} credits needed
+                                  {primary.requiredCourses - primary.earnedCourses} courses needed
                                 </span>
                                 {' '}to complete {primary.pathway.name} pathway
                               </p>
