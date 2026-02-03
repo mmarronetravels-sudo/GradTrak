@@ -2753,11 +2753,13 @@ if (profile.is_superuser) {
     .eq('role', 'student');
   assignedStudentIds = allStudents?.map(s => s.id) || [];
 } else {
-  // Regular counselors see only assigned students
+  // Regular counselors see counselor assignments, case managers see case_manager assignments
+  const assignmentType = profile.role === 'case_manager' ? 'case_manager' : 'counselor';
   const { data: assignmentData } = await supabase
     .from('counselor_assignments')
     .select('student_id')
-    .eq('counselor_id', profile.id);
+    .eq('counselor_id', profile.id)
+    .eq('assignment_type', assignmentType);
   assignedStudentIds = assignmentData?.map(a => a.student_id) || [];
 }
 
@@ -3818,9 +3820,9 @@ export default function App() {
     return <AdminDashboard user={user} profile={profile} onLogout={handleLogout} />;
   }
 
-  if (profile.role === 'counselor') {
-    return <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
-  }
+  if (profile.role === 'counselor' || profile.role === 'case_manager') {
+  return <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
+}
 
   if (profile.role === 'parent') {
     return <ParentDashboard user={user} profile={profile} onLogout={handleLogout} />;
