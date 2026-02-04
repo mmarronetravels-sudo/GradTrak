@@ -170,7 +170,8 @@ function generateAlerts(profile, stats) {
       type: 'success', 
       message: `On track with ${stats.totalDualCredits} dual credits!`, 
       icon: '🌟' 
-    });
+   });
+  }
   
   return alerts;
 }
