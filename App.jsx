@@ -3133,7 +3133,7 @@ const summaryStats = {
 />
           </div>
           )}
-          {{activeTab === 'courses' && (
+          {activeTab === 'courses' && (
           <div>
             {/* Current Courses Section */}
             {currentCourses.length > 0 && (
