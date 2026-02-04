@@ -2368,6 +2368,7 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
   const [coursePathways, setCoursePathways] = useState([]);
+  const [counselors, setCounselors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
