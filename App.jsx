@@ -1944,8 +1944,22 @@ if (studentData) {
                 <h3 className="text-lg font-semibold text-white mb-4">Course History</h3>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {selectedStudent.courses
-                    .sort((a, b) => (b.term || '').localeCompare(a.term || ''))
-                    .map(course => (
+                    {selectedStudent.courses
+  .sort((a, b) => {
+    // Parse terms like "T3 24/25" into parts
+    const parseT = (term) => {
+      if (!term) return { tri: 0, year: 0 };
+      const match = term.match(/T(\d)\s*(\d{2})\/(\d{2})/);
+      if (!match) return { tri: 0, year: 0 };
+      return { tri: parseInt(match[1]), year: parseInt(match[3]) };
+    };
+    const termA = parseT(a.term);
+    const termB = parseT(b.term);
+    // Sort by year first (most recent first), then by trimester
+    if (termB.year !== termA.year) return termB.year - termA.year;
+    return termB.tri - termA.tri;
+  })
+  .map(course => (
                       <div key={course.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
                         <div>
                           <p className="text-white font-medium">{course.name}</p>
