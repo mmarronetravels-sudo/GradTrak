@@ -1163,6 +1163,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
+  const [showLinkParentModal, setShowLinkParentModal] = useState(false);
   
   useEffect(() => {
     fetchData();
@@ -2759,6 +2760,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
+  const [allStudents, setAllStudents] = useState([]);
   const [isReactivating, setIsReactivating] = useState(false);
   const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
@@ -2857,6 +2859,24 @@ if (profile.is_superuser || profile.role === 'viewer') {
   assignedStudentIds = assignmentData?.map(a => a.student_id) || [];
 }
 
+// Fetch all students for Link Parent modal
+const { data: allStudentData } = await supabase
+  .from('profiles')
+  .select('id, full_name, email, grade, graduation_year')
+  .eq('school_id', profile.school_id)
+  .eq('role', 'student')
+  .order('full_name');
+if (allStudentData) setAllStudents(allStudentData);
+
+// If no students, show empty list
+if (assignedStudentIds.length === 0) {
+  setStudents([]);
+  if (catData) setCategories(catData);
+  if (pathData) setPathways(pathData);
+  setLoading(false);
+  return;
+}    
+    
 // If no students, show empty list
 if (assignedStudentIds.length === 0) {
   setStudents([]);
