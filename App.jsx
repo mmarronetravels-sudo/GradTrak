@@ -1153,6 +1153,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
   const [counselors, setCounselors] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
@@ -2938,7 +2939,12 @@ const summaryStats = {
   // Student Detail View
   if (selectedStudent) {
     const student = selectedStudent;
-    const coursesByTerm = (student.courses || []).reduce((acc, course) => {
+    
+    // Separate current (in-progress) from completed courses
+    const currentCourses = (student.courses || []).filter(c => c.status === 'in_progress');
+    const completedCourses = (student.courses || []).filter(c => c.status !== 'in_progress');
+    
+    const coursesByTerm = completedCourses.reduce((acc, course) => {
       if (!acc[course.term]) acc[course.term] = [];
       acc[course.term].push(course);
       return acc;
@@ -3127,8 +3133,44 @@ const summaryStats = {
 />
           </div>
           )}
-          {activeTab === 'courses' && (
+          {{activeTab === 'courses' && (
           <div>
+            {/* Current Courses Section */}
+            {currentCourses.length > 0 && (
+              <div className="mb-6 border border-slate-700 rounded-xl overflow-hidden">
+                <button 
+                  onClick={() => setCurrentCoursesExpanded(!currentCoursesExpanded)}
+                  className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-750 transition-colors"
+                >
+                  <span className="font-semibold text-white flex items-center gap-2">
+                    {currentCoursesExpanded ? (
+                      <ChevronDown className="w-5 h-5" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5" />
+                    )}
+                    📖 Current Courses
+                    <span className="bg-indigo-500 text-white text-sm px-2 py-0.5 rounded-full">
+                      {currentCourses.length}
+                    </span>
+                  </span>
+                </button>
+                
+                {currentCoursesExpanded && (
+                  <div className="p-4 space-y-2">
+                    {currentCourses.map(course => (
+                      <CourseItem 
+                        key={course.id} 
+                        course={course} 
+                        category={getCategoryForCourse(course)} 
+                        pathways={getPathwaysForCourse(course, student.coursePathways)}
+                        showDelete={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
             {Object.entries(coursesByTerm).sort((a, b) => b[0].localeCompare(a[0])).map(([term, termCourses]) => (
               <div key={term} className="mb-4">
