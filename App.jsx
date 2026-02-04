@@ -63,7 +63,12 @@ function calculateStudentStats(courses, categories) {
     return acc;
   }, {});
   const totalEarned = Math.round(courses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
-  const percentage = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
+  const allCategoriesComplete = categories.every(cat => {
+  const earned = creditsByCategory[cat.id] || 0;
+  return earned >= Number(cat.credits_required);
+});
+const rawPercentage = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
+const percentage = allCategoriesComplete ? rawPercentage : Math.min(99, rawPercentage);
   const dualCreditCourses = courses.filter(c => c.is_dual_credit);
   const associateCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'associate' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
   const transferCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'transfer' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
