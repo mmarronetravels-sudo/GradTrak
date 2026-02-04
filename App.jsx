@@ -3360,7 +3360,17 @@ const summaryStats = {
             )}
 
             <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
-            {Object.entries(coursesByTerm).sort((a, b) => b[0].localeCompare(a[0])).map(([term, termCourses]) => (
+            {Object.entries(coursesByTerm).sort((a, b) => {
+  const parseT = (term) => {
+    const match = term.match(/T(\d)\s*(\d{2})\/(\d{2})/);
+    if (!match) return { tri: 0, year: 0 };
+    return { tri: parseInt(match[1]), year: parseInt(match[3]) };
+  };
+  const termA = parseT(a[0]);
+  const termB = parseT(b[0]);
+  if (termB.year !== termA.year) return termB.year - termA.year;
+  return termB.tri - termA.tri;
+}).map(([term, termCourses]) => (
               <div key={term} className="mb-4">
                 <h4 className="text-slate-400 text-sm font-medium mb-2 px-1">{term}</h4>
                 <div className="space-y-2">
