@@ -40,6 +40,13 @@ const NOTE_TYPES = {
     textColor: 'text-blue-400',
     borderColor: 'border-blue-500/30'
   },
+  zoom_meeting: {
+    label: 'Zoom Meeting',
+    icon: '📹',
+    bgColor: 'bg-teal-500/20',
+    textColor: 'text-teal-400',
+    borderColor: 'border-teal-500/30'
+  },
   email: {
     label: 'Email',
     icon: '📧',
