@@ -1944,8 +1944,7 @@ if (studentData) {
                 <h3 className="text-lg font-semibold text-white mb-4">Course History</h3>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {selectedStudent.courses
-                    {selectedStudent.courses
-  .sort((a, b) => {
+                     .sort((a, b) => {
     // Parse terms like "T3 24/25" into parts
     const parseT = (term) => {
       if (!term) return { tri: 0, year: 0 };
