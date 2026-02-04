@@ -498,7 +498,7 @@ const generateMTSSReport = (notes, studentName, studentGrade, counselorName) => 
   // ============ STUDENT INFO BOX ============
   doc.setDrawColor(200);
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 35, 3, 3, 'FD');
+  doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 43, 3, 3, 'FD');
   
   yPos += 8;
   doc.setTextColor(0);
@@ -525,10 +525,11 @@ const generateMTSSReport = (notes, studentName, studentGrade, counselorName) => 
   doc.setFont('helvetica', 'normal');
   doc.text(dateRange, margin + 40, yPos);
 
+  yPos += 8;
   doc.setFont('helvetica', 'bold');
-  doc.text('Generated:', pageWidth / 2, yPos);
+  doc.text('Generated:', margin + 5, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), pageWidth / 2 + 35, yPos);
+  doc.text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), margin + 40, yPos);
 
   yPos += 20;
 
