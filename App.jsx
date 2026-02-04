@@ -3224,7 +3224,11 @@ const summaryStats = {
                   <span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(2))}</span>
                   <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
                 </p>
-                <p className="text-slate-400 text-sm mt-1">{Math.round((student.stats.totalRequired - student.stats.totalEarned) * 10) / 10} credits remaining</p>
+                {student.stats.deficiencies?.length > 0 ? (
+  <p className="text-yellow-400 text-sm mt-1">⚠️ {student.stats.deficiencies.length} category{student.stats.deficiencies.length > 1 ? 's' : ''} incomplete</p>
+) : (
+  <p className="text-emerald-400 text-sm mt-1">✓ All requirements met!</p>
+)}
               </div>
             </div>
           </div>
