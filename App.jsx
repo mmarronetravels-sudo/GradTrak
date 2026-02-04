@@ -1157,6 +1157,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
   const [counselors, setCounselors] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
+  const [parents, setParents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
@@ -3602,7 +3603,7 @@ const summaryStats = {
                     <h3 className="text-white font-medium mb-2">{parent.full_name || parent.email}</h3>
                     <p className="text-slate-400 text-sm mb-3">{parent.email}</p>
                     <div className="space-y-2">
-                      {students.map(student => (
+                      {allStudents.map(student => (
                         <button
                           key={student.id}
                           onClick={async () => {
