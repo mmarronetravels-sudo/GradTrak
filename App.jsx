@@ -1964,7 +1964,6 @@ if (studentData) {
               </div>
             )}
 
-          )}
           )}        
         {/* Privacy/FERPA Tab */}
         {activeTab === 'privacy' && (
