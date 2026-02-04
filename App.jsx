@@ -1931,6 +1931,42 @@ if (studentData) {
                 )}
               </div>
             </div>
+  </div>
+            </div>
+
+            {/* Course History */}
+            {selectedStudent.courses && selectedStudent.courses.length > 0 && (
+              <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+                <h3 className="text-lg font-semibold text-white mb-4">Course History</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {selectedStudent.courses
+                    .sort((a, b) => (b.term || '').localeCompare(a.term || ''))
+                    .map(course => (
+                      <div key={course.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                        <div>
+                          <p className="text-white font-medium">{course.name}</p>
+                          <p className="text-slate-400 text-sm">{course.term} • {course.credits} credits</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {course.status === 'in_progress' ? (
+                            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">In Progress</span>
+                          ) : (
+                            <span className={`text-lg font-bold ${
+                              ['A', 'A-', 'B+', 'B'].includes(course.grade) ? 'text-emerald-400' :
+                              ['B-', 'C+', 'C'].includes(course.grade) ? 'text-amber-400' :
+                              course.grade === 'F' ? 'text-red-400' : 'text-white'
+                            }`}>
+                              {course.grade || '-'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+          )}
           )}        
         {/* Privacy/FERPA Tab */}
         {activeTab === 'privacy' && (
