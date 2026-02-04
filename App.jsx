@@ -1931,9 +1931,7 @@ if (studentData) {
                 )}
               </div>
             </div>
-  </div>
-            </div>
-
+            
             {/* Course History */}
             {selectedStudent.courses && selectedStudent.courses.length > 0 && (
               <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
