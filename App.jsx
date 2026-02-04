@@ -1930,7 +1930,6 @@ if (studentData) {
                   </p>
                 )}
               </div>
-            </div>
             
             {/* Course History */}
             {selectedStudent.courses && selectedStudent.courses.length > 0 && (
