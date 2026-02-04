@@ -1961,9 +1961,9 @@ if (studentData) {
                     ))}
                 </div>
               </div>
-            )}
-
-          )}        
+           )}
+          </div>
+        )}        
         {/* Privacy/FERPA Tab */}
         {activeTab === 'privacy' && (
           <div className="space-y-6">
