@@ -890,6 +890,7 @@ function AuthScreen({ onLogin }) {
   const [selectedSchool, setSelectedSchool] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLinkParentModal, setShowLinkParentModal] = useState(false);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
   const handleGoogleSignIn = async () => {
   setLoading(true);
@@ -1670,6 +1671,37 @@ if (studentData) {
               <p className="text-slate-500 text-xs">Grade {student.grade} • Class of {student.graduation_year}</p>
             </div>
             <div className="flex items-center gap-3">
+              <button
+  onClick={async () => {
+    // Fetch full student data with courses
+    const { data: studentData } = await supabase
+      .from('profiles')
+      .select('*, diploma_types(*)')
+      .eq('id', student.id)
+      .single();
+    
+    const { data: courseData } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('student_id', student.id);
+    
+    if (studentData) {
+      const totalEarned = (courseData || [])
+        .filter(c => c.status === 'completed' && c.grade !== 'F')
+        .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
+      
+      setSelectedStudent({
+        ...studentData,
+        courses: courseData || [],
+        stats: { totalEarned, totalRequired: 24, percentage: Math.round((totalEarned / 24) * 100) }
+      });
+    }
+    setActiveTab('student-detail');
+  }}
+  className="px-3 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 rounded-lg text-sm font-medium transition-colors"
+>
+  View
+</button>
               <select
                 className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
                 value={student.counselor_id || ''}
@@ -1748,9 +1780,9 @@ if (studentData) {
               {/* Back Button */}
               <button
                 onClick={() => {
-                  setSelectedStudent(null);
-                  setActiveTab('at-risk');
-                }}
+  setSelectedStudent(null);
+  setActiveTab('students');
+}}
                 className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
               >
                 ← Back to At-Risk Report
@@ -2727,6 +2759,32 @@ function CounselorDashboard({ user, profile, onLogout }) {
     fetchData();
   }, [profile]);
 
+async function fetchStudentDetail(studentId) {
+  const { data: studentData } = await supabase
+    .from('profiles')
+    .select('*, diploma_types(*)')
+    .eq('id', studentId)
+    .single();
+    
+  const { data: courseData } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('student_id', studentId);
+  
+  // Calculate stats
+  if (studentData && courseData) {
+    const totalEarned = courseData
+      .filter(c => c.status === 'completed' && c.grade !== 'F')
+      .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
+    
+    setSelectedStudent({
+      ...studentData,
+      courses: courseData,
+      stats: { totalEarned, totalRequired: 24, percentage: Math.round((totalEarned / 24) * 100) }
+    });
+  }
+}
+  
   async function fetchData() {
     setLoading(true);
     
