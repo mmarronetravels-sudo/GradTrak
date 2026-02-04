@@ -1844,13 +1844,33 @@ if (studentData) {
     )}
   </div>
   {/* Diploma Type */}
-  {selectedStudent.diploma_types && (
-    <div className="mt-3">
-      <span className="px-3 py-1 text-sm rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-        🎓 {selectedStudent.diploma_types.name}
-      </span>
-    </div>
-  )}
+  <div className="mt-3">
+    <select
+      value={selectedStudent.diploma_type_id || ''}
+      onChange={async (e) => {
+        const newId = e.target.value;
+        await supabase.from('profiles').update({ diploma_type_id: newId }).eq('id', selectedStudent.id);
+        const diplomaNames = {
+          'fd32e741-43ea-4542-aa7f-66fc95357e3f': 'Oregon Standard 2026',
+          'd8e98c11-f3f8-466c-969b-1c41cb0b92d5': 'Oregon Standard 2027',
+          '741728a2-ccbb-4ecf-b892-0425a8e30f99': 'Oregon Honors 2026',
+          'c1fa9ff6-5030-4918-b6eb-451c62b52abf': 'Oregon Honors 2027',
+          'a7bac39a-b3ed-41f0-8fe1-ae002b420100': 'Oregon Modified 2026',
+          '477d93f7-9dc7-4225-adaa-e20e4c494acc': 'Oregon Modified 2027'
+        };
+        setSelectedStudent({ ...selectedStudent, diploma_type_id: newId, diploma_types: { name: diplomaNames[newId] } });
+      }}
+      className="px-3 py-1 text-sm rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 cursor-pointer"
+    >
+      <option value="">Select Diploma</option>
+      <option value="fd32e741-43ea-4542-aa7f-66fc95357e3f">🎓 Oregon Standard 2026</option>
+      <option value="d8e98c11-f3f8-466c-969b-1c41cb0b92d5">🎓 Oregon Standard 2027</option>
+      <option value="741728a2-ccbb-4ecf-b892-0425a8e30f99">🎓 Oregon Honors 2026</option>
+      <option value="c1fa9ff6-5030-4918-b6eb-451c62b52abf">🎓 Oregon Honors 2027</option>
+      <option value="a7bac39a-b3ed-41f0-8fe1-ae002b420100">🎓 Oregon Modified 2026</option>
+      <option value="477d93f7-9dc7-4225-adaa-e20e4c494acc">🎓 Oregon Modified 2027</option>
+    </select>
+  </div>
   <div className="flex gap-2 mt-3">
     {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
     {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
