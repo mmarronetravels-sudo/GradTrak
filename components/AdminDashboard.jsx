@@ -22,6 +22,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCounselor, setSelectedCounselor] = useState('');
+  const [showLinkParentModal, setShowLinkParentModal] = useState(false);  
   const [reassigning, setReassigning] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
