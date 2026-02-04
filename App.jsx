@@ -3614,7 +3614,7 @@ const summaryStats = {
                           }}
                           className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-lg transition-all text-left"
                         >
-                          <span className="text-white text-sm">{student.displayName}</span>
+                          <span className="text-white text-sm">{student.full_name}</span>
                           <span className="text-slate-400 text-xs">Grade {student.grade}</span>
                         </button>
                       ))}
