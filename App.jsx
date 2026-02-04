@@ -171,14 +171,7 @@ function generateAlerts(profile, stats) {
       message: `On track with ${stats.totalDualCredits} dual credits!`, 
       icon: '🌟' 
     });
-  } else if (stats.percentage >= expected + 10) {
-    alerts.push({ 
-      type: 'success', 
-      message: `Ahead of schedule! Great progress!`, 
-      icon: '🌟' 
-    });
-  }
-
+  
   return alerts;
 }
   
