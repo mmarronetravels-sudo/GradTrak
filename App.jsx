@@ -3071,7 +3071,7 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
   // ============================================
   // ADVISING PLAN PDF EXPORT — Feb 5, 2026
   // ============================================
-  function generateAdvisingPlan() {
+  function generateAdvisingPlan(student) {
     const studentCourses = student.courses || [];
     const completedCourses = studentCourses.filter(c => c.status === 'completed');
     const currentCourses = studentCourses.filter(c => c.status === 'in_progress');
