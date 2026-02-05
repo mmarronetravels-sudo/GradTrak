@@ -3071,9 +3071,18 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
   // ============================================
   // ADVISING PLAN PDF EXPORT — Feb 5, 2026
   // ============================================
-  function generateAdvisingPlan() {
+  async function generateAdvisingPlan() {
     const student = selectedStudent;
     if (!student) return;
+    // Fetch fresh notes from Supabase
+    const { data: freshNotes } = await supabase
+      .from('student_notes')
+      .select('*')
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: false });
+    const advisingNotes = freshNotes || [];
+
+advisingNotes.slice(0, 5)
     const studentCourses = student.courses || [];
     const completedCourses = studentCourses.filter(c => c.status === 'completed');
     const currentCourses = studentCourses.filter(c => c.status === 'in_progress');
@@ -3214,23 +3223,13 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
         <!-- Recent Advising Notes -->
         <div class="section">
           <div class="section-title">Recent Advising Notes</div>
-          ${notes.length === 0 ? '<p class="empty-message">No advising notes on record.</p>' : notes.slice(0, 5).map(function(note) { const noteDate = new Date(note.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); return '<div class="note-item"><div class="note-date">' + noteDate + (note.note_type ? ' — ' + note.note_type : '') + '</div><div class="note-text">' + (note.content || note.note_text || '') + '</div>' + (note.follow_up_date ? '<div class="note-followup">Follow-up: ' + new Date(note.follow_up_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + '</div>' : '') + '</div>'; }).join('')}
+          ${advisingNotes.length === 0 ? '<p class="empty-message">No advising notes on record.</p>' : notes.slice(0, 5).map(function(note) { const noteDate = new Date(note.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); return '<div class="note-item"><div class="note-date">' + noteDate + (note.note_type ? ' — ' + note.note_type : '') + '</div><div class="note-text">' + (note.content || note.note_text || '') + '</div>' + (note.follow_up_date ? '<div class="note-followup">Follow-up: ' + new Date(note.follow_up_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + '</div>' : '') + '</div>'; }).join('')}
         </div>
 
-        <!-- Session Notes (blank lines) -->
+        <!-- Session Notes (typeable) -->
         <div class="section">
           <div class="section-title">Session Notes</div>
-          <p style="font-size: 11px; color: #94a3b8; font-style: italic; margin-bottom: 8px;">Use this space to document the advising session:</p>
-          <div class="notes-lines">
-            <div class="line"></div>
-            <div class="line"></div>
-            <div class="line"></div>
-            <div class="line"></div>
-            <div class="line"></div>
-            <div class="line"></div>
-            <div class="line"></div>
-            <div class="line"></div>
-          </div>
+          <textarea id="sessionNotes" rows="8" style="width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;font-size:13px;line-height:1.6;resize:vertical;color:#1e293b;" placeholder="Type session notes here before printing..."></textarea>
         </div>
 
         <div class="footer">
