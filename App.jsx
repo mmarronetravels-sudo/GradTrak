@@ -5,6 +5,7 @@ import AtRiskReport from './components/AtRiskReport';
 import ArchiveStudentModal from './components/ArchiveStudentModal';
 import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
+import SendAdvisingEmail from './components/SendAdvisingEmail';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -1159,6 +1160,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [parents, setParents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
@@ -3152,7 +3154,7 @@ advisingNotes.slice(0, 5)
           .notes-lines { margin-top: 10px; }
           .notes-lines .line { border-bottom: 1px solid #cbd5e1; height: 28px; }
           .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 10px; }
-          @media print { body { padding: 20px; } }
+          @media print { body { padding: 20px; } .no-print { display: none !important; } textarea { border: none !important; } }
         </style>
       </head>
       <body>
@@ -3249,7 +3251,7 @@ advisingNotes.slice(0, 5)
     printWindow.document.close();
     printWindow.focus();
     // Print button added to the page so counselor can review first
-    printWindow.document.body.insertAdjacentHTML('beforeend', '<div style="text-align:center;padding:20px;"><button onclick="window.print()" style="background:#4f46e5;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Print / Save as PDF</button></div>');
+    printWindow.document.body.insertAdjacentHTML('beforeend', '<div class="no-print" style="text-align:center;padding:20px;"><button onclick="window.print()" style="background:#4f46e5;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Print / Save as PDF</button></div>');
   }
   
   async function fetchNotes(studentId) {
@@ -3515,6 +3517,12 @@ const summaryStats = {
   >
     📋 Generate Advising Plan
   </button>
+  <button
+  onClick={() => setShowEmailModal(true)}
+  className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg text-xs font-medium hover:bg-indigo-500/30 transition-colors"
+>
+  📧 Email Student
+</button>
 </div>
             
            {/* Student Notes Log */}
@@ -3615,6 +3623,17 @@ const summaryStats = {
           }}
           onArchive={handleArchiveStudent}
         />
+
+        {/* Send Advising Email Modal */}
+<SendAdvisingEmail
+  isOpen={showEmailModal}
+  onClose={() => setShowEmailModal(false)}
+  student={selectedStudent}
+  notes={studentNotes}
+  categories={categories}
+  counselorProfile={profile}
+  supabaseClient={supabase}
+/>
 
         {/* Add Course Modal for Counselors */}
         {showAddCourseModal && (
