@@ -3358,9 +3358,19 @@ const summaryStats = {
   {student.has_iep && caseManager && (
     <p className="text-slate-400 text-sm">Case Manager: {caseManager.full_name}</p>
   )}
-  {student.has_iep && (
+{student.has_iep && (
     <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30">
       📋 IEP
+    </span>
+  )}
+  {student.has_504 && (
+    <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
+      📋 504
+    </span>
+  )}
+  {student.is_ell && (
+    <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+      🌐 ELL
     </span>
   )}
   {student.diploma_types && (
@@ -3836,6 +3846,12 @@ const summaryStats = {
   <h3 className="text-white font-semibold">{student.displayName}</h3>
   {student.has_iep && (
     <span className="bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded-full text-xs font-medium">IEP</span>
+  )}
+  {student.has_504 && (
+    <span className="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full text-xs font-medium">504</span>
+  )}
+  {student.is_ell && (
+    <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full text-xs font-medium">ELL</span>
   )}
   {student.alerts.some(a => a.type === 'critical') && (
     <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
