@@ -3068,6 +3068,188 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
     setLoading(false);
   }
 
+  // ============================================
+  // ADVISING PLAN PDF EXPORT — Feb 5, 2026
+  // ============================================
+  function generateAdvisingPlan() {
+    const studentCourses = courses;
+    const completedCourses = studentCourses.filter(c => c.status === 'completed');
+    const currentCourses = studentCourses.filter(c => c.status === 'in_progress');
+    const diplomaName = student.diploma_types?.name || 'Not assigned';
+    const counselorName = profile?.full_name || 'N/A';
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Calculate credits by category
+    const categoryProgress = categories.map(cat => {
+      const earned = Math.round(completedCourses.filter(c => c.category_id === cat.id).reduce((sum, c) => sum + Number(c.credits || 0), 0) * 10) / 10;
+      const required = Number(cat.credits_required) || 0;
+      return { name: cat.name, earned, required };
+    }).filter(c => c.required > 0);
+
+    const totalEarned = Math.round(categoryProgress.reduce((sum, c) => sum + c.earned, 0) * 10) / 10;
+    const totalRequired = categoryProgress.reduce((sum, c) => sum + c.required, 0);
+    const progressPercent = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
+
+    // CTE pathway progress
+    const cteCourses = studentCourses.filter(c => c.pathway_id);
+    const pathwayGroups = {};
+    cteCourses.forEach(c => {
+      const pw = pathways.find(p => p.id === c.pathway_id);
+      const pwName = pw?.name || 'Unknown Pathway';
+      if (!pathwayGroups[pwName]) pathwayGroups[pwName] = [];
+      pathwayGroups[pwName].push(c);
+    });
+
+    // IEP/504/ELL flags
+    const flags = [];
+    if (student.has_iep) flags.push('IEP');
+    if (student.has_504) flags.push('504');
+    if (student.is_ell) flags.push('ELL');
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Advising Plan - ${student.full_name}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+          .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #4f46e5; }
+          .header h1 { color: #4f46e5; font-size: 26px; margin-bottom: 5px; }
+          .header p { color: #64748b; font-size: 13px; }
+          .section { margin-bottom: 25px; }
+          .section-title { background: #4f46e5; color: white; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 30px; padding: 15px; background: #f8fafc; border-radius: 8px; }
+          .info-item label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+          .info-item p { font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px; }
+          .progress-summary { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 12px; font-size: 16px; font-weight: 600; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+          th { text-align: left; padding: 8px 12px; background: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+          td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+          .status-complete { color: #16a34a; font-weight: 600; }
+          .status-needed { color: #ea580c; font-weight: 600; }
+          .status-inprogress { color: #2563eb; font-weight: 600; }
+          .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; margin-left: 6px; }
+          .badge-iep { background: #f3e8ff; color: #7c3aed; }
+          .badge-cte { background: #d1fae5; color: #065f46; }
+          .pathway-header { font-size: 13px; font-weight: 600; color: #065f46; margin: 10px 0 6px 0; }
+          .note-item { padding: 10px; margin-bottom: 8px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #4f46e5; }
+          .note-date { font-size: 11px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+          .note-text { font-size: 12px; color: #334155; }
+          .note-followup { font-size: 11px; color: #4f46e5; font-style: italic; margin-top: 4px; }
+          .empty-message { color: #94a3b8; font-style: italic; font-size: 12px; padding: 10px; }
+          .notes-lines { margin-top: 10px; }
+          .notes-lines .line { border-bottom: 1px solid #cbd5e1; height: 28px; }
+          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 10px; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>📋 Advising Plan</h1>
+          <p>Summit Learning Charter &nbsp;|&nbsp; ${today} &nbsp;|&nbsp; GradTrack</p>
+        </div>
+
+        <!-- Student Information -->
+        <div class="section">
+          <div class="section-title">Student Information</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Student Name</label>
+              <p>${student.full_name}${flags.map(f => ' <span class="badge badge-iep">' + f + '</span>').join('')}</p>
+            </div>
+            <div class="info-item">
+              <label>Counselor</label>
+              <p>${counselorName}</p>
+            </div>
+            <div class="info-item">
+              <label>Email</label>
+              <p>${student.email || '—'}</p>
+            </div>
+            <div class="info-item">
+              <label>Grade Level</label>
+              <p>${student.grade_level ? 'Grade ' + student.grade_level : '—'}</p>
+            </div>
+            <div class="info-item">
+              <label>Graduation Year</label>
+              <p>${student.graduation_year || '—'}</p>
+            </div>
+            <div class="info-item">
+              <label>Diploma Type</label>
+              <p>🎓 ${diplomaName}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Graduation Progress -->
+        <div class="section">
+          <div class="section-title">Graduation Progress</div>
+          <div class="progress-summary">
+            ${totalEarned} / ${totalRequired} credits earned (${progressPercent}%)
+          </div>
+          <table>
+            <thead>
+              <tr><th>Category</th><th>Earned</th><th>Required</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              ${categoryProgress.map(cat => '<tr><td>' + cat.name + '</td><td>' + cat.earned + '</td><td>' + cat.required + '</td><td class="' + (cat.earned >= cat.required ? 'status-complete' : 'status-needed') + '">' + (cat.earned >= cat.required ? '✓ Complete' : (Math.round((cat.required - cat.earned) * 10) / 10) + ' needed') + '</td></tr>').join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Current Courses -->
+        <div class="section">
+          <div class="section-title">Current Courses (${currentCourses.length})</div>
+          ${currentCourses.length === 0 ? '<p class="empty-message">No courses currently in progress.</p>' : '<table><thead><tr><th>Course Name</th><th>Credits</th><th>Credit Type</th><th>Term</th></tr></thead><tbody>' + currentCourses.map(c => { const cat = categories.find(ct => ct.id === c.category_id); return '<tr><td>' + c.name + '</td><td>' + (c.credits || '') + '</td><td>' + (cat?.name || '—') + '</td><td>' + (c.term || '—') + '</td></tr>'; }).join('') + '</tbody></table>'}
+        </div>
+
+        <!-- CTE Pathway Progress -->
+        <div class="section">
+          <div class="section-title">CTE Pathway Progress</div>
+          ${Object.keys(pathwayGroups).length === 0 ? '<p class="empty-message">No CTE pathway courses on record.</p>' : Object.entries(pathwayGroups).map(function([pwName, pwCourses]) { const completed = pwCourses.filter(c => c.status === 'completed').length; return '<div class="pathway-header">🎓 ' + pwName + ': ' + completed + '/6 courses completed</div><table><thead><tr><th>Course</th><th>Term</th><th>Status</th></tr></thead><tbody>' + pwCourses.map(c => '<tr><td>' + c.name + '</td><td>' + (c.term || '—') + '</td><td class="' + (c.status === 'completed' ? 'status-complete' : 'status-inprogress') + '">' + (c.status === 'completed' ? '✓ Completed' : '◯ In Progress') + '</td></tr>').join('') + '</tbody></table>'; }).join('')}
+        </div>
+
+        <!-- Recent Advising Notes -->
+        <div class="section">
+          <div class="section-title">Recent Advising Notes</div>
+          ${notes.length === 0 ? '<p class="empty-message">No advising notes on record.</p>' : notes.slice(0, 5).map(function(note) { const noteDate = new Date(note.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); return '<div class="note-item"><div class="note-date">' + noteDate + (note.note_type ? ' — ' + note.note_type : '') + '</div><div class="note-text">' + (note.content || note.note_text || '') + '</div>' + (note.follow_up_date ? '<div class="note-followup">Follow-up: ' + new Date(note.follow_up_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + '</div>' : '') + '</div>'; }).join('')}
+        </div>
+
+        <!-- Session Notes (blank lines) -->
+        <div class="section">
+          <div class="section-title">Session Notes</div>
+          <p style="font-size: 11px; color: #94a3b8; font-style: italic; margin-bottom: 8px;">Use this space to document the advising session:</p>
+          <div class="notes-lines">
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>GradTrack — Advising Plan — ${student.full_name} — Generated ${today}</p>
+          <p>Summit Learning Charter | gradtrak.scholarpathsystems.org</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Pop-up blocked! Please allow pop-ups for this site.');
+      return;
+    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 500);
+  }
+  
   async function fetchNotes(studentId) {
   const { data } = await supabase
     .from('student_notes')
@@ -3323,7 +3505,15 @@ const summaryStats = {
 
           {activeTab === 'notes' && (
           <div className="bg-slate-900/80 backdrop-blur-sm rounded-3xl p-6 border border-slate-700/50">
-            <h3 className="text-lg font-semibold text-white mb-4">📝 Counselor Notes</h3>
+            <div className="flex justify-between items-center mb-4">
+  <h3 className="text-lg font-semibold text-white">📝 Counselor Notes</h3>
+  <button
+    onClick={() => generateAdvisingPlan()}
+    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
+  >
+    📋 Generate Advising Plan
+  </button>
+</div>
             
            {/* Student Notes Log */}
             <StudentNotesLog 
