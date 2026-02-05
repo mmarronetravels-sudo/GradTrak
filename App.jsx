@@ -3249,7 +3249,8 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
     printWindow.document.write(printContent);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => { printWindow.print(); }, 500);
+    // Print button added to the page so counselor can review first
+    printWindow.document.body.insertAdjacentHTML('beforeend', '<div style="text-align:center;padding:20px;"><button onclick="window.print()" style="background:#4f46e5;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Print / Save as PDF</button></div>');
   }
   
   async function fetchNotes(studentId) {
