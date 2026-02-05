@@ -2833,6 +2833,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showLinkParentModal, setShowLinkParentModal] = useState(false);
   const [showAddCourseModal, setShowAddCourseModal] = useState(false);
+  const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
   const [parents, setParents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
