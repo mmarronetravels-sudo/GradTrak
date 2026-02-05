@@ -3538,11 +3538,7 @@ const summaryStats = {
                   className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-750 transition-colors"
                 >
                   <span className="font-semibold text-white flex items-center gap-2">
-                    {currentCoursesExpanded ? (
-                      <ChevronDown className="w-5 h-5" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5" />
-                    )}
+                   <span>{currentCoursesExpanded ? '▼' : '▶'}</span>
                     📖 Current Courses
                     <span className="bg-indigo-500 text-white text-sm px-2 py-0.5 rounded-full">
                       {currentCourses.length}
