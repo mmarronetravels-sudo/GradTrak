@@ -3071,7 +3071,9 @@ console.log('Bellas courses in fetched data:', bellasCourses.length);
   // ============================================
   // ADVISING PLAN PDF EXPORT — Feb 5, 2026
   // ============================================
-  function generateAdvisingPlan(student) {
+  function generateAdvisingPlan() {
+    const student = selectedStudent;
+    if (!student) return;
     const studentCourses = student.courses || [];
     const completedCourses = studentCourses.filter(c => c.status === 'completed');
     const currentCourses = studentCourses.filter(c => c.status === 'in_progress');
@@ -3508,7 +3510,7 @@ const summaryStats = {
             <div className="flex justify-between items-center mb-4">
   <h3 className="text-lg font-semibold text-white">📝 Counselor Notes</h3>
   <button
-    onClick={() => generateAdvisingPlan(student)}
+   onClick={() => generateAdvisingPlan()}
     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
   >
     📋 Generate Advising Plan
