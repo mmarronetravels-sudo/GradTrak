@@ -2556,10 +2556,14 @@ function StudentDashboard({ user, profile, onLogout }) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-    const { data: diplomaReqData } = await supabase
-        .from('diploma_requirements')
-        .select('*')
-        .eq('diploma_type_id', profile.diploma_type_id);
+    let diplomaReqData = null;
+if (profile.diploma_type_id) {
+  const { data } = await supabase
+    .from('diploma_requirements')
+    .select('*')
+    .eq('diploma_type_id', profile.diploma_type_id);
+  diplomaReqData = data;
+}
     
     const { data: courseData } = await supabase
       .from('courses')
@@ -2591,9 +2595,8 @@ function StudentDashboard({ user, profile, onLogout }) {
     setLoading(false);
   }
 
-  const stats = calculateStudentStats(courses, categories, diplomaRequirements);
   const yearlyProgress = useMemo(() => calculateYearlyProgress(courses, profile.graduation_year), [courses, profile.graduation_year]);
-  const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
+  const stats = useMemo(() => calculateStudentStats(courses, categories, diplomaRequirements), [courses, categories, d  const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
   const pathwayProgress = useMemo(() => calculatePathwayProgress(courses, pathways, coursePathways), [courses, pathways, coursePathways]);
 
   const handleAddCourse = async (courseData) => {
@@ -4118,6 +4121,10 @@ function ParentDashboard({ user, profile, onLogout }) {
       if (studentData) {
         const studentsWithStats = studentData.map(student => {
           const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
+          const { data: courseData } = await supabase
+        .from('courses')
+        .select('*')
+        .in('student_id', studentIds);
           const studentDiplomaReqs = student.diploma_type_id 
     ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
   : null;
