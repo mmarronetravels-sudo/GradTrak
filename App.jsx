@@ -4118,14 +4118,13 @@ function ParentDashboard({ user, profile, onLogout }) {
       const { data: diplomaReqData } = await supabase
         .from('diploma_requirements')
         .select('*');
-
-      if (studentData) {
-        const studentsWithStats = studentData.map(student => {
-          const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
-          const { data: courseData } = await supabase
+      const { data: courseData } = await supabase
         .from('courses')
         .select('*')
         .in('student_id', studentIds);
+      if (studentData) {
+        const studentsWithStats = studentData.map(student => {
+          const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
           const studentDiplomaReqs = student.diploma_type_id 
     ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
   : null;
