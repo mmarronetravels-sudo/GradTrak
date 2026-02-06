@@ -56,26 +56,33 @@ function calculateYearlyProgress(courses, graduationYear) {
     return { ...y, earned, expected: expectedPerYear, isPast, isCurrent };
   });
 }
-function calculateStudentStats(courses, categories) {
-  const totalRequired = categories.reduce((sum, cat) => sum + Number(cat.credits_required), 0);
+function calculateStudentStats(courses, categories, diplomaRequirements = null) {
+    // If diploma-specific requirements exist, override category defaults
+    const effectiveCategories = diplomaRequirements 
+      ? categories.map(cat => {
+          const dr = diplomaRequirements.find(r => r.category_id === cat.id);
+          return dr ? { ...cat, credits_required: dr.required_credits } : cat;
+        })
+      : categories;
+    const totalRequired = effectiveCategories.reduce((sum, cat) => sum + Number(cat.credits_required), 0);
   
-  const creditsByCategory = categories.reduce((acc, cat) => {
+  const creditsByCategory = effectiveCategories.reduce((acc, cat) => {
     acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
     return acc;
   }, {});
   const totalEarned = Math.round(courses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
-  const allCategoriesComplete = categories.every(cat => {
-  const earned = creditsByCategory[cat.id] || 0;
-  return earned >= Number(cat.credits_required);
-});
+    const allCategoriesComplete = effectiveCategories.every(cat => {
+      const earned = creditsByCategory[cat.id] || 0;
+      return earned >= Number(cat.credits_required);
+    });
 const rawPercentage = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
 const percentage = allCategoriesComplete ? rawPercentage : Math.min(99, rawPercentage);
   const dualCreditCourses = courses.filter(c => c.is_dual_credit);
   const associateCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'associate' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
   const transferCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'transfer' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
-  const deficiencies = categories.map(cat => {
-    const earned = creditsByCategory[cat.id] || 0;
-    const required = Number(cat.credits_required);
+  const deficiencies = effectiveCategories.map(cat => {
+      const earned = creditsByCategory[cat.id] || 0;
+      const required = Number(cat.credits_required);
     if (earned < required) {
       return { category: cat, needed: Math.round((required - earned) * 100) / 100, earned, required };
     }
@@ -90,6 +97,7 @@ const percentage = allCategoriesComplete ? rawPercentage : Math.min(99, rawPerce
     transferCredits,
     deficiencies,
     isOnTrack: percentage >= 50,
+    categories: effectiveCategories,
     totalDualCredits: Math.round(dualCreditCourses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100
   };
 }
@@ -2546,6 +2554,11 @@ function StudentDashboard({ user, profile, onLogout }) {
       .select('*')
       .eq('school_id', profile.school_id)
       .order('display_order');
+
+    const { data: diplomaReqData } = await supabase
+        .from('diploma_requirements')
+        .select('*')
+        .eq('diploma_type_id', profile.diploma_type_id);
     
     const { data: courseData } = await supabase
       .from('courses')
@@ -2577,7 +2590,7 @@ function StudentDashboard({ user, profile, onLogout }) {
     setLoading(false);
   }
 
-  const stats = useMemo(() => calculateStudentStats(courses, categories), [courses, categories]);
+  const stats = calculateStudentStats(studentCourses, catData || [], diplomaReqData);
   const yearlyProgress = useMemo(() => calculateYearlyProgress(courses, profile.graduation_year), [courses, profile.graduation_year]);
   const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
   const pathwayProgress = useMemo(() => calculatePathwayProgress(courses, pathways, coursePathways), [courses, pathways, coursePathways]);
@@ -2920,6 +2933,11 @@ async function fetchStudentDetail(studentId) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
+    // Fetch diploma-specific requirements for per-diploma credit overrides
+      const { data: diplomaReqData } = await supabase
+        .from('diploma_requirements')
+        .select('*');
+
     const { data: pathData } = await supabase
       .from('cte_pathways')
       .select('*')
@@ -3047,7 +3065,10 @@ if (studentData) {
 console.log('Bellas courses in fetched data:', bellasCourses.length);      
   const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
-        const stats = calculateStudentStats(studentCourses, catData || []);
+        const studentDiplomaReqs = student.diploma_type_id 
+  ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
+  : null;
+const stats = calculateStudentStats(studentCourses, catData || [], studentDiplomaReqs);
         const alerts = generateAlerts(student, stats);
         const studentCoursePathways = cpData?.filter(cp => studentCourses.some(c => c.id === cp.course_id)) || [];
         const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
@@ -4058,10 +4079,20 @@ function ParentDashboard({ user, profile, onLogout }) {
         .eq('school_id', profile.school_id)
         .order('display_order');
 
+      const { data: diplomaReqData } = await supabase
+        .from('diploma_requirements')
+        .select('*');
+
       if (studentData) {
         const studentsWithStats = studentData.map(student => {
           const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
-          const stats = calculateStudentStats(studentCourses, catData || []);
+          const studentDiplomaReqs = student.diploma_type_id 
+  ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
+  : null;
+const studentDiplomaReqs = student.diploma_type_id 
+  ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
+  : null;
+const stats = calculateStudentStats(studentCourses, catData || [], studentDiplomaReqs);
           const alerts = generateAlerts(student, stats);
           return { ...student, courses: studentCourses, stats, alerts, displayName: getDisplayName(student) };
         });
