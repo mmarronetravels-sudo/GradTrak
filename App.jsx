@@ -2596,7 +2596,8 @@ if (profile.diploma_type_id) {
   }
 
   const yearlyProgress = useMemo(() => calculateYearlyProgress(courses, profile.graduation_year), [courses, profile.graduation_year]);
-  const stats = useMemo(() => calculateStudentStats(courses, categories, diplomaRequirements), [courses, categories, d  const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
+  const stats = useMemo(() => calculateStudentStats(courses, categories, diplomaRequirements), [courses, categories, diplomaRequirements]);
+  const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
   const pathwayProgress = useMemo(() => calculatePathwayProgress(courses, pathways, coursePathways), [courses, pathways, coursePathways]);
 
   const handleAddCourse = async (courseData) => {
