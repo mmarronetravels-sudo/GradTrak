@@ -3500,7 +3500,7 @@ const summaryStats = {
                   <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
                 </p>
                 {student.stats.deficiencies?.length > 0 ? (
-  <p className="text-yellow-400 text-sm mt-1">⚠️ {student.stats.deficiencies.length} category{student.stats.deficiencies.length > 1 ? 's' : ''} incomplete</p>
+  <p className="text-yellow-400 text-sm mt-1">⚠️ {student.stats.deficiencies.length} {student.stats.deficiencies.length > 1 ? 'categories' : 'category'} incomplete</p>
 ) : (
   <p className="text-emerald-400 text-sm mt-1">✓ All requirements met!</p>
 )}
