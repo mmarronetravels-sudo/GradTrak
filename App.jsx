@@ -1160,7 +1160,6 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [parents, setParents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
@@ -2851,6 +2850,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [allStudents, setAllStudents] = useState([]);
   const [isReactivating, setIsReactivating] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
       .from('profiles')
