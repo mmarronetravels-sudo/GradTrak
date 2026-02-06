@@ -3121,7 +3121,7 @@ advisingNotes.slice(0, 5)
     const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     // Calculate credits by category
-    const categoryProgress = (stats?.categories || categories).map(cat =>
+    const categoryProgress = (stats?.categories || categories).map(cat => {
       const earned = Math.round(completedCourses.filter(c => c.category_id === cat.id).reduce((sum, c) => sum + Number(c.credits || 0), 0) * 10) / 10;
       const required = Number(cat.credits_required) || 0;
       return { name: cat.name, earned, required };
