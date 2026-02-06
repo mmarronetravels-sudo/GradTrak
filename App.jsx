@@ -2590,7 +2590,7 @@ function StudentDashboard({ user, profile, onLogout }) {
     setLoading(false);
   }
 
-  const stats = calculateStudentStats(studentCourses, catData || [], diplomaReqData);
+  const stats = calculateStudentStats(courseData || [], catData || [], diplomaReqData);
   const yearlyProgress = useMemo(() => calculateYearlyProgress(courses, profile.graduation_year), [courses, profile.graduation_year]);
   const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
   const pathwayProgress = useMemo(() => calculatePathwayProgress(courses, pathways, coursePathways), [courses, pathways, coursePathways]);
