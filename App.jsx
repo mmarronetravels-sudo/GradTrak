@@ -3534,6 +3534,15 @@ const summaryStats = {
 >
   📧 Email Student
 </button>
+<SendAdvisingEmail
+  isOpen={showEmailModal}
+  onClose={() => setShowEmailModal(false)}
+  student={student}
+  notes={[]}
+  categories={categories}
+  counselorProfile={profile}
+  supabaseClient={supabase}
+/>
 </div>
             
            {/* Student Notes Log */}
@@ -3631,17 +3640,7 @@ const summaryStats = {
           onArchive={handleArchiveStudent}
         />
 
-        {/* Send Advising Email Modal */}
-<SendAdvisingEmail
-  isOpen={showEmailModal}
-  onClose={() => setShowEmailModal(false)}
-  student={selectedStudent}
-  notes={studentNotes}
-  categories={categories}
-  counselorProfile={profile}
-  supabaseClient={supabase}
-/>
-
+        
         {/* Add Course Modal for Counselors */}
         {showAddCourseModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
