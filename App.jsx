@@ -67,10 +67,10 @@ function calculateStudentStats(courses, categories, diplomaRequirements = null) 
     const totalRequired = effectiveCategories.reduce((sum, cat) => sum + Number(cat.credits_required), 0);
   
   const creditsByCategory = effectiveCategories.reduce((acc, cat) => {
-    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id && c.status === 'completed').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
     return acc;
   }, {});
-  const totalEarned = Math.round(courses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+  const totalEarned = Math.round(courses.filter(c => c.status === 'completed').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
     const allCategoriesComplete = effectiveCategories.every(cat => {
       const earned = creditsByCategory[cat.id] || 0;
       return earned >= Number(cat.credits_required);
