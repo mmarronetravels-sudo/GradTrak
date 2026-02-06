@@ -2708,7 +2708,7 @@ const getPathwaysForCourse = (course) => {
                 {(stats?.categories || categories).map(cat =>
                   <CategoryCard key={cat.id} category={cat} earnedCredits={stats.creditsByCategory[cat.id] || 0}
                     onClick={() => { setSelectedCategory(cat.id); setActiveTab('courses'); }} />
-                ))}
+                )}
               </div>
             </div>
 
