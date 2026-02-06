@@ -2701,7 +2701,7 @@ const getPathwaysForCourse = (course) => {
             <YearlyProgressChart yearlyProgress={yearlyProgress} />            <div>
               <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
               <div className="grid grid-cols-2 gap-3">
-                {categories.map(cat => (
+                (stats?.categories || categories).map(cat =>
                   <CategoryCard key={cat.id} category={cat} earnedCredits={stats.creditsByCategory[cat.id] || 0}
                     onClick={() => { setSelectedCategory(cat.id); setActiveTab('courses'); }} />
                 ))}
