@@ -35,6 +35,7 @@ export default function SendAdvisingEmail({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [includeStudent, setIncludeStudent] = useState(false);
 
   // -- Default Subject --
   const defaultSubject = useMemo(() => {
@@ -208,6 +209,12 @@ export default function SendAdvisingEmail({
         .map(e => e.trim())
         .filter(e => e && e.includes('@'));
 
+      if (!includeStudent && ccList.length === 0) {
+        setError('Please select the student or add at least one CC recipient.');
+        setSending(false);
+        return;
+      }
+
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) throw new Error('Not authenticated - please log in again');
 
@@ -225,7 +232,7 @@ export default function SendAdvisingEmail({
           body: JSON.stringify({
             studentId: student.id,
             studentName: student.full_name,
-            studentEmail: student.email,
+            studentEmail: includeStudent ? student.email : null,
             recipientEmails: ccList,
             subject,
             contentType,
@@ -317,20 +324,29 @@ export default function SendAdvisingEmail({
 
         <div className="p-6 space-y-5">
 
-          {/* Student / To */}
+          {/* — Student / To — */}
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-500/20 rounded-full flex items-center justify-center text-lg">
-                &#x1F464;
+                👤
               </div>
               <div>
                 <p className="text-white font-medium text-sm">{student.full_name}</p>
-                <p className="text-slate-400 text-xs">To: {student.email}</p>
+                <p className="text-slate-400 text-xs">{student.email}</p>
               </div>
-              <div className="ml-auto flex gap-1">
+              <div className="ml-auto flex items-center gap-2">
                 {student.has_iep && <span className="bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded-full text-xs font-medium">IEP</span>}
                 {student.has_504 && <span className="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full text-xs font-medium">504</span>}
                 {student.is_ell && <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full text-xs font-medium">ELL</span>}
+                <label className="flex items-center gap-1.5 cursor-pointer ml-2">
+                  <input
+                    type="checkbox"
+                    checked={includeStudent}
+                    onChange={(e) => setIncludeStudent(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-600 text-indigo-500 focus:ring-indigo-500 bg-slate-700"
+                  />
+                  <span className="text-xs text-slate-300">Send to student</span>
+                </label>
               </div>
             </div>
           </div>
@@ -395,7 +411,7 @@ export default function SendAdvisingEmail({
             <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">&#x1F4AC; Preview</h4>
             <div className="text-sm space-y-1">
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">From:</span> GradTrack ({counselorProfile?.email})</p>
-              <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">To:</span> {student.email}</p>
+              <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">To:</span> {includeStudent ? student.email : '(CC recipients only)'}</p>
               {ccEmails.trim() && <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">CC:</span> {ccEmails.split(/[,;\n]+/).filter(e => e.trim()).join(', ')}</p>}
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">Subject:</span> {subject}</p>
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">Content:</span> {
