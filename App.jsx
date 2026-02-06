@@ -2590,6 +2590,7 @@ if (profile.diploma_type_id) {
     if (catData) setCategories(catData);
     if (courseData) setCourses(courseData);
     if (pathData) setPathways(pathData);
+    if (diplomaReqData) setDiplomaRequirements(diplomaReqData);
     if (cpData) setCoursePathways(cpData.filter(cp => courseData?.some(c => c.id === cp.course_id)));
     if (counselorData) setCounselors(counselorData.filter(c => c.scheduling_link));
     setLoading(false);
