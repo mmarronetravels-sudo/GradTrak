@@ -4087,8 +4087,7 @@ function ParentDashboard({ user, profile, onLogout }) {
         const studentsWithStats = studentData.map(student => {
           const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
           const studentDiplomaReqs = student.diploma_type_id 
-  const studentDiplomaReqs = student.diploma_type_id 
-  ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
+    ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
   : null;
 const stats = calculateStudentStats(studentCourses, catData || [], studentDiplomaReqs);
           const alerts = generateAlerts(student, stats);
