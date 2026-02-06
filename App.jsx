@@ -3314,29 +3314,21 @@ advisingNotes.slice(0, 5)
     `);
   }
   
-  async function fetchNotes(studentId) {
-  const { data } = await supabase
-    .from('student_notes')
-    .select('*')
-    .eq('student_id', studentId)
-    .order('created_at', { ascending: false });
-  if (data) setNotes(data);
-}
   async function fetchCaseManager(studentId) {
-  const { data } = await supabase
-    .from('counselor_assignments')
-    .select(`
-      counselor:counselor_id (
-        id,
-        full_name,
-        email
-      )
-    `)
-    .eq('student_id', studentId)
-    .eq('assignment_type', 'case_manager')
-    .single();
-  setCaseManager(data?.counselor || null);
-}
+    const { data } = await supabase
+      .from('counselor_assignments')
+      .select(`
+        counselor:profiles!counselor_assignments_counselor_id_fkey (
+          id,
+          full_name,
+          email
+        )
+      `)
+      .eq('student_id', studentId)
+      .eq('assignment_type', 'case_manager')
+      .maybeSingle();
+    setCaseManager(data?.counselor || null);
+  }
   const getCategoryForCourse = (course) => categories.find(c => c.id === course.category_id);
   const getPathwaysForCourse = (course, studentCoursePathways) => {
     const pathwayIds = studentCoursePathways.filter(cp => cp.course_id === course.id).map(cp => cp.pathway_id);
