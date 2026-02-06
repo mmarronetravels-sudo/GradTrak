@@ -2537,6 +2537,7 @@ function StudentDashboard({ user, profile, onLogout }) {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [diplomaRequirements, setDiplomaRequirements] = useState([]);
   const displayName = getDisplayName(profile);
 
   useEffect(() => {
@@ -2590,7 +2591,7 @@ function StudentDashboard({ user, profile, onLogout }) {
     setLoading(false);
   }
 
-  const stats = calculateStudentStats(courseData || [], catData || [], diplomaReqData);
+  const stats = calculateStudentStats(courses, categories, diplomaRequirements);
   const yearlyProgress = useMemo(() => calculateYearlyProgress(courses, profile.graduation_year), [courses, profile.graduation_year]);
   const alerts = useMemo(() => generateAlerts(profile, stats), [profile, stats]);
   const pathwayProgress = useMemo(() => calculatePathwayProgress(courses, pathways, coursePathways), [courses, pathways, coursePathways]);
@@ -2988,6 +2989,7 @@ if (assignedStudentIds.length === 0) {
 if (assignedStudentIds.length === 0) {
   setStudents([]);
   if (catData) setCategories(catData);
+  if (diplomaReqData) setDiplomaRequirements(diplomaReqData);
   if (pathData) setPathways(pathData);
   setLoading(false);
   return;
