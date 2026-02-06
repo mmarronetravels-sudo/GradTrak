@@ -2759,7 +2759,14 @@ const getPathwaysForCourse = (course) => {
             </div>
 
             <div className="space-y-3">
-              {courses.filter(c => !selectedCategory || c.category_id === selectedCategory).map(course => (
+              {courses.filter(c => !selectedCategory || c.category_id === selectedCategory).sort((a, b) => {
+  const yearA = a.term?.match(/(\d{2}\/\d{2})/)?.[1] || '00/00';
+  const yearB = b.term?.match(/(\d{2}\/\d{2})/)?.[1] || '00/00';
+  if (yearA !== yearB) return yearB.localeCompare(yearA);
+  const termA = a.term?.match(/T(\d)/)?.[1] || '0';
+  const termB = b.term?.match(/T(\d)/)?.[1] || '0';
+  return termB.localeCompare(termA);
+}).map(course => (
                 <CourseItem key={course.id} course={course} category={getCategoryForCourse(course)} pathways={getPathwaysForCourse(course)} onDelete={handleDeleteCourse} />
               ))}
               {courses.filter(c => !selectedCategory || c.category_id === selectedCategory).length === 0 && (
@@ -4229,7 +4236,14 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">📚 Courses ({student.courses.length})</h3>
             <div className="space-y-2">
-              {student.courses.map(course => {
+              {[...student.courses].sort((a, b) => {
+  const yearA = a.term?.match(/(\d{2}\/\d{2})/)?.[1] || '00/00';
+  const yearB = b.term?.match(/(\d{2}\/\d{2})/)?.[1] || '00/00';
+  if (yearA !== yearB) return yearB.localeCompare(yearA);
+  const termA = a.term?.match(/T(\d)/)?.[1] || '0';
+  const termB = b.term?.match(/T(\d)/)?.[1] || '0';
+  return termB.localeCompare(termA);
+}).map(course => {
                 const cat = categories.find(c => c.id === course.category_id);
                 return (
                   <div key={course.id} className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
