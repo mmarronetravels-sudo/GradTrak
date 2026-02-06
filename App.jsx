@@ -3482,7 +3482,7 @@ const summaryStats = {
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {categories.map(cat => {
+              {(student.stats?.categories || categories).map(cat => {
                 const earned = student.stats?.creditsByCategory?.[cat.id] || 0;
                 const required = Number(cat.credits_required);
                 const isComplete = earned >= required;
