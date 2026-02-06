@@ -3751,7 +3751,7 @@ const summaryStats = {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-bold text-white">{displayName}</h1>
-              <p className="text-slate-400 text-sm">School Counselor</p>
+              <p className="text-slate-400 text-sm">{profile?.display_title || (profile?.role === 'case_manager' ? 'Case Manager' : 'School Counselor')}</p>
             </div>
             <div className="flex items-center gap-2">
 <button onClick={() => setShowLinkParentModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-xl transition-all text-sm" title="Link Parent">
