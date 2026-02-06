@@ -1,6 +1,6 @@
 // ============================================
 // SendAdvisingEmail.jsx
-// GradTrack â€” Send Notes/Plan via Email
+// GradTrack - Send Notes/Plan via Email
 // February 2026
 // ============================================
 // Usage in App.jsx:
@@ -36,21 +36,21 @@ export default function SendAdvisingEmail({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
-  // â"€â"€ Default Subject â"€â"€
+  // -- Default Subject --
   const defaultSubject = useMemo(() => {
-    if (!student) return '';
+    if (!student) return 'Advising Summary';
     const name = student.full_name || 'Student';
-    if (contentType === 'notes') return `Advising Notes â€" ${name}`;
-    if (contentType === 'plan') return `Graduation Progress â€" ${name}`;
-    return `Advising Summary â€" ${name}`;
-  }, [contentType, student?.full_name]);
+    if (contentType === 'notes') return `Advising Notes - ${name}`;
+    if (contentType === 'plan') return `Graduation Progress - ${name}`;
+    return `Advising Summary - ${name}`;
+  }, [contentType, student]);
 
   const subject = customSubject || defaultSubject;
 
-  // Don't render if not open
+  // -- Guard AFTER all hooks --
   if (!isOpen || !student) return null;
 
-  // â”€â”€ Build Notes HTML â”€â”€
+  // -- Build Notes HTML --
   function buildNotesHtml() {
     if (!notes || notes.length === 0) {
       return '<p style="color: #94a3b8; font-style: italic;">No advising notes on record.</p>';
@@ -71,7 +71,7 @@ export default function SendAdvisingEmail({
       return `
         <div style="padding: 12px 16px; margin-bottom: 8px; background: #f8fafc; border-radius: 8px; border-left: 3px solid #4f46e5;">
           <div style="font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 6px;">
-            ${noteDate}${typeLabel ? ` â€” ${typeLabel}` : ''}
+            ${noteDate}${typeLabel ? ` - ${typeLabel}` : ''}
             ${note.status ? ` <span style="background: ${statusBg}; color: ${statusColor}; padding: 1px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;">${statusLabel}</span>` : ''}
           </div>
           <div style="font-size: 13px; color: #334155; line-height: 1.6;">
@@ -79,7 +79,7 @@ export default function SendAdvisingEmail({
           </div>
           ${note.follow_up_date ? `
             <div style="font-size: 12px; color: #4f46e5; font-style: italic; margin-top: 8px;">
-              ðŸ“… Follow-up: ${new Date(note.follow_up_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              Follow-up: ${new Date(note.follow_up_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
             </div>
           ` : ''}
         </div>
@@ -87,7 +87,7 @@ export default function SendAdvisingEmail({
     }).join('');
   }
 
-  // â”€â”€ Build Plan HTML â”€â”€
+  // -- Build Plan HTML --
   function buildPlanHtml() {
     const studentCourses = student.courses || [];
     const completedCourses = studentCourses.filter(c => c.status === 'completed');
@@ -127,8 +127,8 @@ export default function SendAdvisingEmail({
         </tr>
         <tr>
           <td style="font-size: 13px; color: #64748b;">
-            Grade ${student.grade || 'N/A'} Â· Class of ${student.graduation_year || 'N/A'}
-            ${student.diploma_type_name ? ` Â· ${escapeHtml(student.diploma_type_name)} Diploma` : ''}
+            Grade ${student.grade || 'N/A'} | Class of ${student.graduation_year || 'N/A'}
+            ${student.diploma_type_name ? ` | ${escapeHtml(student.diploma_type_name)} Diploma` : ''}
           </td>
         </tr>
       </table>
@@ -161,7 +161,7 @@ export default function SendAdvisingEmail({
               <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155; text-align: center;">${cat.earned}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155; text-align: center;">${cat.required}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; text-align: center; color: ${met ? '#16a34a' : '#ea580c'}; font-weight: 600;">
-                ${met ? 'âœ“ Complete' : `${Math.round((cat.required - cat.earned) * 10) / 10} needed`}
+                ${met ? 'Complete' : `${Math.round((cat.required - cat.earned) * 10) / 10} needed`}
               </td>
             </tr>`;
           }).join('')}
@@ -172,7 +172,7 @@ export default function SendAdvisingEmail({
     // Current courses
     if (currentCourses.length > 0) {
       html += `
-        <p style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 20px 0 8px 0;">ðŸ“š Current Courses (${currentCourses.length})</p>
+        <p style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 20px 0 8px 0;">Current Courses (${currentCourses.length})</p>
         <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
           <thead>
             <tr style="background: #f1f5f9;">
@@ -185,8 +185,8 @@ export default function SendAdvisingEmail({
             ${currentCourses.map(c => `
               <tr>
                 <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155;">${escapeHtml(c.name || '')}</td>
-                <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155; text-align: center;">${c.credits || 'â€”'}</td>
-                <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155; text-align: center;">${c.term || 'â€”'}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155; text-align: center;">${c.credits || '-'}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #334155; text-align: center;">${c.term || '-'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -197,7 +197,7 @@ export default function SendAdvisingEmail({
     return html;
   }
 
-  // â”€â”€ Send Handler â”€â”€
+  // -- Send Handler --
   async function handleSend() {
     setSending(true);
     setError('');
@@ -209,7 +209,7 @@ export default function SendAdvisingEmail({
         .filter(e => e && e.includes('@'));
 
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) throw new Error('Not authenticated â€” please log in again');
+      if (!session) throw new Error('Not authenticated - please log in again');
 
       // Determine Supabase URL from the client
       const supabaseUrl = supabaseClient.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || '';
@@ -250,7 +250,7 @@ export default function SendAdvisingEmail({
     }
   }
 
-  // â”€â”€ Reset & Close â”€â”€
+  // -- Reset & Close --
   function handleClose() {
     setSent(false);
     setError('');
@@ -260,9 +260,9 @@ export default function SendAdvisingEmail({
     onClose();
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  //  RENDER â€” Success State
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ===================================
+  //  RENDER - Success State
+  // ===================================
   if (sent) {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -270,7 +270,7 @@ export default function SendAdvisingEmail({
         <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 p-8 text-center"
              onClick={e => e.stopPropagation()}>
           <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">âœ…</span>
+            <span className="text-3xl">&#x2705;</span>
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Email Sent!</h2>
           <p className="text-slate-400 text-sm mb-1">
@@ -294,9 +294,9 @@ export default function SendAdvisingEmail({
     );
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  //  RENDER â€” Email Compose Form
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ===================================
+  //  RENDER - Email Compose Form
+  // ===================================
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
          onClick={handleClose}>
@@ -306,7 +306,7 @@ export default function SendAdvisingEmail({
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-0">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>ðŸ“§</span> Send Advising Email
+            <span>&#x1F4E7;</span> Send Advising Email
           </h2>
           <button onClick={handleClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -317,11 +317,11 @@ export default function SendAdvisingEmail({
 
         <div className="p-6 space-y-5">
 
-          {/* â”€â”€ Student / To â”€â”€ */}
+          {/* Student / To */}
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-500/20 rounded-full flex items-center justify-center text-lg">
-                ðŸ‘¤
+                &#x1F464;
               </div>
               <div>
                 <p className="text-white font-medium text-sm">{student.full_name}</p>
@@ -335,14 +335,14 @@ export default function SendAdvisingEmail({
             </div>
           </div>
 
-          {/* â”€â”€ Content Type Selector â”€â”€ */}
+          {/* Content Type Selector */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">Include in email:</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: 'notes', icon: 'ðŸ“', label: 'Notes', desc: 'Recent notes' },
-                { value: 'plan', icon: 'ðŸ“‹', label: 'Plan', desc: 'Credit progress' },
-                { value: 'both', icon: 'ðŸ“‹ðŸ“', label: 'Both', desc: 'Full summary' },
+                { value: 'notes', icon: '\u{1F4DD}', label: 'Notes', desc: 'Recent notes' },
+                { value: 'plan', icon: '\u{1F4CB}', label: 'Plan', desc: 'Credit progress' },
+                { value: 'both', icon: '\u{1F4CB}\u{1F4DD}', label: 'Both', desc: 'Full summary' },
               ].map(opt => (
                 <button
                   key={opt.value}
@@ -361,7 +361,7 @@ export default function SendAdvisingEmail({
             </div>
           </div>
 
-          {/* â”€â”€ Subject â”€â”€ */}
+          {/* Subject */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Subject</label>
             <input
@@ -373,10 +373,10 @@ export default function SendAdvisingEmail({
             />
           </div>
 
-          {/* â”€â”€ CC Recipients â”€â”€ */}
+          {/* CC Recipients */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              CC â€” Teachers, Family, Others
+              CC - Teachers, Family, Others
             </label>
             <textarea
               value={ccEmails}
@@ -390,9 +390,9 @@ export default function SendAdvisingEmail({
             </p>
           </div>
 
-          {/* â”€â”€ Preview Summary â”€â”€ */}
+          {/* Preview Summary */}
           <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
-            <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">ðŸ“¬ Preview</h4>
+            <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">&#x1F4AC; Preview</h4>
             <div className="text-sm space-y-1">
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">From:</span> GradTrack ({counselorProfile?.email})</p>
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">To:</span> {student.email}</p>
@@ -406,21 +406,21 @@ export default function SendAdvisingEmail({
             </div>
           </div>
 
-          {/* â”€â”€ FERPA Notice â”€â”€ */}
+          {/* FERPA Notice */}
           <div className="bg-amber-500/10 rounded-xl p-3 border border-amber-500/20">
             <p className="text-amber-400/80 text-xs">
-              ðŸ”’ Includes FERPA confidentiality notice. All sends are logged for audit compliance.
+              &#x1F512; Includes FERPA confidentiality notice. All sends are logged for audit compliance.
             </p>
           </div>
 
-          {/* â”€â”€ Error â”€â”€ */}
+          {/* Error */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
               <p className="text-red-400 text-sm">{error}</p>
             </div>
           )}
 
-          {/* â”€â”€ Buttons â”€â”€ */}
+          {/* Buttons */}
           <div className="flex gap-3 pt-1">
             <button
               onClick={handleClose}
@@ -442,7 +442,7 @@ export default function SendAdvisingEmail({
                   Sending...
                 </>
               ) : (
-                <>ðŸ“§ Send Email</>
+                <>&#x1F4E7; Send Email</>
               )}
             </button>
           </div>
@@ -452,7 +452,7 @@ export default function SendAdvisingEmail({
   );
 }
 
-// â”€â”€ Helper â”€â”€
+// -- Helper --
 function escapeHtml(str) {
   if (!str) return '';
   return str
