@@ -36,18 +36,19 @@ export default function SendAdvisingEmail({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
-  // Reset state when modal opens
-  if (!isOpen || !student) return null;
-
-  // â”€â”€ Default Subject â”€â”€
+  // â"€â"€ Default Subject â"€â"€
   const defaultSubject = useMemo(() => {
+    if (!student) return '';
     const name = student.full_name || 'Student';
-    if (contentType === 'notes') return `Advising Notes â€” ${name}`;
-    if (contentType === 'plan') return `Graduation Progress â€” ${name}`;
-    return `Advising Summary â€” ${name}`;
-  }, [contentType, student.full_name]);
+    if (contentType === 'notes') return `Advising Notes â€" ${name}`;
+    if (contentType === 'plan') return `Graduation Progress â€" ${name}`;
+    return `Advising Summary â€" ${name}`;
+  }, [contentType, student?.full_name]);
 
   const subject = customSubject || defaultSubject;
+
+  // Don't render if not open
+  if (!isOpen || !student) return null;
 
   // â”€â”€ Build Notes HTML â”€â”€
   function buildNotesHtml() {
