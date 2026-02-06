@@ -4116,9 +4116,10 @@ function ParentDashboard({ user, profile, onLogout }) {
         .eq('school_id', profile.school_id)
         .order('display_order');
 
-      const { data: diplomaReqData } = await supabase
+     const { data: diplomaReqData } = await supabase
         .from('diploma_requirements')
         .select('*');
+      
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
