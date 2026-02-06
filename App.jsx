@@ -3272,7 +3272,7 @@ advisingNotes.slice(0, 5)
           student_id: student.id,
           counselor_id: profile.id,
           note_type: 'advising_plan',
-          content: noteText.trim(),
+          note: noteText.trim(),
           status: 'completed',
           created_at: new Date().toISOString(),
         }]);
