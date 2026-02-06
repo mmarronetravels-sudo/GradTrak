@@ -3264,6 +3264,24 @@ advisingNotes.slice(0, 5)
       </html>
     `;
 
+// Save handler for the print window to call back
+    window._saveAdvisingPlanNotes = async (noteText) => {
+      if (!noteText || !noteText.trim()) return { success: false, error: 'No notes to save' };
+      try {
+        const { error } = await supabase.from('student_notes').insert([{
+          student_id: student.id,
+          counselor_id: profile.id,
+          note_type: 'advising_plan',
+          content: noteText.trim(),
+          status: 'completed',
+          created_at: new Date().toISOString(),
+        }]);
+        if (error) return { success: false, error: error.message };
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    };    
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
       alert('Pop-up blocked! Please allow pop-ups for this site.');
@@ -3273,7 +3291,27 @@ advisingNotes.slice(0, 5)
     printWindow.document.close();
     printWindow.focus();
     // Print button added to the page so counselor can review first
-    printWindow.document.body.insertAdjacentHTML('beforeend', '<div class="no-print" style="text-align:center;padding:20px;"><button onclick="window.print()" style="background:#4f46e5;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Print / Save as PDF</button></div>');
+    printWindow.document.body.insertAdjacentHTML('beforeend', `
+      <div class="no-print" style="text-align:center;padding:20px;display:flex;gap:12px;justify-content:center;">
+        <button onclick="
+          var notes = document.getElementById('sessionNotes').value;
+          if (!notes || !notes.trim()) { alert('No session notes to save.'); return; }
+          this.disabled = true;
+          this.textContent = 'Saving...';
+          window.opener._saveAdvisingPlanNotes(notes).then(function(result) {
+            if (result.success) {
+              this.textContent = '✓ Saved';
+              this.style.background = '#16a34a';
+            } else {
+              alert('Error saving: ' + result.error);
+              this.disabled = false;
+              this.textContent = '💾 Save Session Notes';
+            }
+          }.bind(this));
+        " style="background:#16a34a;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;">💾 Save Session Notes</button>
+        <button onclick="window.print()" style="background:#4f46e5;color:white;border:none;padding:12px 32px;border-radius:8px;font-size:16px;cursor:pointer;">🖨️ Print / Save as PDF</button>
+      </div>
+    `);
   }
   
   async function fetchNotes(studentId) {
