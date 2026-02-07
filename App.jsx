@@ -3362,27 +3362,40 @@ advisingNotes.slice(0, 5)
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
- // Calculate expected credits based on grade and current trimester (Winter/T2)
+ // Calculate expected credits based on grade and current trimester
 const getExpectedCredits = (grade) => {
-  const expectedByGrade = { 9: 2, 10: 8, 11: 14, 12: 20 }; // Winter T2 expectations (24 total credits)
-  return expectedByGrade[grade] || 0;
+  const month = new Date().getMonth() + 1;
+  let trimester;
+  if (month >= 8 && month <= 11) trimester = 1;
+  else if (month === 12 || month <= 2) trimester = 2;
+  else trimester = 3;
+
+  const expectations = {
+    9:  { 1: 0,  2: 8,  3: 17 },
+    10: { 1: 25, 2: 33, 3: 42 },
+    11: { 1: 50, 2: 58, 3: 67 },
+    12: { 1: 75, 2: 83, 3: 92 }
+  };
+  const expectedPercent = expectations[grade]?.[trimester] || 0;
+  return (expectedPercent / 100) * 24;
 };
 
-const isStudentAtRisk = (student) => {
+const getStudentRiskLevel = (student) => {
   const expected = getExpectedCredits(student.grade);
   const earned = student.stats?.totalEarned || 0;
   const behind = expected - earned;
-  return behind >= 0.5; // Critical, At-Risk, or Watch
+  if (behind >= 3) return 'critical';
+  if (behind >= 1.5) return 'at-risk';
+  if (behind >= 0.5) return 'watch';
+  return 'on-track';
 };
 
 // Sort and filter students
 const filteredStudents = students
   .filter(student => {
-    // Filter by active status (hide archived unless toggle is on)
     if (!showArchivedStudents && student.is_active === false) {
       return false;
     }
-    // Filter by search term
     return student.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
   })
   .sort((a, b) => {
@@ -3390,11 +3403,12 @@ const filteredStudents = students
     const bLastName = b.full_name?.split(' ').slice(-1)[0] || '';
     return aLastName.localeCompare(bLastName);
   });
-  const activeStudents = students.filter(s => s.is_active !== false);
+
+const activeStudents = students.filter(s => s.is_active !== false);
 const summaryStats = {
   total: activeStudents.length,
-  atRisk: activeStudents.filter(s => isStudentAtRisk(s)).length,
-  onTrack: activeStudents.filter(s => !isStudentAtRisk(s)).length,
+  atRisk: activeStudents.filter(s => getStudentRiskLevel(s) !== 'on-track').length,
+  onTrack: activeStudents.filter(s => getStudentRiskLevel(s) === 'on-track').length,
   avgProgress: activeStudents.length > 0 ? Math.round(activeStudents.reduce((sum, s) => sum + (s.stats?.percentage || 0), 0) / activeStudents.length) : 0
 };
   // Student Detail View
