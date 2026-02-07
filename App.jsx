@@ -1468,7 +1468,7 @@ if (studentData) {
           <button onClick={() => setActiveTab('pathways')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             🎯 CTE Pathways
-          </button
+          </button>
             <button onClick={() => setActiveTab('privacy')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'privacy' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             🔒 FERPA
