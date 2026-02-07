@@ -2131,6 +2131,15 @@ if (studentData) {
             </div>
           </div>
         )}
+
+        {activeTab === 'contact-snapshot' && (
+          <ContactSnapshotReport
+            supabaseClient={supabase}
+            schoolId={profile.school_id}
+            userRole={profile.role}
+            userId={profile.id}
+          />
+        )}
       </main>
 
       {/* Category Modal */}
