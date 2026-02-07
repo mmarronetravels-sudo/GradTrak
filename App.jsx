@@ -359,7 +359,18 @@ function CourseItem({ course, category, pathways = [], onDelete, showDelete = tr
             <h4 className="text-white font-medium">{course.name}</h4>
             {course.is_dual_credit && <DualCreditBadge type={course.dual_credit_type} />}
             {course.grade && <span className="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-300">{course.grade}</span>}
+            {course.section_name && (
+  <span className="text-xs px-2 py-1 rounded-full bg-purple-600/80 text-purple-100">{course.section_name}</span>
+)}
           </div>
+          {course.teacher_name && (
+  <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+    <span>👩‍🏫 {course.teacher_name}</span>
+    {course.teacher_email && (
+      <a href={`mailto:${course.teacher_email}`} className="text-blue-400 hover:text-blue-300">✉️</a>
+    )}
+  </div>
+)}
           <div className="flex items-center gap-3 mt-2 text-sm text-slate-400">
   <span>{category?.icon} {category?.name}</span>
   <span>•</span>
