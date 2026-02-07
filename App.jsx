@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabase';
 import DataSyncUpload from './components/DataSyncUpload';
 import AtRiskReport from './components/AtRiskReport';
+import ContactSnapshotReport from './components/ContactSnapshotReport';
 import ArchiveStudentModal from './components/ArchiveStudentModal';
 import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
@@ -3880,6 +3881,12 @@ const summaryStats = {
 >
   🎯 CTE Pathways
 </button>
+              <button
+  onClick={() => setMainView('contact-snapshot')}
+  className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'contact-snapshot' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+>
+  📊 Contact Snapshot
+</button>
             </div>
 
             {mainView === 'students' && (
@@ -4015,6 +4022,14 @@ const summaryStats = {
       const fullStudent = students.find(s => s.id === student.id) || student;
       setSelectedStudent(fullStudent);
     }}
+  />
+)}
+          {mainView === 'contact-snapshot' && (
+  <ContactSnapshotReport
+    supabaseClient={supabase}
+    schoolId={profile.school_id}
+    userRole={profile.role}
+    userId={profile.id}
   />
 )}
           </div>
