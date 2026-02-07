@@ -3961,9 +3961,19 @@ const summaryStats = {
   {student.is_ell && (
     <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full text-xs font-medium">ELL</span>
   )}
-  {student.alerts.some(a => a.type === 'critical') && (
-    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
-  )}
+  {(() => {
+  const risk = getStudentRiskLevel(student);
+  if (risk === 'critical') return (
+    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">Critical</span>
+  );
+  if (risk === 'at-risk') return (
+    <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
+  );
+  if (risk === 'watch') return (
+    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full text-xs font-medium">Watch</span>
+  );
+  return null;
+})()}
   {student.is_adult_student && (
     <span className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium">18+ FERPA</span>
   )}
@@ -4312,9 +4322,19 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h3 className="text-white font-semibold">{student.displayName}</h3>
-                    {student.alerts.some(a => a.type === 'critical') && (
-                      <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
-                    )}
+                    {(() => {
+  const risk = getStudentRiskLevel(student);
+  if (risk === 'critical') return (
+    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full text-xs font-medium">Critical</span>
+  );
+  if (risk === 'at-risk') return (
+    <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-xs font-medium">At Risk</span>
+  );
+  if (risk === 'watch') return (
+    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full text-xs font-medium">Watch</span>
+  );
+  return null;
+})()}
                   </div>
                   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
                   <p className="text-slate-500 text-xs mt-1">{student.courses.length} courses • {student.stats.totalEarned} credits earned</p>
