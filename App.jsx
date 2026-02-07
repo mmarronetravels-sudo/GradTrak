@@ -1468,8 +1468,8 @@ if (studentData) {
           <button onClick={() => setActiveTab('pathways')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             🎯 CTE Pathways
-          </button>
-          <button onClick={() => setActiveTab('privacy')}
+          </button
+            <button onClick={() => setActiveTab('privacy')}
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'privacy' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             🔒 FERPA
           </button>
@@ -1488,6 +1488,10 @@ if (studentData) {
          <button onClick={() => setActiveTab('cte-pathways')}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'cte-pathways' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
                 🎯 CTE Pathways
+              </button>
+         <button onClick={() => setActiveTab('contact-snapshot')}
+                className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'contact-snapshot' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                📊 Contacts
               </button>
          <button onClick={() => setActiveTab('students')}
       className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -4004,7 +4008,7 @@ const summaryStats = {
               </>
             )}
 
-            {mainView === 'at-risk' && (
+            {activeTab === 'at-risk' && (
               <AtRiskReport
                 schoolId={profile.school_id}
                 counselorId={profile.id}
@@ -4014,24 +4018,24 @@ const summaryStats = {
 }}
               />
             )}
-            {mainView === 'cte-pathways' && (
-  <CTEPathwayReport
-    schoolId={profile.school_id}
-    counselorId={profile.id}
-    onSelectStudent={(student) => {
-      const fullStudent = students.find(s => s.id === student.id) || student;
-      setSelectedStudent(fullStudent);
-    }}
-  />
-)}
-          {mainView === 'contact-snapshot' && (
-  <ContactSnapshotReport
-    supabaseClient={supabase}
-    schoolId={profile.school_id}
-    userRole={profile.role}
-    userId={profile.id}
-  />
-)}
+            {activeTab === 'cte-pathways' && (
+              <CTEPathwayReport
+                schoolId={profile.school_id}
+                counselorId={profile.id}
+                onSelectStudent={(student) => {
+                  const fullStudent = students.find(s => s.id === student.id) || student;
+                  setSelectedStudent(fullStudent);
+                }}
+              />
+            )}
+            {activeTab === 'contact-snapshot' && (
+              <ContactSnapshotReport
+                supabaseClient={supabase}
+                schoolId={profile.school_id}
+                userRole={profile.role}
+                userId={profile.id}
+              />
+            )}
           </div>
         </main>
 
