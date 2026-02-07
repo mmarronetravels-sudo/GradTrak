@@ -120,7 +120,7 @@ const filteredNotes = (notesData || []).filter(note =>
   
   const calculateStudentStats = (studentId) => {
     const studentCourses = courses.filter(c => c.student_id === studentId);
-    const totalEarned = studentCourses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+    const totalEarned = studentCourses.filter(c => c.status === 'completed').reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
     const totalRequired = 24;
     const percentage = Math.round((totalEarned / totalRequired) * 100);
     return { totalEarned, totalRequired, percentage };
