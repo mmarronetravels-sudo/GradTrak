@@ -4037,7 +4037,7 @@ const summaryStats = {
 }}
   />
 )}
-            {MainView === 'contact-snapshot' && (
+            {mainView === 'contact-snapshot' && (
               <ContactSnapshotReport
                 supabaseClient={supabase}
                 schoolId={profile.school_id}
