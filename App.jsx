@@ -1782,15 +1782,15 @@ if (studentData) {
   </div>
 )}
   {activeTab === 'at-risk' && (
-            <AtRiskReport
-  schoolId={profile.school_id}
-  counselorId={profile.role === 'counselor' ? profile.id : null}
-  onSelectStudent={(student) => {
-    setSelectedStudent(student);
-    setActiveTab('student-detail');
-  }}
-/>
-          )}
+  <AtRiskReport
+    schoolId={profile.school_id}
+    counselorId={profile.id}
+    onSelectStudent={(student) => {
+      const fullStudent = students.find(s => s.id === student.id) || student;
+      setSelectedStudent(fullStudent);
+    }}
+  />
+)}
   {activeTab === 'cte-pathways' && (
             <CTEPathwayReport
   schoolId={profile.school_id}
@@ -4023,20 +4023,20 @@ const summaryStats = {
                 counselorId={profile.id}
                 onSelectStudent={(student) => {
   const fullStudent = students.find(s => s.id === student.id) || student;
- setSelectedStudent(fullStudent);
+  setSelectedStudent(fullStudent);
 }}
-              />
-            )}
+  />
+)}
             {activeTab === 'cte-pathways' && (
               <CTEPathwayReport
                 schoolId={profile.school_id}
                 counselorId={profile.id}
                 onSelectStudent={(student) => {
-                  const fullStudent = students.find(s => s.id === student.id) || student;
-                  setSelectedStudent(fullStudent);
-                }}
-              />
-            )}
+  const fullStudent = students.find(s => s.id === student.id) || student;
+  setSelectedStudent(fullStudent);
+}}
+  />
+)}
             {activeTab === 'contact-snapshot' && (
               <ContactSnapshotReport
                 supabaseClient={supabase}
