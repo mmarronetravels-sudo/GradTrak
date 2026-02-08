@@ -4017,7 +4017,7 @@ const summaryStats = {
               </>
             )}
 
-            {activeTab === 'at-risk' && (
+            {mainView === 'at-risk' && (
               <AtRiskReport
                 schoolId={profile.school_id}
                 counselorId={profile.id}
@@ -4027,7 +4027,7 @@ const summaryStats = {
 }}
   />
 )}
-            {activeTab === 'cte-pathways' && (
+            {mainView === 'cte-pathways' && (
               <CTEPathwayReport
                 schoolId={profile.school_id}
                 counselorId={profile.id}
@@ -4037,7 +4037,7 @@ const summaryStats = {
 }}
   />
 )}
-            {activeTab === 'contact-snapshot' && (
+            {MainView === 'contact-snapshot' && (
               <ContactSnapshotReport
                 supabaseClient={supabase}
                 schoolId={profile.school_id}
