@@ -4392,20 +4392,70 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    async function initAuth() {
+   async function initAuth() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
         
         if (session?.user) {
           setUser(session.user);
-          const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-          if (mounted) setProfile(data);
+          const profile = await findOrCreateProfile(session.user);
+          if (mounted) setProfile(profile);
         }
       } catch (err) {
         console.error('Auth init error:', err);
       }
       if (mounted) setLoading(false);
+    }
+
+    // Shared helper: find profile by ID, then by email, or create one
+    async function findOrCreateProfile(authUser) {
+      // 1. Try by ID
+      let { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      
+      if (data) return data;
+
+      // 2. Try by email
+      if (authUser.email) {
+        const { data: emailMatch } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', authUser.email)
+          .single();
+        
+        if (emailMatch) {
+          await supabase
+            .from('profiles')
+            .update({ id: authUser.id })
+            .eq('email', authUser.email);
+          
+          return { ...emailMatch, id: authUser.id };
+        }
+      }
+
+      // 3. No profile exists — create a basic one
+      const fullName = authUser.user_metadata?.full_name 
+        || authUser.user_metadata?.name 
+        || authUser.email?.split('@')[0] 
+        || 'Unknown';
+      
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .insert({
+          id: authUser.id,
+          email: authUser.email,
+          full_name: fullName,
+          role: 'student',
+          school_id: 'c3c8b2d1-d01d-42ce-9e64-d2f8ed07c534'
+        })
+        .select()
+        .single();
+      
+      return newProfile;
     }
 
     initAuth();
@@ -4420,39 +4470,15 @@ export default function App() {
         return;
       }
       
-      if (event === 'SIGNED_IN' && session?.user) {
-  setUser(session.user);
-  
-  // First try to find profile by ID (for email/password logins)
-  let { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-  
-  // If not found by ID, try to find by email (for Google SSO)
-  if (!data && session.user.email) {
-    const { data: emailMatch } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', session.user.email)
-      .single();
-    
-    if (emailMatch) {
-      // Update the profile's ID to match the auth user's ID for future logins
-      await supabase
-        .from('profiles')
-        .update({ id: session.user.id })
-        .eq('email', session.user.email);
-      
-      data = { ...emailMatch, id: session.user.id };
-    }
-  }
-  
-  if (mounted) {
-    setProfile(data);
-    setLoading(false);
-  }
-}
-
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+        setUser(session.user);
+        const profile = await findOrCreateProfile(session.user);
+        if (mounted) {
+          setProfile(profile);
+          setLoading(false);
+        }
+      }
     });
-
     return () => {
       mounted = false;
       subscription.unsubscribe();
