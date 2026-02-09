@@ -724,19 +724,20 @@ const StudentNotesLog = ({
   }, [studentId]);
 
   // Add new note
-  const handleAddNote = async (noteData) => {
+ const handleAddNote = async (noteData) => {
     setIsSubmitting(true);
+    setError(null);
     try {
       const { data, error } = await supabase
-  .from('student_notes')
-  .insert([{
-    student_id: studentId,
-    counselor_id: counselorId,
-    note: noteData.content,
-    note_type: noteData.note_type,
-    follow_up_date: noteData.follow_up_date,
-    status: noteData.status
-  }])
+        .from('student_notes')
+        .insert([{
+          student_id: studentId,
+          counselor_id: counselorId,
+          note: noteData.content,
+          note_type: noteData.note_type,
+          follow_up_date: noteData.follow_up_date,
+          status: noteData.status
+        }])
         .select()
         .single();
 
@@ -744,7 +745,7 @@ const StudentNotesLog = ({
       setNotes(prev => [data, ...prev]);
     } catch (err) {
       console.error('Error adding note:', err);
-      setError('Failed to add note');
+      setError('Failed to save note: ' + (err.message || 'Unknown error'));
     } finally {
       setIsSubmitting(false);
     }
