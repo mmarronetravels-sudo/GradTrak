@@ -95,7 +95,8 @@ export default function ContactSnapshotReport({
           // Transform fallback data to match RPC shape
           const aggregated = {};
           (fallbackData || []).forEach(row => {
-            const monthKey = dateToKey(new Date(row.created_at));
+           const monthKey = dateStringToKey(row.created_at);
+           if (!monthKey) return;
             const key = `${row.counselor_id}|${monthKey}|${row.note_type || 'general'}`;
             if (!aggregated[key]) {
               aggregated[key] = {
