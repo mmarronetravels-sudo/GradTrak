@@ -3979,7 +3979,14 @@ const summaryStats = {
               <button 
                 key={student.id} 
                 onClick={() => {
-  setSelectedStudent(student);
+  const totalEarned = (student.courses || [])
+    .filter(c => c.status === 'completed' && c.grade !== 'F')
+    .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
+  const totalRequired = 24;
+  setSelectedStudent({
+    ...student,
+    stats: { totalEarned, totalRequired, percentage: Math.round((totalEarned / totalRequired) * 100) }
+  });
   console.log('Selected student:', student.full_name, 'courses:', student.courses?.length);
   fetchCaseManager(student.id);
 }}
