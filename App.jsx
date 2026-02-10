@@ -7,6 +7,7 @@ import ArchiveStudentModal from './components/ArchiveStudentModal';
 import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
 import SendAdvisingEmail from './components/SendAdvisingEmail';
+import AcademicContractForm from './components/AcademicContractForm';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -2902,6 +2903,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [allStudents, setAllStudents] = useState([]);
   const [isReactivating, setIsReactivating] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showContractModal, setShowContractModal] = useState(false);
+const [selectedContract, setSelectedContract] = useState(null);
   const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
       .from('profiles')
@@ -3638,6 +3641,12 @@ const summaryStats = {
 >
   📧 Email Student
 </button>
+ <button
+  onClick={() => { setSelectedContract(null); setShowContractModal(true); }}
+  className="px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/30 transition-colors"
+>
+  📋 Academic Contract
+</button>
 <SendAdvisingEmail
   isOpen={showEmailModal}
   onClose={() => setShowEmailModal(false)}
@@ -3646,6 +3655,15 @@ const summaryStats = {
   categories={categories}
   counselorProfile={profile}
   supabaseClient={supabase}
+/>
+<AcademicContractForm
+  isOpen={showContractModal}
+  onClose={() => setShowContractModal(false)}
+  student={student}
+  counselorProfile={profile}
+  supabaseClient={supabase}
+  existingContract={selectedContract}
+  onSaved={() => {}}
 />
 </div>
             
