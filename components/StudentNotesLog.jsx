@@ -773,6 +773,7 @@ const StudentNotesLog = ({
       refetch();
     } catch (err) {
       console.error('Error deleting note:', err);
+      alert('Failed to delete: ' + err.message);
     }
   };
 
