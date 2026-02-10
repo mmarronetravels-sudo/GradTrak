@@ -40,6 +40,16 @@ function dateToKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function dateStringToKey(str) {
+  if (!str) return null;
+  const s = String(str);
+  const match = s.match(/^(\d{4})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}`;
+  const d = new Date(s);
+  if (isNaN(d)) return null;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export default function ContactSnapshotReport({
   supabaseClient,
   schoolId,
