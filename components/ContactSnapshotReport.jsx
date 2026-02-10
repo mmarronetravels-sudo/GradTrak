@@ -15,17 +15,15 @@ const NOTE_TYPES = {
 
 // ── Month helpers ──
 function getSchoolYearMonths() {
-  // School year: July → June
+  // School year: August → June (11 months, no July)
   const now = new Date();
-  const year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const year = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+
   const months = [];
-  for (let m = 6; m < 18; m++) {
+  for (let m = 7; m <= 17; m++) {
     const actualMonth = m % 12;
     const actualYear = m >= 12 ? year + 1 : year;
-    const d = new Date(actualYear, actualMonth, 1);
-    // Don't show future months
-    if (d > now) break;
-    months.push(d);
+    months.push(new Date(actualYear, actualMonth, 1));
   }
   return months;
 }
