@@ -764,11 +764,14 @@ const StudentNotesLog = ({
     if (!confirm('Are you sure you want to delete this note?')) return;
     
     try {
-      const { error } = await supabase
+      const { data, error, status } = await supabase
         .from('student_notes')
         .delete()
-        .eq('id', noteId);
+        .eq('id', noteId)
+        .select();
 
+      alert('Delete result: status=' + status + ' error=' + JSON.stringify(error) + ' data=' + JSON.stringify(data));
+      
       if (error) throw error;
       refetch();
     } catch (err) {
