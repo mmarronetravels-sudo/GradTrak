@@ -20,7 +20,8 @@
  * />
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import useSupabaseQuery from '../hooks/useSupabaseQuery';
 import { supabase } from '../supabase';
 import jsPDF from 'jspdf';
 
@@ -692,42 +693,26 @@ const StudentNotesLog = ({
   studentGrade = null,
   counselorName = null 
 }) => {
-  const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [localNotes, setLocalNotes] = useState([]);
 
-  // Fetch notes from database
-  const fetchNotes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('student_notes')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
+  // Bulletproof data fetching — timeout, error handling, retry, cancel on unmount
+  const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
+    () => supabase
+      .from('student_notes')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false }),
+    [studentId]
+  );
 
-      if (error) throw error;
-      setNotes(data || []);
-    } catch (err) {
-      console.error('Error fetching notes:', err);
-      setError('Failed to load notes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (studentId) {
-      fetchNotes();
-    }
-  }, [studentId]);
+  const notes = fetchedNotes || localNotes;
 
   // Add new note
  const handleAddNote = async (noteData) => {
     setIsSubmitting(true);
-    setError(null);
-    try {
+        try {
       const { data, error } = await supabase
         .from('student_notes')
         .insert([{
@@ -742,10 +727,11 @@ const StudentNotesLog = ({
         .single();
 
       if (error) throw error;
-      setNotes(prev => [data, ...prev]);
+       setLocalNotes(prev => [data, ...prev]);
+      refetch();
     } catch (err) {
       console.error('Error adding note:', err);
-      setError('Failed to save note: ' + (err.message || 'Unknown error'));
+      alert('Failed to save note: ' + (err.message || 'Unknown error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -761,7 +747,7 @@ const StudentNotesLog = ({
         .eq('id', noteId);
 
       if (error) throw error;
-      setNotes(prev => prev.map(note => 
+     setLocalNotes(prev => prev.map(note => 
         note.id === noteId ? { ...note, status: newStatus } : note
       ));
     } catch (err) {
@@ -780,7 +766,7 @@ const StudentNotesLog = ({
         .eq('id', noteId);
 
       if (error) throw error;
-      setNotes(prev => prev.filter(note => note.id !== noteId));
+      setLocalNotes(prev => prev.filter(note => note.id !== noteId));
     } catch (err) {
       console.error('Error deleting note:', err);
     }
@@ -811,8 +797,24 @@ const StudentNotesLog = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-slate-400 text-sm">Loading notes...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-3xl mb-3">⚠️</p>
+        <p className="text-red-400 text-sm mb-3">{error}</p>
+        <button
+          onClick={retry}
+          className="px-4 py-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-colors text-sm font-medium"
+        >
+          🔄 Retry
+        </button>
       </div>
     );
   }
