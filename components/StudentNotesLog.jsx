@@ -696,6 +696,13 @@ const StudentNotesLog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [localNotes, setLocalNotes] = useState([]);
+  const [lastStudentId, setLastStudentId] = useState(studentId);
+
+  // Clear local notes when switching students
+  if (studentId !== lastStudentId) {
+    setLocalNotes([]);
+    setLastStudentId(studentId);
+  }
 
   // Bulletproof data fetching — timeout, error handling, retry, cancel on unmount
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
@@ -707,7 +714,7 @@ const StudentNotesLog = ({
     [studentId]
   );
 
-  const notes = fetchedNotes || localNotes;
+  const notes = fetchedNotes || [];
 
   // Add new note
  const handleAddNote = async (noteData) => {
@@ -727,7 +734,6 @@ const StudentNotesLog = ({
         .single();
 
       if (error) throw error;
-       setLocalNotes(prev => [data, ...prev]);
       refetch();
     } catch (err) {
       console.error('Error adding note:', err);
@@ -747,9 +753,7 @@ const StudentNotesLog = ({
         .eq('id', noteId);
 
       if (error) throw error;
-     setLocalNotes(prev => prev.map(note => 
-        note.id === noteId ? { ...note, status: newStatus } : note
-      ));
+     refetch();
     } catch (err) {
       console.error('Error updating status:', err);
     }
@@ -766,7 +770,7 @@ const StudentNotesLog = ({
         .eq('id', noteId);
 
       if (error) throw error;
-      setLocalNotes(prev => prev.filter(note => note.id !== noteId));
+      refetch();
     } catch (err) {
       console.error('Error deleting note:', err);
     }
