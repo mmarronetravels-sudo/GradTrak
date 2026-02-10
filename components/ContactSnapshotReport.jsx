@@ -152,7 +152,8 @@ export default function ContactSnapshotReport({
     let gTotal = 0;
 
     filtered.forEach(r => {
-      const mKey = dateToKey(new Date(r.month_start));
+      const mKey = dateStringToKey(r.month_start);
+if (!mKey) return;
       const cId = r.counselor_id;
       const count = Number(r.contact_count);
 
