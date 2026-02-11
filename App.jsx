@@ -4537,10 +4537,9 @@ export default function App() {
     };
   }, []);
 
-  const handleLogout = () => {
+ const handleLogout = () => {
     setUser(null);
     setProfile(null);
-    setSelectedStudent(null);
     localStorage.clear();
     sessionStorage.clear();
     supabase.auth.signOut().catch(() => {});
