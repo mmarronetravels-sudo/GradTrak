@@ -4430,7 +4430,23 @@ export default function App() {
           if (mounted) setProfile(profile);
         }
       } catch (err) {
-        console.error('Auth init error:', err);
+        // Ignore AbortError — React StrictMode double-mount causes this
+        if (err.name === 'AbortError') {
+          console.log('Auth init aborted (normal during mount) — retrying...');
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!mounted) return;
+            if (session?.user) {
+              setUser(session.user);
+              const profile = await findOrCreateProfile(session.user);
+              if (mounted) setProfile(profile);
+            }
+          } catch (retryErr) {
+            console.error('Auth retry also failed:', retryErr);
+          }
+        } else {
+          console.error('Auth init error:', err);
+        }
       }
       if (mounted) setLoading(false);
     }
@@ -4506,13 +4522,25 @@ export default function App() {
         }
       }
     });
+    // Safety timeout — if auth doesn't resolve in 8 seconds, show login screen
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Auth safety timeout — showing login screen');
+        setLoading(false);
+      }
+    }, 8000);
+
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
 
   const handleLogout = () => {
+    setUser(null);
+    setProfile(null);
+    setSelectedStudent(null);
     localStorage.clear();
     sessionStorage.clear();
     supabase.auth.signOut().catch(() => {});
