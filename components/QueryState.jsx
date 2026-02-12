@@ -1,15 +1,19 @@
+
 import React from 'react';
 
 export default function QueryState({
-  loading,
-  error,
-  retry,
-  data,
-  emptyMessage = 'No data found.',
-  emptyIcon = '📋',
-  loadingMessage = 'Loading...',
-  children
+  loading,           // true/false — is the data still loading?
+  error,             // string or null — error message if something went wrong
+  retry,             // function — called when user clicks the Retry button
+  data,              // the actual data (array, object, etc.)
+  emptyMessage = 'No data found.',     // shown when data is an empty array
+  emptyIcon = '📋',                     // emoji shown above the empty message
+  loadingMessage = 'Loading...',        // shown next to the spinner
+  children           // your actual content — only renders when data is ready
 }) {
+
+  // ----- LOADING STATE -----
+  // Shows a spinning circle + message while waiting for Supabase
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -19,6 +23,10 @@ export default function QueryState({
     );
   }
 
+  // ----- ERROR STATE -----
+  // Shows the error message + a Retry button so the user can try again
+  // This is what replaces the old "infinite spinner" — now they see
+  // a clear message and can do something about it
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -27,7 +35,8 @@ export default function QueryState({
         {retry && (
           <button
             onClick={retry}
-            className="px-4 py-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-colors text-sm font-medium"
+            className="px-4 py-2 bg-indigo-500/20 text-indigo-400 rounded-lg
+                       hover:bg-indigo-500/30 transition-colors text-sm font-medium"
           >
             🔄 Retry
           </button>
@@ -36,6 +45,9 @@ export default function QueryState({
     );
   }
 
+  // ----- EMPTY STATE -----
+  // Shows a friendly message when the query worked but returned nothing
+  // (e.g., a student with no notes yet)
   if (!data || (Array.isArray(data) && data.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -45,5 +57,8 @@ export default function QueryState({
     );
   }
 
+  // ----- DATA READY -----
+  // Everything loaded successfully and there's data to show.
+  // Render whatever was passed in as children (your notes list, course table, etc.)
   return <>{children}</>;
 }
