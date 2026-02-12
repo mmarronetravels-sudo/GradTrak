@@ -12,6 +12,7 @@
  * 
  * Usage:
  * <StudentNotesLog 
+ *   key={student.id}  
  *   studentId={student.id} 
  *   counselorId={counselor.id}
  *   studentName="Landon St Aubin"
