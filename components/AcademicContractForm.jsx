@@ -22,6 +22,7 @@
 // ============================================
 
 import React, { useState, useEffect } from 'react';
+import jsPDF from 'jspdf';
 
 export default function AcademicContractForm({
   isOpen,
@@ -50,6 +51,8 @@ export default function AcademicContractForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   // Pre-fill dates (start = today, review = 30 days out)
   useEffect(() => {
@@ -212,6 +215,221 @@ export default function AcademicContractForm({
   const modalBg = 'fixed inset-0 z-50 flex items-center justify-center bg-black/40';
   const modalBox = 'bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4';
 
+  // — Generate PDF —
+  function handleExportPDF() {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let y = margin;
+
+    const addText = (text, x, size, style = 'normal', color = [0, 0, 0]) => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', style);
+      doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(text, pageWidth - margin * 2 - (x - margin));
+      lines.forEach(line => {
+        if (y > 270) { doc.addPage(); y = margin; }
+        doc.text(line, x, y);
+        y += size * 0.5;
+      });
+    };
+
+    const addSection = (label, value) => {
+      if (!value) return;
+      y += 4;
+      if (y > 260) { doc.addPage(); y = margin; }
+      doc.setFillColor(241, 245, 249);
+      doc.roundedRect(margin, y - 4, pageWidth - margin * 2, 8, 2, 2, 'F');
+      addText(label, margin + 3, 11, 'bold', [30, 41, 59]);
+      y += 2;
+      addText(value, margin + 3, 10, 'normal', [51, 65, 85]);
+      y += 4;
+    };
+
+    // Header
+    doc.setFillColor(79, 70, 229);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Academic Contract', pageWidth / 2, 15, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${student.full_name} — Grade ${student.grade || 'N/A'}`, pageWidth / 2, 25, { align: 'center' });
+    y = 45;
+
+    // Info box
+    doc.setDrawColor(200);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 30, 3, 3, 'FD');
+    y += 8;
+    addText(`Counselor: ${counselorProfile?.full_name || 'N/A'}`, margin + 5, 10, 'normal', [100, 116, 139]);
+    addText(`Start Date: ${planStartDate || 'N/A'}     Review Date: ${planReviewDate || 'N/A'}`, margin + 5, 10, 'normal', [100, 116, 139]);
+    addText(`Status: ${existingContract?.status || 'active'}     Agreement: ${partiesInAgreement ? 'Yes' : 'Pending'}`, margin + 5, 10, 'normal', [100, 116, 139]);
+    y += 10;
+
+    // Sections
+    addSection('REASON FOR PLAN', reasonForPlan);
+    addSection('ACADEMIC PLAN DEFINED', academicPlanDefined);
+    addSection('STUDENT ROLE / RESPONSIBILITIES', studentRole);
+    if (caregiverRole) addSection('CAREGIVER ROLE', caregiverRole);
+
+    // Review section if completed
+    if (existingContract?.status === 'completed' && existingContract.review_summary) {
+      y += 6;
+      doc.setDrawColor(22, 163, 74);
+      doc.setFillColor(209, 250, 229);
+      doc.roundedRect(margin, y - 4, pageWidth - margin * 2, 8, 2, 2, 'FD');
+      addText('REVIEW COMPLETED', margin + 3, 11, 'bold', [6, 95, 70]);
+      y += 2;
+      addText(existingContract.review_summary, margin + 3, 10, 'normal', [6, 95, 70]);
+      if (existingContract.review_completed_at) {
+        y += 2;
+        addText(`Completed: ${new Date(existingContract.review_completed_at).toLocaleDateString()}`, margin + 3, 9, 'normal', [100, 116, 139]);
+      }
+    }
+
+    // Signature lines
+    y += 20;
+    if (y > 240) { doc.addPage(); y = margin + 20; }
+    doc.setDrawColor(200);
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(10);
+
+    const sigY = y;
+    doc.line(margin, sigY, margin + 70, sigY);
+    doc.text('Student Signature', margin, sigY + 5);
+
+    doc.line(pageWidth / 2 + 5, sigY, pageWidth / 2 + 75, sigY);
+    doc.text('Date', pageWidth / 2 + 5, sigY + 5);
+
+    doc.line(margin, sigY + 20, margin + 70, sigY + 20);
+    doc.text('Counselor Signature', margin, sigY + 25);
+
+    doc.line(pageWidth / 2 + 5, sigY + 20, pageWidth / 2 + 75, sigY + 20);
+    doc.text('Date', pageWidth / 2 + 5, sigY + 25);
+
+    doc.line(margin, sigY + 40, margin + 70, sigY + 40);
+    doc.text('Caregiver Signature (optional)', margin, sigY + 45);
+
+    doc.line(pageWidth / 2 + 5, sigY + 40, pageWidth / 2 + 75, sigY + 40);
+    doc.text('Date', pageWidth / 2 + 5, sigY + 45);
+
+    // Footer
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Generated by GradTrack | ${new Date().toLocaleDateString()}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    const fileName = `Academic_Contract_${student.full_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  }
+
+  // — Email Contract —
+  async function handleEmailContract() {
+    if (!student.email) {
+      setError('Student has no email address on file.');
+      return;
+    }
+
+    setSendingEmail(true);
+    setError('');
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('Not authenticated — please log in again');
+
+      const supabaseUrl = supabaseClient.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || '';
+
+      const contractHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 20px 24px; border-radius: 8px 8px 0 0;">
+            <h2 style="color: white; margin: 0; font-size: 18px;">📋 Academic Contract</h2>
+            <p style="color: rgba(255,255,255,0.8); margin: 4px 0 0; font-size: 13px;">${student.full_name} — Grade ${student.grade || 'N/A'}</p>
+          </div>
+          <div style="padding: 20px 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+            <table width="100%" style="margin-bottom: 16px; font-size: 13px; color: #64748b;">
+              <tr><td><strong>Counselor:</strong> ${counselorProfile?.full_name || 'N/A'}</td></tr>
+              <tr><td><strong>Start Date:</strong> ${planStartDate || 'N/A'} &nbsp;&nbsp; <strong>Review Date:</strong> ${planReviewDate || 'N/A'}</td></tr>
+              <tr><td><strong>Agreement:</strong> ${partiesInAgreement ? '✅ Yes' : '⏳ Pending'}</td></tr>
+            </table>
+
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin: 0 0 4px;">Reason for Plan</p>
+              <p style="font-size: 13px; color: #334155; margin: 0; line-height: 1.6;">${escapeHtml(reasonForPlan)}</p>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin: 0 0 4px;">Academic Plan</p>
+              <p style="font-size: 13px; color: #334155; margin: 0; line-height: 1.6;">${escapeHtml(academicPlanDefined)}</p>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin: 0 0 4px;">Student Responsibilities</p>
+              <p style="font-size: 13px; color: #334155; margin: 0; line-height: 1.6;">${escapeHtml(studentRole)}</p>
+            </div>
+
+            ${caregiverRole ? `
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; margin: 0 0 4px;">Caregiver Role</p>
+              <p style="font-size: 13px; color: #334155; margin: 0; line-height: 1.6;">${escapeHtml(caregiverRole)}</p>
+            </div>
+            ` : ''}
+
+            ${existingContract?.status === 'completed' && existingContract.review_summary ? `
+            <div style="background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 8px; padding: 12px 16px; margin-top: 16px;">
+              <p style="font-size: 11px; text-transform: uppercase; color: #065f46; font-weight: 700; margin: 0 0 4px;">Review Completed</p>
+              <p style="font-size: 13px; color: #065f46; margin: 0;">${escapeHtml(existingContract.review_summary)}</p>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/send-advising-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            studentId: student.id,
+            studentName: student.full_name,
+            studentEmail: student.email,
+            recipientEmails: [],
+            subject: `Academic Contract — ${student.full_name}`,
+            contentType: 'notes',
+            notesHtml: contractHtml,
+            planHtml: null,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || data.details?.message || 'Failed to send email');
+      }
+
+      setEmailSent(true);
+      setSuccess('Contract emailed to ' + student.email);
+    } catch (err) {
+      console.error('Email contract error:', err);
+      setError(err.message || 'Failed to send email');
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+  
   return (
     <div className={modalBg} onClick={onClose}>
       <div className={modalBox} onClick={e => e.stopPropagation()}>
@@ -422,6 +640,35 @@ export default function AcademicContractForm({
               }}
             >Cancel</button>
 
+            <button
+              onClick={handleExportPDF}
+              style={{
+                padding: '8px 20px',
+                borderRadius: '8px',
+                border: '1px solid #4f46e5',
+                background: 'white',
+                color: '#4f46e5',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              
+            >📄 Download PDF</button>
+            <button
+              onClick={handleEmailContract}
+              disabled={sendingEmail || emailSent}
+              style={{
+                padding: '8px 20px',
+                borderRadius: '8px',
+                border: '1px solid #7c3aed',
+                background: emailSent ? '#d1fae5' : 'white',
+                color: emailSent ? '#065f46' : '#7c3aed',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: sendingEmail ? 'not-allowed' : 'pointer',
+              }}
+            >{sendingEmail ? '📧 Sending...' : emailSent ? '✅ Sent!' : '📧 Email Contract'}</button>
+            
             {!isReview && (
               <button
                 onClick={handleSave}
@@ -496,3 +743,13 @@ const textareaStyle = {
   fontFamily: 'inherit',
   boxSizing: 'border-box',
 };
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, '<br>');
+}
