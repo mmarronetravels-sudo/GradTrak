@@ -3069,7 +3069,8 @@ if (assignedStudentIds.length === 0) {
     setArchiveTarget(null);
   };
 
-    const { data: studentData } = await supabase
+   // Fetch student profiles — superusers/viewers get all, counselors get assigned only
+    let studentQuery = supabase
       .from('profiles')
       .select(`
         *,
@@ -3078,8 +3079,19 @@ if (assignedStudentIds.length === 0) {
           code,
           name
         )
-      `)
-      .in('id', assignedStudentIds);
+      `);
+    
+    if (profile.is_superuser || profile.role === 'viewer') {
+      // Fetch all students directly — no .in() needed, avoids URL length limit
+      studentQuery = studentQuery
+        .eq('school_id', profile.school_id)
+        .eq('role', 'student');
+    } else {
+      // Counselors/case managers — fetch only assigned students
+      studentQuery = studentQuery.in('id', assignedStudentIds);
+    }
+
+    const { data: studentData } = await studentQuery;
 
 if (studentData) {
   // Fetch courses in batches of 50 to avoid URL length limits
