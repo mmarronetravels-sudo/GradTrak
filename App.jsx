@@ -4480,12 +4480,20 @@ export default function App() {
         }
       }
 
-      // 3. No profile exists — create a basic one
+     // 3. No profile exists — create one with smart defaults
       const fullName = authUser.user_metadata?.full_name 
         || authUser.user_metadata?.name 
         || authUser.email?.split('@')[0] 
         || 'Unknown';
       
+      // Look up school by email domain
+      const emailDomain = authUser.email.split('@')[1]?.toLowerCase();
+      const schoolDomainMap = {
+        'summitlc.org': 'c3c8b2d1-d01d-42ce-9e64-d2f8ed07c534'
+        // Add more schools here as they onboard
+      };
+      const schoolId = schoolDomainMap[emailDomain] || null;
+
       const { data: newProfile } = await supabase
         .from('profiles')
         .insert({
@@ -4493,9 +4501,10 @@ export default function App() {
           email: authUser.email,
           full_name: fullName,
           role: 'student',
-          school_id: 'c3c8b2d1-d01d-42ce-9e64-d2f8ed07c534'
+          school_id: schoolId,
+          is_active: true
         })
-        .select()
+        .select('*')
         .single();
       
       return newProfile;
