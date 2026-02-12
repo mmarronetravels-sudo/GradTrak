@@ -8,6 +8,7 @@ import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
 import SendAdvisingEmail from './components/SendAdvisingEmail';
 import AcademicContractForm from './components/AcademicContractForm';
+const APP_VERSION = '2.11.2';
 
 // ============================================
 // AUDIT LOGGING HELPER
@@ -4556,8 +4557,9 @@ export default function App() {
   };
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center relative">
         <LoadingSpinner />
+        <span className="absolute bottom-4 text-xs text-slate-600">v{APP_VERSION}</span>
       </div>
     );
   }
