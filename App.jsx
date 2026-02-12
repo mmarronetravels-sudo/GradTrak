@@ -3661,6 +3661,7 @@ const summaryStats = {
   📋 Academic Contract
 </button>
 <SendAdvisingEmail
+  key={`email-${student.id}`}
   isOpen={showEmailModal}
   onClose={() => setShowEmailModal(false)}
   student={student}
@@ -3670,6 +3671,7 @@ const summaryStats = {
   supabaseClient={supabase}
 />
 <AcademicContractForm
+  key={`contract-${student.id}`}
   isOpen={showContractModal}
   onClose={() => setShowContractModal(false)}
   student={student}
@@ -3680,8 +3682,9 @@ const summaryStats = {
 />
 </div>
             
-           {/* Student Notes Log */}
-            <StudentNotesLog 
+{/* Student Notes Log */}
+  <StudentNotesLog 
+  key={student.id}           
   studentId={student.id}
   counselorId={profile.id}
   studentName={student.displayName}
