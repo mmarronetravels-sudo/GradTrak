@@ -2905,7 +2905,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [isReactivating, setIsReactivating] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
-const [selectedContract, setSelectedContract] = useState(null);
+  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+  const [selectedContract, setSelectedContract] = useState(null);
   const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
       .from('profiles')
