@@ -696,15 +696,7 @@ const StudentNotesLog = ({
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
-  const [localNotes, setLocalNotes] = useState([]);
-  const [lastStudentId, setLastStudentId] = useState(studentId);
-
-  // Clear local notes when switching students
-  if (studentId !== lastStudentId) {
-    setLocalNotes([]);
-    setLastStudentId(studentId);
-  }
-
+  
   // Bulletproof data fetching — timeout, error handling, retry, cancel on unmount
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
     () => supabase
