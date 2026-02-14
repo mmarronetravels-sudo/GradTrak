@@ -1810,11 +1810,10 @@ if (studentData) {
               <button
                 onClick={() => {
   setSelectedStudent(null);
-  setActiveTab('students');
 }}
                 className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
               >
-                ← Back to At-Risk Report
+                ← Back to Students
               </button>
 
               {/* Student Header */}
@@ -4001,7 +4000,7 @@ const summaryStats = {
                 key={student.id} 
                 onClick={() => {
   setSelectedStudent(null);
-  setActiveTab('overview');
+  setActiveTab('progress');
   setTimeout(() => {
     const totalEarned = (student.courses || [])
       .filter(c => c.status === 'completed' && c.grade !== 'F')
