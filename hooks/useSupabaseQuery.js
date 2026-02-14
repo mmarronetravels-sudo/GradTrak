@@ -21,6 +21,7 @@ export default function useSupabaseQuery(queryFn, deps = []) {
   // AFTER the user already navigated away.
   const cancelledRef = useRef(false);
   const mountedRef = useRef(true);
+  const retriedRef = useRef(false);  // Prevents infinite auth retry loops
 
   // --- The actual fetch function ---
   // This runs automatically when the component loads,
@@ -29,6 +30,7 @@ export default function useSupabaseQuery(queryFn, deps = []) {
   const execute = useCallback(async () => {
     // Reset everything for a fresh fetch
     cancelledRef.current = false;
+     retriedRef.current = false;
     setLoading(true);
     setError(null);
 
@@ -61,9 +63,41 @@ export default function useSupabaseQuery(queryFn, deps = []) {
         setData(result.data);
         setError(null);
       }
-    } catch (err) {
+} catch (err) {
       // This catches both timeout errors and network errors
       if (cancelledRef.current || !mountedRef.current) return;
+
+      // ============================================
+      // AUTH-AWARE ERROR RECOVERY — Feb 14, 2026
+      // If the error looks like an expired token,
+      // refresh the session and retry once automatically
+      // ============================================
+      const isAuthError =
+        err?.message?.includes('JWT') ||
+        err?.message?.includes('token') ||
+        err?.message?.includes('401') ||
+        err?.message?.includes('403') ||
+        err?.code === 'PGRST301' ||
+        err?.code === '401' ||
+        err?.code === '403';
+
+      if (isAuthError && !retriedRef.current) {
+        console.log('useSupabaseQuery: auth error detected, refreshing session...');
+        retriedRef.current = true;
+
+        try {
+          const { default: supabase } = await import('../supabase');
+          const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+
+          if (refreshed?.session && !refreshError) {
+            console.log('useSupabaseQuery: session refreshed, retrying query...');
+            return execute();
+          }
+        } catch (refreshErr) {
+          console.warn('useSupabaseQuery: session refresh failed:', refreshErr);
+        }
+      }
+
       setError(err.message || 'Something went wrong');
       setData(null);
     } finally {
