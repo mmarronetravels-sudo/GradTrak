@@ -8,7 +8,8 @@ import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
 import SendAdvisingEmail from './components/SendAdvisingEmail';
 import AcademicContractForm from './components/AcademicContractForm';
-const APP_VERSION = '2.11.2';
+const APP_VERSION = '2.14.0';
+
 
 // ============================================
 // AUDIT LOGGING HELPER
