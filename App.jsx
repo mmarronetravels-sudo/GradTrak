@@ -3680,13 +3680,16 @@ const summaryStats = {
   counselorProfile={profile}
   supabaseClient={supabase}
   existingContract={selectedContract}
-  onSaved={() => {}}
+   onSaved={() => {
+    setShowContractModal(false);
+    setNotesRefreshKey(prev => prev + 1);
+  }}
 />
 </div>
             
 {/* Student Notes Log */}
   <StudentNotesLog 
-  key={student.id}           
+  key={`${student.id}-${notesRefreshKey}`}          
   studentId={student.id}
   counselorId={profile.id}
   studentName={student.displayName}
