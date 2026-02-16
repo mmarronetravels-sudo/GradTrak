@@ -2877,6 +2877,34 @@ const getPathwaysForCourse = (course) => {
 // COUNSELOR DASHBOARD
 // ============================================
 
+ // Calculate expected credits based on grade and current trimester
+const getExpectedCredits = (grade) => {
+  const month = new Date().getMonth() + 1;
+  let trimester;
+  if (month >= 8 && month <= 11) trimester = 1;
+  else if (month === 12 || month <= 2) trimester = 2;
+  else trimester = 3;
+
+  const expectations = {
+    9:  { 1: 0,  2: 8,  3: 17 },
+    10: { 1: 25, 2: 33, 3: 42 },
+    11: { 1: 50, 2: 58, 3: 67 },
+    12: { 1: 75, 2: 83, 3: 92 }
+  };
+  const expectedPercent = expectations[grade]?.[trimester] || 0;
+  return (expectedPercent / 100) * 24;
+};
+
+const getStudentRiskLevel = (student) => {
+  const expected = getExpectedCredits(student.grade);
+  const earned = student.stats?.totalEarned || 0;
+  const behind = expected - earned;
+  if (behind >= 3) return 'critical';
+  if (behind >= 1.5) return 'at-risk';
+  if (behind >= 0.5) return 'watch';
+  return 'on-track';
+};
+
 function CounselorDashboard({ user, profile, onLogout }) {
   const [students, setStudents] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -3393,33 +3421,6 @@ advisingNotes.slice(0, 5)
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
- // Calculate expected credits based on grade and current trimester
-const getExpectedCredits = (grade) => {
-  const month = new Date().getMonth() + 1;
-  let trimester;
-  if (month >= 8 && month <= 11) trimester = 1;
-  else if (month === 12 || month <= 2) trimester = 2;
-  else trimester = 3;
-
-  const expectations = {
-    9:  { 1: 0,  2: 8,  3: 17 },
-    10: { 1: 25, 2: 33, 3: 42 },
-    11: { 1: 50, 2: 58, 3: 67 },
-    12: { 1: 75, 2: 83, 3: 92 }
-  };
-  const expectedPercent = expectations[grade]?.[trimester] || 0;
-  return (expectedPercent / 100) * 24;
-};
-
-const getStudentRiskLevel = (student) => {
-  const expected = getExpectedCredits(student.grade);
-  const earned = student.stats?.totalEarned || 0;
-  const behind = expected - earned;
-  if (behind >= 3) return 'critical';
-  if (behind >= 1.5) return 'at-risk';
-  if (behind >= 0.5) return 'watch';
-  return 'on-track';
-};
 
 // Sort and filter students
 const filteredStudents = students
