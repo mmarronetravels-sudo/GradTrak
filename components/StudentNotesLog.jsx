@@ -698,11 +698,12 @@ const StudentNotesLog = ({
   const [activeFilter, setActiveFilter] = useState('all');
   
   // Bulletproof data fetching — timeout, error handling, retry, cancel on unmount
-  // Nudge session before querying to wake up Supabase after tab switch
+  // Force session refresh before querying to unfreeze Supabase client after tab switch
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
     async () => {
-      // Wake up Supabase's internal auth state (reads from memory, very fast)
-      await supabase.auth.getSession();
+      // Force Supabase client to re-read its session from localStorage
+      // This unfreezes the client after Chrome tab throttling
+      await supabase.auth.refreshSession();
       
       return supabase
         .from('student_notes')
