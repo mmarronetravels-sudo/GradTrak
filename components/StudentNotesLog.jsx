@@ -734,10 +734,17 @@ const StudentNotesLog = ({
           }
         );
         
+        if (res.status === 401) {
+          console.warn('GradTrack: Token expired — redirecting to login');
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.replace(window.location.origin);
+          return { data: [], error: null };
+        }
         if (!res.ok) throw new Error('Notes fetch failed: ' + res.status);
         const data = await res.json();
         return { data, error: null };
-      }
+             }
     },
     [studentId]
   );
