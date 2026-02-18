@@ -4591,7 +4591,10 @@ export default function App() {
       hiddenSince = null;
 
       if (awayDuration < MINIMUM_AWAY_MS) {
-        console.log(`GradTrack: Tab visible after ${Math.round(awayDuration / 1000)}s — no action needed`);
+        console.log(`GradTrack: Tab visible after ${Math.round(awayDuration / 1000)}s — light session nudge`);
+        // Just call getSession to wake up Supabase's internal state
+        // This doesn't refresh the token — just reads from memory
+        await supabase.auth.getSession();
         return;
       }
 
