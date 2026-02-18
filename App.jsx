@@ -4441,6 +4441,15 @@ export default function App() {
     let mounted = true;
 
    async function initAuth() {
+     // Clean up any stale PKCE code verifier from previous config
+      try {
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.includes('code-verifier') || key.includes('code_verifier')) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (e) {}
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!mounted) return;
