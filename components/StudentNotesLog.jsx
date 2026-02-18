@@ -748,61 +748,31 @@ const StudentNotesLog = ({
 const handleAddNote = async (noteData) => {
     setIsSubmitting(true);
     try {
-      // Try normal Supabase client with 3-second timeout
-      const quickTimeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('CLIENT_FROZEN')), 3000)
+      const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
+      if (!token) throw new Error('No auth token — please log in again');
+
+      const res = await fetch(
+        'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes',
+        {
+          method: 'POST',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            student_id: studentId,
+            counselor_id: counselorId,
+            note: noteData.content,
+            note_type: noteData.note_type,
+            follow_up_date: noteData.follow_up_date,
+            status: noteData.status
+          })
+        }
       );
 
-      try {
-        const result = await Promise.race([
-          supabase
-            .from('student_notes')
-            .insert([{
-              student_id: studentId,
-              counselor_id: counselorId,
-              note: noteData.content,
-              note_type: noteData.note_type,
-              follow_up_date: noteData.follow_up_date,
-              status: noteData.status
-            }])
-            .select()
-            .single(),
-          quickTimeout
-        ]);
-
-        if (result.error) throw result.error;
-      } catch (err) {
-        if (err.message !== 'CLIENT_FROZEN') throw err;
-
-        // Client frozen — use direct fetch
-        console.log('GradTrack: Supabase client frozen, saving note via direct fetch');
-        const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
-        if (!token) throw new Error('No auth token found');
-
-        const res = await fetch(
-          'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes',
-          {
-            method: 'POST',
-            headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
-              'Authorization': 'Bearer ' + token,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify({
-              student_id: studentId,
-              counselor_id: counselorId,
-              note: noteData.content,
-              note_type: noteData.note_type,
-              follow_up_date: noteData.follow_up_date,
-              status: noteData.status
-            })
-          }
-        );
-
-        if (!res.ok) throw new Error('Save failed: ' + res.status);
-      }
-
+      if (!res.ok) throw new Error('Save failed: ' + res.status);
       refetch();
     } catch (err) {
       console.error('Error adding note:', err);
@@ -816,13 +786,23 @@ const handleAddNote = async (noteData) => {
   const handleStatusToggle = async (noteId, currentStatus) => {
     const newStatus = currentStatus === 'open' ? 'completed' : 'open';
     try {
-      const { error } = await supabase
-        .from('student_notes')
-        .update({ status: newStatus })
-        .eq('id', noteId);
+      const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
+      if (!token) return;
 
-      if (error) throw error;
-     refetch();
+      await fetch(
+        'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes?id=eq.' + noteId,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: newStatus })
+        }
+      );
+
+      refetch();
     } catch (err) {
       console.error('Error updating status:', err);
     }
@@ -833,15 +813,22 @@ const handleAddNote = async (noteData) => {
     if (!confirm('Are you sure you want to delete this note?')) return;
     
     try {
-      const { data, error, status } = await supabase
-        .from('student_notes')
-        .delete()
-        .eq('id', noteId)
-        .select();
+      const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
+      if (!token) return;
 
-      alert('Delete result: status=' + status + ' error=' + JSON.stringify(error) + ' data=' + JSON.stringify(data));
-      
-      if (error) throw error;
+      const res = await fetch(
+        'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes?id=eq.' + noteId,
+        {
+          method: 'DELETE',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!res.ok) throw new Error('Delete failed: ' + res.status);
       refetch();
     } catch (err) {
       console.error('Error deleting note:', err);
