@@ -697,19 +697,47 @@ const StudentNotesLog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   
-  // Bulletproof data fetching — timeout, error handling, retry, cancel on unmount
-  // Force session refresh before querying to unfreeze Supabase client after tab switch
+  // Bulletproof data fetching — bypasses frozen Supabase client
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
     async () => {
-      // Force Supabase client to re-read its session from localStorage
-      // This unfreezes the client after Chrome tab throttling
-      await supabase.auth.refreshSession();
+      // Try the normal Supabase client first with a 3-second race
+      const quickTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('CLIENT_FROZEN')), 3000)
+      );
       
-      return supabase
-        .from('student_notes')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
+      try {
+        const result = await Promise.race([
+          supabase
+            .from('student_notes')
+            .select('*')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false }),
+          quickTimeout
+        ]);
+        return result;
+      } catch (err) {
+        if (err.message !== 'CLIENT_FROZEN') throw err;
+        
+        // Client is frozen — bypass it with raw fetch
+        console.log('GradTrack: Supabase client frozen, using direct fetch');
+        const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
+        if (!token) throw new Error('No auth token found');
+        
+        const res = await fetch(
+          'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes?student_id=eq.' + studentId + '&select=*&order=created_at.desc',
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (!res.ok) throw new Error('Notes fetch failed: ' + res.status);
+        const data = await res.json();
+        return { data, error: null };
+      }
     },
     [studentId]
   );
