@@ -698,12 +698,18 @@ const StudentNotesLog = ({
   const [activeFilter, setActiveFilter] = useState('all');
   
   // Bulletproof data fetching — timeout, error handling, retry, cancel on unmount
+  // Nudge session before querying to wake up Supabase after tab switch
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
-    () => supabase
-      .from('student_notes')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false }),
+    async () => {
+      // Wake up Supabase's internal auth state (reads from memory, very fast)
+      await supabase.auth.getSession();
+      
+      return supabase
+        .from('student_notes')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+    },
     [studentId]
   );
 
