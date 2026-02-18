@@ -4676,7 +4676,66 @@ export default function App() {
     return () => clearInterval(keepAlive);
   }, [user]);
 
- const handleLogout = () => {
+ // ============================================
+  // SESSION RECOVERY — Feb 17, 2026
+  // Only checks session after 15+ min away from tab.
+  // Quick tab switches are completely ignored.
+  // Supabase autoRefreshToken handles normal renewal.
+  // ============================================
+  useEffect(() => {
+    if (!user) return;
+
+    let hiddenSince = null;
+    const MINIMUM_AWAY_MS = 15 * 60 * 1000; // 15 minutes
+
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        hiddenSince = Date.now();
+        return;
+      }
+
+      if (!hiddenSince) return;
+      const awayDuration = Date.now() - hiddenSince;
+      hiddenSince = null;
+
+      if (awayDuration < MINIMUM_AWAY_MS) {
+        console.log(`GradTrack: Tab visible after ${Math.round(awayDuration / 1000)}s — no action needed`);
+        return;
+      }
+
+      console.log(`GradTrack: Tab visible after ${Math.round(awayDuration / 60000)} min — checking session`);
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error || !session) {
+          console.warn('GradTrack: Session expired — attempting refresh');
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            console.warn('GradTrack: Refresh token expired — logging out');
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+            return;
+          }
+          console.log('GradTrack: Session refreshed successfully');
+          return;
+        }
+
+        const timeUntilExpiry = session.expires_at - Math.floor(Date.now() / 1000);
+        if (timeUntilExpiry < 300) {
+          console.log(`GradTrack: Token expires in ${timeUntilExpiry}s — refreshing`);
+          await supabase.auth.refreshSession();
+        }
+      } catch (err) {
+        console.warn('GradTrack: Session check failed — will retry on next query', err);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+  const handleLogout = () => {
     setUser(null);
     setProfile(null);
     localStorage.clear();
