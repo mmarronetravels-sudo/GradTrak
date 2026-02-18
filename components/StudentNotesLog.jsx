@@ -745,23 +745,64 @@ const StudentNotesLog = ({
   const notes = fetchedNotes || [];
 
   // Add new note
- const handleAddNote = async (noteData) => {
+const handleAddNote = async (noteData) => {
     setIsSubmitting(true);
-        try {
-      const { data, error } = await supabase
-        .from('student_notes')
-        .insert([{
-          student_id: studentId,
-          counselor_id: counselorId,
-          note: noteData.content,
-          note_type: noteData.note_type,
-          follow_up_date: noteData.follow_up_date,
-          status: noteData.status
-        }])
-        .select()
-        .single();
+    try {
+      // Try normal Supabase client with 3-second timeout
+      const quickTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('CLIENT_FROZEN')), 3000)
+      );
 
-      if (error) throw error;
+      try {
+        const result = await Promise.race([
+          supabase
+            .from('student_notes')
+            .insert([{
+              student_id: studentId,
+              counselor_id: counselorId,
+              note: noteData.content,
+              note_type: noteData.note_type,
+              follow_up_date: noteData.follow_up_date,
+              status: noteData.status
+            }])
+            .select()
+            .single(),
+          quickTimeout
+        ]);
+
+        if (result.error) throw result.error;
+      } catch (err) {
+        if (err.message !== 'CLIENT_FROZEN') throw err;
+
+        // Client frozen — use direct fetch
+        console.log('GradTrack: Supabase client frozen, saving note via direct fetch');
+        const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
+        if (!token) throw new Error('No auth token found');
+
+        const res = await fetch(
+          'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes',
+          {
+            method: 'POST',
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
+              'Authorization': 'Bearer ' + token,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              student_id: studentId,
+              counselor_id: counselorId,
+              note: noteData.content,
+              note_type: noteData.note_type,
+              follow_up_date: noteData.follow_up_date,
+              status: noteData.status
+            })
+          }
+        );
+
+        if (!res.ok) throw new Error('Save failed: ' + res.status);
+      }
+
       refetch();
     } catch (err) {
       console.error('Error adding note:', err);
