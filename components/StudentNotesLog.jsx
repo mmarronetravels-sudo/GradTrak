@@ -9,6 +9,7 @@
  * - Status tracking (open/completed)
  * - Filter by note type
  * - MTSS Documentation Export (PDF)
+ * - Inline note editing (author only) — Added Feb 20, 2026
  * 
  * Usage:
  * <StudentNotesLog 
@@ -150,10 +151,150 @@ const StatusBadge = ({ status, onClick }) => {
   );
 };
 
-// Single Note Entry Component
-const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
+// ============================================================
+// Single Note Entry Component — UPDATED with inline edit
+// ============================================================
+const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editState }) => {
   const [showFullDate, setShowFullDate] = useState(false);
 
+  const isAuthor = note.counselor_id === counselorId;
+  const isEditing = editState && editState.noteId === note.id;
+
+  // ============================
+  // EDITING STATE — inline form
+  // ============================
+  if (isEditing) {
+    return (
+      <div className="group relative pl-6 pb-6 border-l-2 border-slate-700 last:border-l-transparent last:pb-0">
+        {/* Timeline dot — cyan when editing */}
+        <div className="absolute left-0 top-0 w-3 h-3 -translate-x-[7px] rounded-full bg-cyan-500 border-2 border-cyan-500/50 transition-colors" />
+
+        {/* Edit form card */}
+        <div className="bg-slate-800/70 rounded-lg border border-cyan-500/40 p-4 transition-colors">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-medium text-cyan-400">✏️ Editing Note</span>
+            <span className="text-xs text-slate-500">•</span>
+            <span className="text-xs text-slate-500">{formatDate(note.created_at)}</span>
+          </div>
+
+          {/* Note type selector */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-slate-400 mb-2">Note Type</label>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(NOTE_TYPES).map(([key, config]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => editState.setNoteType(key)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    editState.noteType === key
+                      ? `${config.bgColor} ${config.textColor} border-2 ${config.borderColor}`
+                      : 'bg-slate-700/50 text-slate-400 border-2 border-transparent hover:bg-slate-700'
+                  }`}
+                >
+                  <span>{config.icon}</span>
+                  <span>{config.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Note text */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-slate-400 mb-2">Note Content</label>
+            <textarea
+              value={editState.noteText}
+              onChange={(e) => editState.setNoteText(e.target.value)}
+              placeholder="Enter your note..."
+              rows={4}
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-none"
+              autoFocus
+            />
+          </div>
+
+          {/* Follow-up date */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-slate-400 mb-2">
+              Follow-up Date <span className="text-slate-600">(optional)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={editState.followUpDate}
+                onChange={(e) => editState.setFollowUpDate(e.target.value)}
+                className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+              />
+              {editState.followUpDate && (
+                <button
+                  onClick={() => editState.setFollowUpDate('')}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1"
+                  title="Clear follow-up date"
+                >
+                  ✕ Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Status toggle */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-slate-400 mb-2">Status</label>
+            <button
+              type="button"
+              onClick={() => editState.setStatus(editState.status === 'open' ? 'completed' : 'open')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                editState.status === 'completed'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${editState.status === 'completed' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              {editState.status === 'completed' ? 'Completed' : 'Open'}
+              <span className="text-slate-500 ml-1">(click to toggle)</span>
+            </button>
+          </div>
+
+          {/* Save / Cancel buttons */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={editState.onSave}
+              disabled={editState.saving || !editState.noteText.trim()}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              {editState.saving ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Save Changes
+                </>
+              )}
+            </button>
+            <button
+              onClick={editState.onCancel}
+              disabled={editState.saving}
+              className="px-4 py-2 text-slate-400 hover:text-slate-300 font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================
+  // NORMAL STATE — display note
+  // ============================
   return (
     <div className="group relative pl-6 pb-6 border-l-2 border-slate-700 last:border-l-transparent last:pb-0">
       {/* Timeline dot */}
@@ -171,14 +312,26 @@ const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
             />
           </div>
           
-          {/* Timestamp */}
-          <div 
-            className="text-xs text-slate-500 cursor-help"
-            onMouseEnter={() => setShowFullDate(true)}
-            onMouseLeave={() => setShowFullDate(false)}
-            title={formatFullTimestamp(note.created_at)}
-          >
-            {showFullDate ? formatFullTimestamp(note.created_at) : formatDate(note.created_at)}
+          {/* Timestamp + edited indicator */}
+          <div className="flex items-center gap-2">
+            {/* Edited indicator */}
+            {note.updated_at && note.created_at &&
+              Math.abs(new Date(note.updated_at) - new Date(note.created_at)) > 60000 && (
+              <span
+                className="text-xs text-slate-600 italic"
+                title={`Edited ${formatFullTimestamp(note.updated_at)}`}
+              >
+                (edited)
+              </span>
+            )}
+            <div 
+              className="text-xs text-slate-500 cursor-help"
+              onMouseEnter={() => setShowFullDate(true)}
+              onMouseLeave={() => setShowFullDate(false)}
+              title={formatFullTimestamp(note.created_at)}
+            >
+              {showFullDate ? formatFullTimestamp(note.created_at) : formatDate(note.created_at)}
+            </div>
           </div>
         </div>
 
@@ -206,6 +359,19 @@ const NoteEntry = ({ note, onStatusToggle, onDelete }) => {
               <span className="text-red-400 font-medium">(Overdue)</span>
             )}
           </div>
+        )}
+
+        {/* Edit button (appears on hover, author only) */}
+        {isAuthor && (
+          <button
+            onClick={() => onEdit(note)}
+            className="absolute top-2 right-10 p-1.5 rounded text-slate-600 hover:text-cyan-400 hover:bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-all"
+            title="Edit note"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
         )}
 
         {/* Delete button (appears on hover) */}
@@ -686,7 +852,9 @@ const generateMTSSReport = (notes, studentName, studentGrade, counselorName) => 
   doc.save(fileName);
 };
 
+// ============================================================
 // Main StudentNotesLog Component
+// ============================================================
 const StudentNotesLog = ({ 
   studentId, 
   counselorId, 
@@ -697,6 +865,14 @@ const StudentNotesLog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   
+  // === EDIT FEATURE — State ===
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editNoteText, setEditNoteText] = useState('');
+  const [editNoteType, setEditNoteType] = useState('general');
+  const [editFollowUpDate, setEditFollowUpDate] = useState('');
+  const [editNoteStatus, setEditNoteStatus] = useState('open');
+  const [editSaving, setEditSaving] = useState(false);
+
   // Bulletproof data fetching — bypasses frozen Supabase client
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
     async () => {
@@ -751,9 +927,83 @@ const StudentNotesLog = ({
 
   const notes = fetchedNotes || [];
 
+  // === EDIT FEATURE — Functions ===
+  const startEditing = (note) => {
+    setEditingNoteId(note.id);
+    setEditNoteText(note.content || note.note || '');
+    setEditNoteType(note.note_type || 'general');
+    setEditFollowUpDate(note.follow_up_date || '');
+    setEditNoteStatus(note.status || 'open');
+  };
+
+  const cancelEditing = () => {
+    setEditingNoteId(null);
+    setEditNoteText('');
+    setEditNoteType('general');
+    setEditFollowUpDate('');
+    setEditNoteStatus('open');
+    setEditSaving(false);
+  };
+
+  const handleEditNote = async () => {
+    if (!editNoteText.trim() || !editingNoteId) return;
+    setEditSaving(true);
+
+    try {
+      const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
+      if (!token) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      const res = await fetch(
+        'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes?id=eq.' + editingNoteId,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            note: editNoteText.trim(),
+            note_type: editNoteType,
+            follow_up_date: editFollowUpDate || null,
+            status: editNoteStatus,
+          }),
+        }
+      );
+
+      if (res.status === 401) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error('Update failed: ' + res.status + ' ' + errText);
+      }
+
+      cancelEditing();
+      refetch();
+    } catch (err) {
+      console.error('Edit note error:', err);
+      alert('Failed to update note: ' + err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // Add new note
-const handleAddNote = async (noteData) => {
+  const handleAddNote = async (noteData) => {
     setIsSubmitting(true);
+    // Close any open edit when adding a new note
+    cancelEditing();
     try {
       const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
       if (!token) throw new Error('No auth token — please log in again');
@@ -866,6 +1116,22 @@ const handleAddNote = async (noteData) => {
     return (note.note_type || 'general') === activeFilter;
   });
 
+  // Build edit state object to pass down to NoteEntry
+  const currentEditState = editingNoteId ? {
+    noteId: editingNoteId,
+    noteText: editNoteText,
+    setNoteText: setEditNoteText,
+    noteType: editNoteType,
+    setNoteType: setEditNoteType,
+    followUpDate: editFollowUpDate,
+    setFollowUpDate: setEditFollowUpDate,
+    status: editNoteStatus,
+    setStatus: setEditNoteStatus,
+    saving: editSaving,
+    onSave: handleEditNote,
+    onCancel: cancelEditing,
+  } : null;
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -937,8 +1203,11 @@ const handleAddNote = async (noteData) => {
             <NoteEntry
               key={note.id}
               note={note}
+              counselorId={counselorId}
               onStatusToggle={handleStatusToggle}
               onDelete={handleDeleteNote}
+              onEdit={startEditing}
+              editState={editingNoteId === note.id ? currentEditState : null}
             />
           ))}
         </div>
