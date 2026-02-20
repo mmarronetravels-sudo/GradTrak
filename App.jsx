@@ -112,17 +112,21 @@ function calculatePathwayProgress(courses, pathways, coursePathways) {
       .filter(cp => cp.pathway_id === pathway.id)
       .map(cp => cp.course_id);
     
-    const pathwayCourses = courses.filter(c => linkedCourseIds.includes(c.id));
-    const earnedCourses = pathwayCourses.length;
-    const requiredCourses = Number(pathway.courses_required);
-    const percentage = requiredCourses > 0 ? Math.round((earnedCourses / requiredCourses) * 100) : 0;
+    // NEW (sum credits) — Feb 20, 2026
+const earnedCredits = Math.round(
+  pathwayCourses
+    .filter(c => c.status === 'completed')
+    .reduce((sum, c) => sum + Number(c.credits || 0), 0) * 10
+) / 10;
+const required = pathway.credits_required || 3.0;
+const percentage = Math.min(Math.round((earnedCredits / required) * 100), 100);
     
     return {
       ...pathway,
-      earnedCourses,
+      earnedCredits,
       requiredCourses,
       percentage: Math.min(percentage, 100),
-      isComplete: earnedCourses >= requiredCourses,
+      isComplete: earnedCredits >= requiredCourses,
       courses: pathwayCourses
     };
   });
@@ -338,8 +342,8 @@ function PathwayCard({ pathway }) {
         {pathway.isComplete && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full font-medium">✓ Complete</span>}
       </div>
       <h3 className="text-white font-semibold mb-1">{pathway.name}</h3>
-      <p className="text-slate-400 text-xs mb-3">{pathway.earnedCourses} / {pathway.requiredCourses} courses</p>
-      <ProgressBar earned={pathway.earnedCourses} required={pathway.requiredCourses} color={pathway.isComplete ? '#10b981' : '#f59e0b'} />
+      <p className="text-slate-400 text-xs mb-3">{pathway.earnedCredits} / {pathway.requiredCourses} courses</p>
+      <ProgressBar earned={pathway.earnedCredits} required={pathway.requiredCourses} color={pathway.isComplete ? '#10b981' : '#f59e0b'} />
       {pathway.courses.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-700">
           <p className="text-slate-500 text-xs mb-2">Courses:</p>
@@ -2744,7 +2748,7 @@ const getPathwaysForCourse = (course) => {
               <div>
                 <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
                 <div className="space-y-3">
-                  {pathwayProgress.filter(p => p.earnedCourses > 0).map(pathway => (
+                  {pathwayProgress.filter(p => p.earnedCredits > 0).map(pathway => (
                     <PathwayCard key={pathway.id} pathway={pathway} />
                   ))}
                 </div>
@@ -3325,7 +3329,7 @@ advisingNotes.slice(0, 5)
         <!-- CTE Pathway Progress -->
         <div class="section">
           <div class="section-title">CTE Pathway Progress</div>
-          ${Object.keys(pathwayGroups).length === 0 ? '<p class="empty-message">No CTE pathway courses on record.</p>' : Object.entries(pathwayGroups).map(function([pwName, pwCourses]) { const completed = pwCourses.filter(c => c.status === 'completed').length; return '<div class="pathway-header">🎓 ' + pwName + ': ' + completed + '/6 courses completed</div><table><thead><tr><th>Course</th><th>Term</th><th>Status</th></tr></thead><tbody>' + pwCourses.map(c => '<tr><td>' + c.name + '</td><td>' + (c.term || '—') + '</td><td class="' + (c.status === 'completed' ? 'status-complete' : 'status-inprogress') + '">' + (c.status === 'completed' ? '✓ Completed' : '◯ In Progress') + '</td></tr>').join('') + '</tbody></table>'; }).join('')}
+          ${Object.keys(pathwayGroups).length === 0 ? '<p class="empty-message">No CTE pathway courses on record.</p>' : Object.entries(pathwayGroups).map(function([pwName, pwCourses]) { const completed = pwCourses.filter(c => c.status === 'completed').length; return '<div class="pathway-header">🎓 ' + pwName + ': ' + pwCourses.filter(c => c.status === 'completed').reduce((sum, c) => sum + Number(c.credits || 0), 0).toFixed(1) + '/3.0 credits earned'</div><table><thead><tr><th>Course</th><th>Term</th><th>Status</th></tr></thead><tbody>' + pwCourses.map(c => '<tr><td>' + c.name + '</td><td>' + (c.term || '—') + '</td><td class="' + (c.status === 'completed' ? 'status-complete' : 'status-inprogress') + '">' + (c.status === 'completed' ? '✓ Completed' : '◯ In Progress') + '</td></tr>').join('') + '</tbody></table>'; }).join('')}
         </div>
 
         <!-- Recent Advising Notes -->
@@ -3603,11 +3607,11 @@ const summaryStats = {
           </div>
 
           {/* CTE Pathways */}
-          {student.pathwayProgress && student.pathwayProgress.length > 0 && student.pathwayProgress.some(p => p.earnedCourses > 0) && (
+          {student.pathwayProgress && student.pathwayProgress.length > 0 && student.pathwayProgress.some(p => p.earnedCredits > 0) && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-4">🎯 CTE Pathways</h3>
               <div className="space-y-3">
-                {student.pathwayProgress.filter(p => p.earnedCourses > 0).map(pathway => (
+                {student.pathwayProgress.filter(p => p.earnedCredits > 0).map(pathway => (
                   <PathwayCard key={pathway.id} pathway={pathway} />
                 ))}
               </div>
