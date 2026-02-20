@@ -88,6 +88,18 @@ function dateStringToKey(dateStr) {
   return match ? `${match[1]}-${match[2]}` : null;
 }
 
+// Compute current grade level from graduation_year
+// e.g., graduation_year 2026 in school year 2025-26 = grade 12
+function getGradeLevel(graduationYear) {
+  if (!graduationYear) return null;
+  const now = new Date();
+  const currentSchoolYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  // Grade 12 graduates in the school year's spring. 
+  // If graduation_year = currentSchoolYear + 1, they're in grade 12.
+  const grade = 12 - (graduationYear - (currentSchoolYear + 1));
+  return grade >= 1 && grade <= 12 ? grade : null;
+}
+
 export default function ContactSnapshotReport({
   supabaseClient,
   schoolId,
@@ -219,9 +231,10 @@ export default function ContactSnapshotReport({
         if (isAdmin) {
           // Admin path: query profiles directly — admin RLS allows school-wide access.
           // Use .limit(2000) to override default 1000-row cap (776 students currently).
+          // NOTE: profiles table has graduation_year, NOT grade_level. We compute grade from it.
           const { data: profilesData, error: profilesError } = await supabaseClient
             .from('profiles')
-            .select('id, full_name, grade_level')
+            .select('id, full_name, graduation_year')
             .eq('role', 'student')
             .eq('school_id', schoolId)
             .eq('is_active', true)
@@ -244,7 +257,7 @@ export default function ContactSnapshotReport({
               const batch = studentIds.slice(i, i + batchSize);
               const { data: profilesBatch, error: profilesError } = await supabaseClient
                 .from('profiles')
-                .select('id, full_name, grade_level')
+                .select('id, full_name, graduation_year')
                 .in('id', batch)
                 .eq('is_active', true);
 
@@ -257,9 +270,10 @@ export default function ContactSnapshotReport({
           }
         }
 
-        // Merge counselor info into profiles
+        // Merge counselor info + compute grade_level from graduation_year
         const mergedProfiles = profiles.map(s => ({
           ...s,
+          grade_level: getGradeLevel(s.graduation_year),
           counselor_id: assignmentMap[s.id]?.counselor_id || null,
           counselor_name: assignmentMap[s.id]?.counselor_name || 'Unassigned',
         }));
