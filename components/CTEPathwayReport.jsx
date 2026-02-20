@@ -137,7 +137,7 @@ const earnedCredits = Math.round(
 const requiredCredits = Number(pathway.credits_required) || 3.0;
 const percentage = Math.round((earnedCredits / requiredCredits) * 100);
       
-      if (earnedCourses > 0) {
+      if (earnedCredits > 0) {
         results.push({
   pathway,
   earnedCredits,
