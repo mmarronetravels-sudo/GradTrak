@@ -16,6 +16,11 @@
 //   Feb 20 — Added CSV export for counselor × month grid
 //   Feb 20 — Added per-student contact breakdown view
 //   Feb 20 — Added PDF export for per-student report
+//   Feb 20 — FIX: Student view empty for counselors — RLS on profiles
+//            blocks counselor from querying all students by school_id.
+//            Now fetches counselor_assignments first, then fetches only
+//            assigned student profiles. Eliminates race condition between
+//            steps 3 and 4.
 //
 // Usage in App.jsx:
 //   <ContactSnapshotReport
@@ -156,40 +161,78 @@ export default function ContactSnapshotReport({
           setStudentNotes(notesData || []);
         }
 
-        // 3. Fetch student profiles (names + counselor assignments)
-        const { data: profilesData, error: profilesError } = await supabaseClient
-          .from('profiles')
-          .select('id, full_name, grade_level')
-          .eq('role', 'student')
-          .eq('school_id', schoolId)
-          .eq('is_active', true);
+        // ============================================
+        // FIX (Feb 20): Fetch student profiles + assignments
+        // ============================================
+        // Previous bug: For counselors, querying profiles with .eq('school_id', schoolId)
+        // returned 0 rows because the RLS policy on profiles only allows counselors to see
+        // students they're assigned to — not all students at the school. The assignment
+        // merge in step 4 then had nothing to map over → 0 students in the "By Student" view.
+        //
+        // Fix: Fetch counselor_assignments FIRST to get student IDs and counselor names,
+        // then fetch only those student profiles. This works with RLS because counselors
+        // CAN see their own assigned students' profiles.
+        // ============================================
 
-        if (profilesError) {
-          console.warn('Profiles fetch error:', profilesError.message);
-        } else {
-          setStudentProfiles(profilesData || []);
-        }
-
-        // 4. Fetch counselor assignments
-        const { data: assignmentsData } = await supabaseClient
+        // 3. Fetch counselor assignments (with counselor name)
+        let assignmentsQuery = supabaseClient
           .from('counselor_assignments')
           .select('student_id, counselor_id, profiles!counselor_assignments_counselor_id_fkey (full_name)');
 
-        if (assignmentsData) {
-          // Attach counselor info to student profiles
-          const assignmentMap = {};
-          assignmentsData.forEach(a => {
+        // For non-admin, only fetch this counselor's assignments
+        if (!isAdmin) {
+          assignmentsQuery = assignmentsQuery.eq('counselor_id', userId);
+        }
+
+        const { data: assignmentsData, error: assignmentsError } = await assignmentsQuery;
+
+        if (assignmentsError) {
+          console.warn('Assignments fetch error:', assignmentsError.message);
+        }
+
+        // Build assignment lookup: student_id → { counselor_id, counselor_name }
+        const assignmentMap = {};
+        (assignmentsData || []).forEach(a => {
+          // If a student has multiple assignments, keep the first one for display
+          if (!assignmentMap[a.student_id]) {
             assignmentMap[a.student_id] = {
               counselor_id: a.counselor_id,
               counselor_name: a.profiles?.full_name || 'Unassigned',
             };
-          });
-          setStudentProfiles(prev => prev.map(s => ({
-            ...s,
-            counselor_id: assignmentMap[s.id]?.counselor_id || null,
-            counselor_name: assignmentMap[s.id]?.counselor_name || 'Unassigned',
-          })));
+          }
+        });
+
+        // 4. Fetch student profiles — only the students we have assignments for
+        const studentIds = Object.keys(assignmentMap);
+
+        let profiles = [];
+        if (studentIds.length > 0) {
+          // Batch in groups of 100 to avoid URL length limits
+          const batchSize = 100;
+          for (let i = 0; i < studentIds.length; i += batchSize) {
+            const batch = studentIds.slice(i, i + batchSize);
+            const { data: profilesBatch, error: profilesError } = await supabaseClient
+              .from('profiles')
+              .select('id, full_name, grade_level')
+              .in('id', batch)
+              .eq('is_active', true);
+
+            if (profilesError) {
+              console.warn('Profiles batch fetch error:', profilesError.message);
+            } else {
+              profiles = profiles.concat(profilesBatch || []);
+            }
+          }
         }
+
+        // Merge counselor info into profiles
+        const mergedProfiles = profiles.map(s => ({
+          ...s,
+          counselor_id: assignmentMap[s.id]?.counselor_id || null,
+          counselor_name: assignmentMap[s.id]?.counselor_name || 'Unassigned',
+        }));
+
+        setStudentProfiles(mergedProfiles);
 
       } catch (err) {
         console.error('Contact snapshot fetch error:', err);
@@ -271,6 +314,8 @@ export default function ContactSnapshotReport({
     });
 
     // Merge with student profiles
+    // NOTE: studentProfiles is already filtered to assigned students for counselors
+    // (the fetch query handles this), so we don't need to re-filter by counselor_id here.
     return studentProfiles.map(student => {
       const noteData = studentMap[student.id] || {
         total: 0, lastContactDate: null, byType: {}, byCounselor: {}, openCount: 0,
@@ -284,12 +329,9 @@ export default function ContactSnapshotReport({
         ...noteData,
         daysSinceContact,
       };
-    }).filter(s => {
-      // Non-admin: only show students assigned to this counselor
-      if (!isAdmin) return s.counselor_id === userId;
-      return true;
     });
-  }, [studentNotes, studentProfiles, isAdmin, userId]);
+    // No need for .filter() here — the fetch already scoped to this counselor's students
+  }, [studentNotes, studentProfiles]);
 
   // —— Filtered + sorted student list ——
   const filteredStudents = useMemo(() => {
