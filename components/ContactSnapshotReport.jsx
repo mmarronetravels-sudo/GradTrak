@@ -21,6 +21,11 @@
 //            Now fetches counselor_assignments first, then fetches only
 //            assigned student profiles. Eliminates race condition between
 //            steps 3 and 4.
+//   Feb 20 — FIX: Student view empty for admin — Supabase default 1000-row
+//            limit on counselor_assignments truncated results. Admin now
+//            queries profiles directly (admin RLS allows school-wide access)
+//            with explicit .limit(). Assignments fetched separately for
+//            counselor name display.
 //
 // Usage in App.jsx:
 //   <ContactSnapshotReport
@@ -151,9 +156,11 @@ export default function ContactSnapshotReport({
         }
 
         // 2. Fetch per-student note data (for student breakdown view)
+        //    Use .limit(10000) to override Supabase's default 1000-row cap
         const { data: notesData, error: notesError } = await supabaseClient
           .from('student_notes')
-          .select('id, student_id, counselor_id, note_type, created_at, status');
+          .select('id, student_id, counselor_id, note_type, created_at, status')
+          .limit(10000);
 
         if (notesError) {
           console.warn('Student notes fetch error:', notesError.message);
@@ -164,20 +171,24 @@ export default function ContactSnapshotReport({
         // ============================================
         // FIX (Feb 20): Fetch student profiles + assignments
         // ============================================
-        // Previous bug: For counselors, querying profiles with .eq('school_id', schoolId)
-        // returned 0 rows because the RLS policy on profiles only allows counselors to see
-        // students they're assigned to — not all students at the school. The assignment
-        // merge in step 4 then had nothing to map over → 0 students in the "By Student" view.
+        // Bug 1 (counselor): Querying profiles with .eq('school_id', schoolId) returned
+        //   0 rows because RLS on profiles only allows counselors to see assigned students.
+        // Bug 2 (admin): Fetching all counselor_assignments hit Supabase's default 1000-row
+        //   limit, silently truncating the student list.
         //
-        // Fix: Fetch counselor_assignments FIRST to get student IDs and counselor names,
-        // then fetch only those student profiles. This works with RLS because counselors
-        // CAN see their own assigned students' profiles.
+        // Fix: Two strategies —
+        //   Admin: fetch profiles directly (admin RLS allows school-wide access), then
+        //          fetch assignments separately for counselor name display.
+        //   Counselor: fetch own assignments first, then fetch only those student profiles.
         // ============================================
 
         // 3. Fetch counselor assignments (with counselor name)
+        //    Always needed for the counselor_name column in the student table.
+        //    Use .limit(5000) to override Supabase's default 1000-row cap.
         let assignmentsQuery = supabaseClient
           .from('counselor_assignments')
-          .select('student_id, counselor_id, profiles!counselor_assignments_counselor_id_fkey (full_name)');
+          .select('student_id, counselor_id, profiles!counselor_assignments_counselor_id_fkey (full_name)')
+          .limit(5000);
 
         // For non-admin, only fetch this counselor's assignments
         if (!isAdmin) {
@@ -202,25 +213,46 @@ export default function ContactSnapshotReport({
           }
         });
 
-        // 4. Fetch student profiles — only the students we have assignments for
-        const studentIds = Object.keys(assignmentMap);
-
+        // 4. Fetch student profiles
         let profiles = [];
-        if (studentIds.length > 0) {
-          // Batch in groups of 100 to avoid URL length limits
-          const batchSize = 100;
-          for (let i = 0; i < studentIds.length; i += batchSize) {
-            const batch = studentIds.slice(i, i + batchSize);
-            const { data: profilesBatch, error: profilesError } = await supabaseClient
-              .from('profiles')
-              .select('id, full_name, grade_level')
-              .in('id', batch)
-              .eq('is_active', true);
 
-            if (profilesError) {
-              console.warn('Profiles batch fetch error:', profilesError.message);
-            } else {
-              profiles = profiles.concat(profilesBatch || []);
+        if (isAdmin) {
+          // Admin path: query profiles directly — admin RLS allows school-wide access.
+          // Use .limit(2000) to override default 1000-row cap (776 students currently).
+          const { data: profilesData, error: profilesError } = await supabaseClient
+            .from('profiles')
+            .select('id, full_name, grade_level')
+            .eq('role', 'student')
+            .eq('school_id', schoolId)
+            .eq('is_active', true)
+            .limit(2000);
+
+          if (profilesError) {
+            console.warn('Profiles fetch error:', profilesError.message);
+          } else {
+            profiles = profilesData || [];
+          }
+        } else {
+          // Counselor path: fetch only students we have assignments for.
+          // This works with RLS because counselors CAN see their assigned students.
+          const studentIds = Object.keys(assignmentMap);
+
+          if (studentIds.length > 0) {
+            // Batch in groups of 100 to avoid URL length limits
+            const batchSize = 100;
+            for (let i = 0; i < studentIds.length; i += batchSize) {
+              const batch = studentIds.slice(i, i + batchSize);
+              const { data: profilesBatch, error: profilesError } = await supabaseClient
+                .from('profiles')
+                .select('id, full_name, grade_level')
+                .in('id', batch)
+                .eq('is_active', true);
+
+              if (profilesError) {
+                console.warn('Profiles batch fetch error:', profilesError.message);
+              } else {
+                profiles = profiles.concat(profilesBatch || []);
+              }
             }
           }
         }
