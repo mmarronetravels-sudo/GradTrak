@@ -361,11 +361,11 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
           </div>
         )}
 
-        {/* Edit button (appears on hover, author only) */}
+        {/* Edit button (always visible, author only) */}
         {isAuthor && (
           <button
             onClick={() => onEdit(note)}
-            className="absolute top-2 right-10 p-1.5 rounded text-slate-600 hover:text-cyan-400 hover:bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-all"
+            className="absolute top-2 right-10 p-1.5 rounded text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
             title="Edit note"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
