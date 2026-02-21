@@ -443,7 +443,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() && !isAttendanceContact) return;
 
    await onSubmit({
   note_type: noteType,
@@ -563,7 +563,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={!content.trim() || isSubmitting}
+          disabled={(!content.trim() && !isAttendanceContact) || isSubmitting}
           className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
         >
           {isSubmitting ? (
