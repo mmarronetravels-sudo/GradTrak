@@ -450,8 +450,8 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
   content: content.trim(),
   follow_up_date: followUpDate || null,
   contact_date: contactDate || null,
-  is_attendance_contact: noteData.is_attendance_contact,
-  status: 'open'
+is_attendance_contact: noteData.is_attendance_contact,     
+     status: 'open'
 });
 
     // Reset form
@@ -1113,7 +1113,7 @@ const StudentNotesLog = ({
             note_type: noteData.note_type,
             follow_up_date: noteData.follow_up_date,
             contact_date: noteData.contact_date,
-            is_attendance_contact: noteData.is_attendance_contact,
+            is_attendance_contact: isAttendanceContact,
             status: noteData.status
           })
         }
