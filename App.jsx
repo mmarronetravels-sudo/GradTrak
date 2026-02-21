@@ -3555,7 +3555,7 @@ const summaryStats = {
               onClick={() => setActiveTab('progress')}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'progress' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
             >
-              📊 Progress
+              📊 Credits
             </button>
             <button 
               onClick={() => setActiveTab('courses')}
