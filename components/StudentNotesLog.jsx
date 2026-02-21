@@ -57,6 +57,13 @@ const NOTE_TYPES = {
     textColor: 'text-violet-400',
     borderColor: 'border-violet-500/30'
   },
+  text: {
+    label: 'Text Message',
+    icon: '💬',
+    bgColor: 'bg-purple-500/20',
+    textColor: 'text-purple-400',
+    borderColor: 'border-purple-500/30'
+},
   parent_contact: {
     label: 'Parent Contact',
     icon: '👨‍👩‍👧',
