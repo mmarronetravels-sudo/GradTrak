@@ -2620,19 +2620,19 @@ if (profile.diploma_type_id) {
       .from('course_pathways')
       .select('*');
 
-    // Fetch counselors with scheduling links
+    // Fetch only the student's assigned counselor(s) with scheduling links
     const { data: counselorData } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, scheduling_link')
-      .eq('school_id', profile.school_id)
-      .eq('role', 'counselor');
+      .from('counselor_assignments')
+      .select('counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name, email, scheduling_link)')
+      .eq('student_id', user.id)
+      .eq('assignment_type', 'counselor');
 
     if (catData) setCategories(catData);
     if (courseData) setCourses(courseData);
     if (pathData) setPathways(pathData);
     if (diplomaReqData) setDiplomaRequirements(diplomaReqData);
     if (cpData) setCoursePathways(cpData.filter(cp => courseData?.some(c => c.id === cp.course_id)));
-    if (counselorData) setCounselors(counselorData.filter(c => c.scheduling_link));
+    if (counselorData) setCounselors(counselorData.map(a => a.counselor).filter(c => c?.scheduling_link));
     setLoading(false);
   }
 
