@@ -7,6 +7,7 @@ import ArchiveStudentModal from './components/ArchiveStudentModal';
 import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
 import SendAdvisingEmail from './components/SendAdvisingEmail';
+import SendParentAlert from './components/SendParentAlert';
 import AcademicContractForm from './components/AcademicContractForm';
 const APP_VERSION = '2.14.0';
 
@@ -2944,6 +2945,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [allStudents, setAllStudents] = useState([]);
   const [isReactivating, setIsReactivating] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showParentAlertModal, setShowParentAlertModal] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
   const [notesRefreshKey, setNotesRefreshKey] = useState(0);
   const [selectedContract, setSelectedContract] = useState(null);
@@ -3673,9 +3675,15 @@ const summaryStats = {
   onClick={() => setShowEmailModal(true)}
   className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg text-xs font-medium hover:bg-indigo-500/30 transition-colors"
 >
-  📧 Email Student
+📧 Email Student
 </button>
- <button
+<button
+  onClick={() => setShowParentAlertModal(true)}
+  className="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-xs font-medium hover:bg-amber-500/30 transition-colors"
+>
+  ⚠️ Alert Parent
+</button>
+<button
   onClick={() => { setSelectedContract(null); setShowContractModal(true); }}
   className="px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/30 transition-colors"
 >
@@ -3690,6 +3698,15 @@ const summaryStats = {
   categories={categories}
   counselorProfile={profile}
   supabaseClient={supabase}
+/>
+<SendParentAlert
+  key={`parent-alert-${student.id}`}
+  isOpen={showParentAlertModal}
+  onClose={() => setShowParentAlertModal(false)}
+  student={student}
+  counselorProfile={profile}
+  supabaseClient={supabase}
+  onNoteSaved={() => {}}
 />
 <AcademicContractForm
   key={`contract-${student.id}`}
