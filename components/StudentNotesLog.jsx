@@ -256,7 +256,7 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
               max={new Date().toLocaleDateString('en-CA')}
               className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
             />
-          </div
+          </div>
           {/* Attendance Contact checkbox */}
           <div className="mb-3">
             <label className="flex items-center gap-3 cursor-pointer">
