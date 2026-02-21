@@ -351,10 +351,7 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
                 📋 Attendance
               </span>
             )}
-          </div>              status={note.status} 
-              onClick={() => onStatusToggle(note.id, note.status)}
-            />
-          </div>
+          </div>              
           
           {/* Timestamp + edited indicator */}
           <div className="flex items-center gap-2">
