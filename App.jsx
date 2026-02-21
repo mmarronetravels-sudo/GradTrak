@@ -4459,8 +4459,7 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
           )}
 
       </div>
-      </div>
-    );
+     );
   }
 
   return (
