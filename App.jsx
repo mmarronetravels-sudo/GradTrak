@@ -2930,6 +2930,8 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [showAddCourseModal, setShowAddCourseModal] = useState(false);
   const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
   const [courseHistoryExpanded, setCourseHistoryExpanded] = useState(true);
+  const [courseYearFilter, setCourseYearFilter] = useState('all');
+  const [courseTermFilter, setCourseTermFilter] = useState('all');
   const [parents, setParents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
@@ -3769,16 +3771,53 @@ const summaryStats = {
               </div>
             )}
 
-<h3 
-  className="text-lg font-semibold text-white mb-4 cursor-pointer select-none flex items-center gap-2"
-  onClick={() => setCourseHistoryExpanded(!courseHistoryExpanded)}
->
-  <span className="text-sm">{courseHistoryExpanded ? '▼' : '▶'}</span>
-  📚 Course History
-</h3>            
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+  <h3 
+    className="text-lg font-semibold text-white cursor-pointer select-none flex items-center gap-2"
+    onClick={() => setCourseHistoryExpanded(!courseHistoryExpanded)}
+  >
+    <span className="text-sm">{courseHistoryExpanded ? '▼' : '▶'}</span>
+    📚 Course History
+  </h3>
+  {courseHistoryExpanded && (
+    <div className="flex gap-2">
+      <select
+        value={courseYearFilter}
+        onChange={(e) => { setCourseYearFilter(e.target.value); setCourseTermFilter('all'); }}
+        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+      >
+        <option value="all">All Years</option>
+        {[...new Set(completedCourses.map(c => {
+          const match = c.term?.match(/(\d{2}\/\d{2})/);
+          return match ? match[1] : null;
+        }).filter(Boolean))].sort().reverse().map(year => (
+          <option key={year} value={year}>{year}</option>
+        ))}
+      </select>
+      <select
+        value={courseTermFilter}
+        onChange={(e) => setCourseTermFilter(e.target.value)}
+        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+      >
+        <option value="all">All Terms</option>
+        {[...new Set(completedCourses
+          .filter(c => courseYearFilter === 'all' || c.term?.includes(courseYearFilter))
+          .map(c => c.term)
+          .filter(Boolean)
+        )].sort().reverse().map(term => (
+          <option key={term} value={term}>{term}</option>
+        ))}
+      </select>
+    </div>
+  )}
+</div>
 {courseHistoryExpanded && (
               <>
-              {Object.entries(coursesByTerm).sort((a, b) => {
+              {Object.entries(coursesByTerm).filter(([term]) => {
+                if (courseYearFilter !== 'all' && !term.includes(courseYearFilter)) return false;
+                if (courseTermFilter !== 'all' && term !== courseTermFilter) return false;
+                return true;
+              }).sort((a, b) => {
   const parseT = (term) => {
     const match = term.match(/T(\d)\s*(\d{2})\/(\d{2})/);
     if (!match) return { tri: 0, year: 0 };
