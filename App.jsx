@@ -1826,13 +1826,14 @@ if (studentData) {
             <div className="space-y-6">
               {/* Back Button */}
               <button
-                onClick={() => {
-  setSelectedStudent(null);
-}}
-                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-              >
-                ← Back to Students
-              </button>
+  onClick={() => {
+    setSelectedStudent(null);
+    setActiveTab('students');
+  }}
+  className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+>
+  ← Back to Students
+</button>
 
               {/* Student Header */}
 <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
