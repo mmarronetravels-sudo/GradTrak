@@ -2954,6 +2954,7 @@ const [counselorFilter, setCounselorFilter] = useState('all');
   const [showParentAlertModal, setShowParentAlertModal] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
   const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+  const [viewAllStudents, setViewAllStudents] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
   const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
@@ -2983,9 +2984,9 @@ const [counselorFilter, setCounselorFilter] = useState('all');
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
     fetchData();
-  }, [profile]);
+  }, [profile, viewAllStudents]);
 
 async function fetchStudentDetail(studentId) {
   const { data: studentData } = await supabase
@@ -3042,19 +3043,27 @@ async function fetchStudentDetail(studentId) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-// Get students - superusers see all, counselors see assigned only
+// Get students - viewers see all, superuser counselors depend on toggle, regular counselors see assigned only
 let assignedStudentIds = [];
 
-if (profile.is_superuser || profile.role === 'viewer') {
-  // Superusers see all students in their school
-  const { data: allStudents } = await supabase
+if (profile.role === 'viewer') {
+  // Viewers always see all students
+  const { data: allStudentData } = await supabase
     .from('profiles')
     .select('id')
     .eq('school_id', profile.school_id)
     .eq('role', 'student');
-  assignedStudentIds = allStudents?.map(s => s.id) || [];
+  assignedStudentIds = allStudentData?.map(s => s.id) || [];
+} else if (profile.is_superuser && viewAllStudents) {
+  // Superuser counselor in "All Students" mode
+  const { data: allStudentData } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('school_id', profile.school_id)
+    .eq('role', 'student');
+  assignedStudentIds = allStudentData?.map(s => s.id) || [];
 } else {
-  // Regular counselors see counselor assignments, case managers see case_manager assignments
+  // Regular counselors (or superuser counselors in "My Students" mode) see assigned only
   const assignmentType = profile.role === 'case_manager' ? 'case_manager' : 'counselor';
   const { data: assignmentData } = await supabase
     .from('counselor_assignments')
@@ -4093,6 +4102,40 @@ const summaryStats = {
     </p>
   )}
 </div>
+                
+{/* My Students / All Students toggle — superuser counselors only */}
+{profile?.is_superuser && profile?.role !== 'viewer' && (
+  <div className="flex items-center gap-3 mt-3">
+    <div className="inline-flex rounded-xl overflow-hidden border border-slate-700">
+      <button
+        onClick={() => setViewAllStudents(false)}
+        className={`px-4 py-2 text-sm font-medium transition-colors ${
+          !viewAllStudents
+            ? 'bg-indigo-600 text-white'
+            : 'bg-slate-800 text-slate-400 hover:text-white'
+        }`}
+      >
+        👤 My Students
+      </button>
+      <button
+        onClick={() => setViewAllStudents(true)}
+        className={`px-4 py-2 text-sm font-medium transition-colors ${
+          viewAllStudents
+            ? 'bg-indigo-600 text-white'
+            : 'bg-slate-800 text-slate-400 hover:text-white'
+        }`}
+      >
+        👁 All Students
+      </button>
+    </div>
+    {viewAllStudents && (
+      <span className="text-slate-500 text-xs">
+        Viewing all {students.length} students
+      </span>
+    )}
+  </div>
+)}
+                
                 {/* Filters */}
 <div className="flex flex-wrap gap-2 mt-3">
   <select
@@ -4122,7 +4165,7 @@ const summaryStats = {
       <option key={term} value={term}>{term}</option>
     ))}
   </select>
-  {(profile.is_superuser || profile.role === 'viewer') && (
+  {(profile.role === 'viewer' || (profile.is_superuser && viewAllStudents)) && (
     <select
       value={counselorFilter}
       onChange={(e) => setCounselorFilter(e.target.value)}
