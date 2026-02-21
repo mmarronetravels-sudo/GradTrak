@@ -1113,7 +1113,7 @@ const StudentNotesLog = ({
             note_type: noteData.note_type,
             follow_up_date: noteData.follow_up_date,
             contact_date: noteData.contact_date,
-            is_attendance_contact: isAttendanceContact,
+            is_attendance_contact: noteData.is_attendance_contact,
             status: noteData.status
           })
         }
