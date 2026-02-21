@@ -111,6 +111,8 @@ function calculatePathwayProgress(courses, pathways, coursePathways) {
     const linkedCourseIds = coursePathways
       .filter(cp => cp.pathway_id === pathway.id)
       .map(cp => cp.course_id);
+
+    const pathwayCourses = courses.filter(c => linkedCourseIds.includes(c.id));
     
     // NEW (sum credits) — Feb 20, 2026
 const earnedCredits = Math.round(
