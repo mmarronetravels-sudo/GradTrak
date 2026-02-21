@@ -4415,8 +4415,6 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
             </div>
           </div>
         </main>
-        </div>
-        </main>
 
           {/* Schedule Appointment Modal */}
           {showScheduleModal && (
