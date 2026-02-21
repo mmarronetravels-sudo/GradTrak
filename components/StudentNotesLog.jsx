@@ -340,10 +340,7 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
       <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 hover:border-slate-600/50 transition-colors">
         {/* Header row */}
         <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <NoteTypeBadge type={note.note_type} />
-            <StatusBadge 
-              <div className="flex flex-wrap items-center gap-2">
+                       <div className="flex flex-wrap items-center gap-2">
             <NoteTypeBadge type={note.note_type} />
             <StatusBadge 
               status={note.status} 
