@@ -4235,6 +4235,8 @@ function ParentDashboard({ user, profile, onLogout }) {
   const [categories, setCategories] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [counselors, setCounselors] = useState([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const displayName = getDisplayName(profile);
 
   useEffect(() => {
@@ -4284,6 +4286,13 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
         setLinkedStudents(studentsWithStats);
       }
       if (catData) setCategories(catData);
+      // Fetch assigned counselors for linked students (with scheduling links)
+      const { data: counselorData } = await supabase
+        .from('counselor_assignments')
+        .select('student_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name, email, scheduling_link)')
+        .in('student_id', studentIds)
+        .eq('assignment_type', 'counselor');
+      if (counselorData) setCounselors(counselorData.filter(a => a.counselor?.scheduling_link));
     }
     setLoading(false);
   }
@@ -4334,6 +4343,12 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
                 <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
               </div>
             </div>
+            {counselors.filter(a => a.student_id === student.id).length > 0 && (
+              <button onClick={() => setShowScheduleModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2" title="Schedule Appointment">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                📅 Schedule with Counselor
+              </button>
+            )}
           </div>
         </header>
         <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -4400,6 +4415,52 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
             </div>
           </div>
         </main>
+        </div>
+        </main>
+
+          {/* Schedule Appointment Modal */}
+          {showScheduleModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-slate-900 rounded-3xl w-full max-w-md border border-slate-700 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-white">📅 Schedule Appointment</h2>
+                  <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-white p-2">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-slate-400 text-sm mb-4">Schedule a meeting with {student.displayName}'s counselor:</p>
+                <div className="space-y-3">
+                  {counselors.filter(a => a.student_id === student.id).map(a => (
+                    
+                      key={a.counselor.id}
+                      href={a.counselor.scheduling_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-xl p-4 transition-all text-left"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-white font-medium">{a.counselor.full_name || a.counselor.email}</h3>
+                          <p className="text-slate-400 text-sm">{a.counselor.email}</p>
+                        </div>
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+                <button onClick={() => setShowScheduleModal(false)}
+                  className="w-full mt-6 bg-slate-800 text-slate-300 font-medium py-3 rounded-xl hover:bg-slate-700 transition-all">
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+      </div>
       </div>
     );
   }
