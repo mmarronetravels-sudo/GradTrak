@@ -4430,7 +4430,7 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
                 </div>
                 <p className="text-slate-400 text-sm mb-4">Schedule a meeting with {student.displayName}'s counselor:</p>
                 <div className="space-y-3">
-                  {counselors.filter(a => a.student_id === student.id).map(a => (
+                 {counselors.filter(a => a.student_id === student.id).map(a => (
                     
                       key={a.counselor.id}
                       href={a.counselor.scheduling_link}
