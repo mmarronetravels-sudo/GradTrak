@@ -2169,12 +2169,7 @@ if (studentData) {
     userRole={profile.role}
     userId={profile.id}
     isAdmin={true}
-    onSelectStudent={async (student) => {
-      const { data: studentData } = await supabase
-        .from('profiles')
-        .select('*, diploma_types(*)')
-        .eq('id', student.id)
-        .single();
+    
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
@@ -2205,12 +2200,15 @@ if (studentData) {
         .select('*, diploma_types(*)')
         .eq('id', student.id)
         .single();
-      
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
         .eq('student_id', student.id);
-      
+      const { data: assignmentData } = await supabase
+        .from('counselor_assignments')
+        .select('counselor_id, profiles!counselor_assignments_counselor_id_fkey(full_name)')
+        .eq('student_id', student.id)
+        .maybeSingle();
       if (studentData) {
         let diplomaReqs = null;
         if (studentData.diploma_type_id) {
@@ -2220,13 +2218,13 @@ if (studentData) {
             .eq('diploma_type_id', studentData.diploma_type_id);
           diplomaReqs = drData;
         }
-        
         const stats = calculateStudentStats(courseData || [], categories, diplomaReqs);
-        
         setSelectedStudent({
           ...studentData,
           courses: courseData || [],
-          stats
+          stats,
+          counselor_id: assignmentData?.counselor_id || null,
+          counselor_name: assignmentData?.profiles?.full_name || null
         });
       }
       setActiveTab('student-detail');
