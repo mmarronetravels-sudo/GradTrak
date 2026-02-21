@@ -8,6 +8,7 @@ import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
 import SendAdvisingEmail from './components/SendAdvisingEmail';
 import SendParentAlert from './components/SendParentAlert';
+import MTSSInterventionReport from './components/MTSSInterventionReport';
 import AcademicContractForm from './components/AcademicContractForm';
 const APP_VERSION = '2.14.0';
 
@@ -1503,6 +1504,10 @@ if (studentData) {
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'contact-snapshot' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
                 📊 Contacts
               </button>
+         <button onClick={() => setActiveTab('mtss-interventions')}
+  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'mtss-interventions' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+  🔍 MTSS
+</button>
          <button onClick={() => setActiveTab('students')}
       className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
       👥 Students
@@ -2155,6 +2160,19 @@ if (studentData) {
             userId={profile.id}
           />
         )}
+  {activeTab === 'mtss-interventions' && (
+  <MTSSInterventionReport
+    supabaseClient={supabase}
+    schoolId={profile.school_id}
+    userRole={profile.role}
+    userId={profile.id}
+    isAdmin={true}
+    onSelectStudent={(student) => {
+      setSelectedStudent(student);
+      setActiveTab('student-detail');
+    }}
+  />
+)}
       </main>
 
       {/* Category Modal */}
@@ -4051,6 +4069,12 @@ const summaryStats = {
 >
   📊 Contact Snapshot
 </button>
+              <button
+  onClick={() => setMainView('mtss-interventions')}
+  className={`px-4 py-2 rounded-lg font-medium transition-all ${mainView === 'mtss-interventions' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+>
+  🔍 MTSS Interventions
+</button>
             </div>
 
             {mainView === 'students' && (
@@ -4282,6 +4306,19 @@ const summaryStats = {
                 userId={profile.id}
               />
             )}
+          {mainView === 'mtss-interventions' && (
+  <MTSSInterventionReport
+    supabaseClient={supabase}
+    schoolId={profile.school_id}
+    userRole={profile.role}
+    userId={profile.id}
+    isAdmin={profile.role === 'admin'}
+    onSelectStudent={(student) => {
+      const fullStudent = students.find(s => s.id === student.id) || student;
+      setSelectedStudent(fullStudent);
+    }}
+  />
+)}
           </div>
         </main>
 
