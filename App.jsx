@@ -2169,32 +2169,7 @@ if (studentData) {
     userRole={profile.role}
     userId={profile.id}
     isAdmin={true}
-    
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('student_id', student.id);
-      if (studentData) {
-        let diplomaReqs = null;
-        if (studentData.diploma_type_id) {
-          const { data: drData } = await supabase
-            .from('diploma_requirements')
-            .select('*')
-            .eq('diploma_type_id', studentData.diploma_type_id);
-          diplomaReqs = drData;
-        }
-        const stats = calculateStudentStats(courseData || [], categories, diplomaReqs);
-        setSelectedStudent({
-          ...studentData,
-          courses: courseData || [],
-          stats
-        });
-      }
-      setActiveTab('student-detail');
-    }}
-  />
-)}
-  onSelectStudent={async (student) => {
+    onSelectStudent={async (student) => {
       const { data: studentData } = await supabase
         .from('profiles')
         .select('*, diploma_types(*)')
@@ -2229,8 +2204,9 @@ if (studentData) {
       }
       setActiveTab('student-detail');
     }}
+  />
+)}
       </main>
-
       {/* Category Modal */}
       {showCategoryModal && (
         <CategoryModal
