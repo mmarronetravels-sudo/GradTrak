@@ -2929,6 +2929,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [showLinkParentModal, setShowLinkParentModal] = useState(false);
   const [showAddCourseModal, setShowAddCourseModal] = useState(false);
   const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
+  const [courseHistoryExpanded, setCourseHistoryExpanded] = useState(true);
   const [parents, setParents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
@@ -3768,7 +3769,14 @@ const summaryStats = {
               </div>
             )}
 
-            <h3 className="text-lg font-semibold text-white mb-4">📚 Course History</h3>
+<h3 
+  className="text-lg font-semibold text-white mb-4 cursor-pointer select-none flex items-center gap-2"
+  onClick={() => setCourseHistoryExpanded(!courseHistoryExpanded)}
+>
+  <span className="text-sm">{courseHistoryExpanded ? '▼' : '▶'}</span>
+  📚 Course History
+</h3>            
+{courseHistoryExpanded && (
             {Object.entries(coursesByTerm).sort((a, b) => {
   const parseT = (term) => {
     const match = term.match(/T(\d)\s*(\d{2})\/(\d{2})/);
@@ -3795,6 +3803,7 @@ const summaryStats = {
                 </div>
               </div>
             ))}
+            )}
             {(student.courses?.length || 0) === 0 && (
               <div className="text-center py-8 text-slate-400">
                 <p>No courses recorded yet.</p>
