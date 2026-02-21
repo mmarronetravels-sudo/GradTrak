@@ -3777,7 +3777,8 @@ const summaryStats = {
   📚 Course History
 </h3>            
 {courseHistoryExpanded && (
-            {Object.entries(coursesByTerm).sort((a, b) => {
+              <>
+              {Object.entries(coursesByTerm).sort((a, b) => {
   const parseT = (term) => {
     const match = term.match(/T(\d)\s*(\d{2})\/(\d{2})/);
     if (!match) return { tri: 0, year: 0 };
@@ -3803,6 +3804,7 @@ const summaryStats = {
                 </div>
               </div>
             ))}
+              </>
             )}
             {(student.courses?.length || 0) === 0 && (
               <div className="text-center py-8 text-slate-400">
