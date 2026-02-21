@@ -244,6 +244,20 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
             </div>
           </div>
 
+          {/* Contact Date */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-slate-400 mb-2">
+              Contact Date <span className="text-slate-600">(when the interaction happened)</span>
+            </label>
+            <input
+              type="date"
+              value={editState.contactDate}
+              onChange={(e) => editState.setContactDate(e.target.value)}
+              max={new Date().toLocaleDateString('en-CA')}
+              className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+            />
+          </div>
+
           {/* Status toggle */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-slate-400 mb-2">Status</label>
@@ -337,7 +351,9 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
               onMouseLeave={() => setShowFullDate(false)}
               title={formatFullTimestamp(note.created_at)}
             >
-              {showFullDate ? formatFullTimestamp(note.created_at) : formatDate(note.created_at)}
+              {showFullDate 
+  ? formatFullTimestamp(note.contact_date || note.created_at) 
+  : formatDate(note.contact_date || note.created_at)}
             </div>
           </div>
         </div>
@@ -402,23 +418,26 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
   const [noteType, setNoteType] = useState('general');
   const [content, setContent] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
+  const [contactDate, setContactDate] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
 
-    await onSubmit({
-      note_type: noteType,
-      content: content.trim(),
-      follow_up_date: followUpDate || null,
-      status: 'open'
-    });
+   await onSubmit({
+  note_type: noteType,
+  content: content.trim(),
+  follow_up_date: followUpDate || null,
+  contact_date: contactDate || null,
+  status: 'open'
+});
 
     // Reset form
     setContent('');
     setFollowUpDate('');
     setNoteType('general');
     setIsExpanded(false);
+    setContactDate('');
   };
 
   if (!isExpanded) {
@@ -474,6 +493,20 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
         />
       </div>
 
+      {/* Contact Date */}
+<div className="mb-4">
+  <label className="block text-xs font-medium text-slate-400 mb-2">
+    Contact Date <span className="text-slate-600">(optional — defaults to today)</span>
+  </label>
+  <input
+    type="date"
+    value={contactDate}
+    onChange={(e) => setContactDate(e.target.value)}
+    max={new Date().toLocaleDateString('en-CA')}
+    className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
+  />
+</div>
+
       {/* Follow-up Date */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-slate-400 mb-2">
@@ -518,6 +551,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
             setIsExpanded(false);
             setContent('');
             setFollowUpDate('');
+            setContactDate('');
             setNoteType('general');
           }}
           className="px-4 py-2 text-slate-400 hover:text-slate-300 font-medium transition-colors"
@@ -879,6 +913,7 @@ const StudentNotesLog = ({
   const [editFollowUpDate, setEditFollowUpDate] = useState('');
   const [editNoteStatus, setEditNoteStatus] = useState('open');
   const [editSaving, setEditSaving] = useState(false);
+  const [editContactDate, setEditContactDate] = useState('');
 
   // Bulletproof data fetching — bypasses frozen Supabase client
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
@@ -941,6 +976,7 @@ const StudentNotesLog = ({
     setEditNoteType(note.note_type || 'general');
     setEditFollowUpDate(note.follow_up_date || '');
     setEditNoteStatus(note.status || 'open');
+    setEditContactDate(note.contact_date || '');
   };
 
   const cancelEditing = () => {
@@ -949,6 +985,7 @@ const StudentNotesLog = ({
     setEditNoteType('general');
     setEditFollowUpDate('');
     setEditNoteStatus('open');
+    setEditContactDate('');
     setEditSaving(false);
   };
 
@@ -976,11 +1013,12 @@ const StudentNotesLog = ({
             'Prefer': 'return=minimal',
           },
           body: JSON.stringify({
-            note: editNoteText.trim(),
-            note_type: editNoteType,
-            follow_up_date: editFollowUpDate || null,
-            status: editNoteStatus,
-          }),
+  note: editNoteText.trim(),
+  note_type: editNoteType,
+  follow_up_date: editFollowUpDate || null,
+  contact_date: editContactDate || null,
+  status: editNoteStatus,
+}),
         }
       );
 
@@ -1031,6 +1069,7 @@ const StudentNotesLog = ({
             note: noteData.content,
             note_type: noteData.note_type,
             follow_up_date: noteData.follow_up_date,
+            contact_date: noteData.contact_date,
             status: noteData.status
           })
         }
@@ -1132,8 +1171,11 @@ const StudentNotesLog = ({
     setNoteType: setEditNoteType,
     followUpDate: editFollowUpDate,
     setFollowUpDate: setEditFollowUpDate,
+    contactDate: editContactDate,
+    setContactDate: setEditContactDate,
     status: editNoteStatus,
     setStatus: setEditNoteStatus,
+    setEditContactDate(note.contact_date || '');
     saving: editSaving,
     onSave: handleEditNote,
     onCancel: cancelEditing,
