@@ -256,6 +256,21 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
               max={new Date().toLocaleDateString('en-CA')}
               className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
             />
+          </div
+          {/* Attendance Contact checkbox */}
+          <div className="mb-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editState.isAttendanceContact}
+                onChange={(e) => editState.setIsAttendanceContact(e.target.checked)}
+                className="w-5 h-5 rounded bg-slate-700 border-slate-600 text-emerald-500"
+              />
+              <div>
+                <span className="text-slate-200 text-sm font-medium">📋 Attendance Contact</span>
+                <p className="text-slate-500 text-xs">Count this note as an attendance contact log</p>
+              </div>
+            </label>
           </div>
 
           {/* Status toggle */}
@@ -328,7 +343,18 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
           <div className="flex flex-wrap items-center gap-2">
             <NoteTypeBadge type={note.note_type} />
             <StatusBadge 
+              <div className="flex flex-wrap items-center gap-2">
+            <NoteTypeBadge type={note.note_type} />
+            <StatusBadge 
               status={note.status} 
+              onClick={() => onStatusToggle(note.id, note.status)}
+            />
+            {note.is_attendance_contact && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                📋 Attendance
+              </span>
+            )}
+          </div>              status={note.status} 
               onClick={() => onStatusToggle(note.id, note.status)}
             />
           </div>
@@ -419,6 +445,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
   const [content, setContent] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
   const [contactDate, setContactDate] = useState('');
+  const [isAttendanceContact, setIsAttendanceContact] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -429,6 +456,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
   content: content.trim(),
   follow_up_date: followUpDate || null,
   contact_date: contactDate || null,
+  is_attendance_contact: noteData.is_attendance_contact,
   status: 'open'
 });
 
@@ -438,6 +466,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
     setNoteType('general');
     setIsExpanded(false);
     setContactDate('');
+    setIsAttendanceContact(false);
   };
 
   if (!isExpanded) {
@@ -506,6 +535,21 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
     className="px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50"
   />
 </div>
+{/* Attendance Contact checkbox */}
+<div className="mb-3">
+  <label className="flex items-center gap-3 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={isAttendanceContact}
+      onChange={(e) => setIsAttendanceContact(e.target.checked)}
+      className="w-5 h-5 rounded bg-slate-700 border-slate-600 text-emerald-500"
+    />
+    <div>
+      <span className="text-slate-200 text-sm font-medium">📋 Attendance Contact</span>
+      <p className="text-slate-500 text-xs">Count this note as an attendance contact log</p>
+    </div>
+  </label>
+</div>
 
       {/* Follow-up Date */}
       <div className="mb-4">
@@ -553,6 +597,7 @@ const NewNoteForm = ({ onSubmit, isSubmitting }) => {
             setFollowUpDate('');
             setContactDate('');
             setNoteType('general');
+            setIsAttendanceContact(false);
           }}
           className="px-4 py-2 text-slate-400 hover:text-slate-300 font-medium transition-colors"
         >
@@ -914,6 +959,8 @@ const StudentNotesLog = ({
   const [editNoteStatus, setEditNoteStatus] = useState('open');
   const [editSaving, setEditSaving] = useState(false);
   const [editContactDate, setEditContactDate] = useState('');
+  const [editIsAttendanceContact, setEditIsAttendanceContact] = useState(false);
+  
 
   // Bulletproof data fetching — bypasses frozen Supabase client
   const { data: fetchedNotes, loading, error, retry, refetch } = useSupabaseQuery(
@@ -977,6 +1024,7 @@ const StudentNotesLog = ({
     setEditFollowUpDate(note.follow_up_date || '');
     setEditNoteStatus(note.status || 'open');
     setEditContactDate(note.contact_date || '');
+    setEditIsAttendanceContact(note.is_attendance_contact || false);
   };
 
   const cancelEditing = () => {
@@ -1012,11 +1060,12 @@ const StudentNotesLog = ({
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal',
           },
-          body: JSON.stringify({
+         body: JSON.stringify({
   note: editNoteText.trim(),
   note_type: editNoteType,
   follow_up_date: editFollowUpDate || null,
   contact_date: editContactDate || null,
+  is_attendance_contact: editIsAttendanceContact,
   status: editNoteStatus,
 }),
         }
@@ -1070,6 +1119,7 @@ const StudentNotesLog = ({
             note_type: noteData.note_type,
             follow_up_date: noteData.follow_up_date,
             contact_date: noteData.contact_date,
+            is_attendance_contact: isAttendanceContact,
             status: noteData.status
           })
         }
@@ -1173,6 +1223,8 @@ const StudentNotesLog = ({
     setFollowUpDate: setEditFollowUpDate,
     contactDate: editContactDate,
     setContactDate: setEditContactDate,
+    isAttendanceContact: editIsAttendanceContact,
+    setIsAttendanceContact: setEditIsAttendanceContact,    
     status: editNoteStatus,
     setStatus: setEditNoteStatus,
     saving: editSaving,
