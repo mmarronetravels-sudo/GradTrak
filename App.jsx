@@ -1705,8 +1705,7 @@ if (studentData) {
             </div>
             <div className="flex items-center gap-3">
               <button
-  onClick={async () => {
-    // Fetch full student data with courses
+ onClick={async () => {
     const { data: studentData } = await supabase
       .from('profiles')
       .select('*, diploma_types(*)')
@@ -1719,14 +1718,21 @@ if (studentData) {
       .eq('student_id', student.id);
     
     if (studentData) {
-      const totalEarned = (courseData || [])
-        .filter(c => c.status === 'completed' && c.grade !== 'F')
-        .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
+      let diplomaReqs = null;
+      if (studentData.diploma_type_id) {
+        const { data: drData } = await supabase
+          .from('diploma_requirements')
+          .select('*')
+          .eq('diploma_type_id', studentData.diploma_type_id);
+        diplomaReqs = drData;
+      }
+      
+      const stats = calculateStudentStats(courseData || [], categories, diplomaReqs);
       
       setSelectedStudent({
         ...studentData,
         courses: courseData || [],
-        stats: { totalEarned, totalRequired: 24, percentage: Math.round((totalEarned / 24) * 100) }
+        stats
       });
     }
     setActiveTab('student-detail');
@@ -2983,16 +2989,23 @@ async function fetchStudentDetail(studentId) {
     .select('*')
     .eq('student_id', studentId);
   
-  // Calculate stats
   if (studentData && courseData) {
-    const totalEarned = courseData
-      .filter(c => c.status === 'completed' && c.grade !== 'F')
-      .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
+    // Fetch diploma requirements for this student
+    let diplomaReqs = null;
+    if (studentData.diploma_type_id) {
+      const { data: drData } = await supabase
+        .from('diploma_requirements')
+        .select('*')
+        .eq('diploma_type_id', studentData.diploma_type_id);
+      diplomaReqs = drData;
+    }
+    
+    const stats = calculateStudentStats(courseData, categories, diplomaReqs);
     
     setSelectedStudent({
       ...studentData,
       courses: courseData,
-      stats: { totalEarned, totalRequired: 24, percentage: Math.round((totalEarned / 24) * 100) }
+      stats
     });
   }
 }
@@ -4007,14 +4020,7 @@ const summaryStats = {
   setSelectedStudent(null);
   setActiveTab('progress');
   setTimeout(() => {
-    const totalEarned = (student.courses || [])
-      .filter(c => c.status === 'completed' && c.grade !== 'F')
-      .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
-    const totalRequired = 24;
-    setSelectedStudent({
-      ...student,
-      stats: { totalEarned, totalRequired, percentage: Math.round((totalEarned / totalRequired) * 100) }
-    });
+    setSelectedStudent(student);
     fetchCaseManager(student.id);
   }, 0);
 }}
