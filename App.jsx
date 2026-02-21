@@ -126,7 +126,7 @@ const percentage = Math.min(Math.round((earnedCredits / required) * 100), 100);
     return {
       ...pathway,
       earnedCredits,
-      requiredCourses,
+      requiredCourses, required,
       percentage: Math.min(percentage, 100),
       isComplete: earnedCredits >= requiredCourses,
       courses: pathwayCourses
