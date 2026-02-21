@@ -2942,6 +2942,9 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const displayName = getDisplayName(profile);
   const [mainView, setMainView] = useState('students');
   const [searchTerm, setSearchTerm] = useState('');
+  const [listYearFilter, setListYearFilter] = useState('all');
+const [listTermFilter, setListTermFilter] = useState('all');
+const [counselorFilter, setCounselorFilter] = useState('all');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
@@ -3452,7 +3455,21 @@ const filteredStudents = students
     if (!showArchivedStudents && student.is_active === false) {
       return false;
     }
-    return student.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!student.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+    if (counselorFilter !== 'all' && student.counselor_name !== counselorFilter) {
+      return false;
+    }
+    if (listYearFilter !== 'all' || listTermFilter !== 'all') {
+      const hasMatchingCourse = (student.courses || []).some(c => {
+        if (listYearFilter !== 'all' && !c.term?.includes(listYearFilter)) return false;
+        if (listTermFilter !== 'all' && c.term !== listTermFilter) return false;
+        return true;
+      });
+      if (!hasMatchingCourse) return false;
+    }
+    return true;
   })
   .sort((a, b) => {
     const aLastName = a.full_name?.split(' ').slice(-1)[0] || '';
@@ -4074,6 +4091,56 @@ const summaryStats = {
     <p className="text-sm text-slate-400 mt-2">
       Showing {filteredStudents.length} of {students.length} students
     </p>
+  )}
+</div>
+                {/* Filters */}
+<div className="flex flex-wrap gap-2 mt-3">
+  <select
+    value={listYearFilter}
+    onChange={(e) => { setListYearFilter(e.target.value); setListTermFilter('all'); }}
+    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+  >
+    <option value="all">All Years</option>
+    {[...new Set(students.flatMap(s => (s.courses || []).map(c => {
+      const match = c.term?.match(/(\d{2}\/\d{2})/);
+      return match ? match[1] : null;
+    })).filter(Boolean))].sort().reverse().map(year => (
+      <option key={year} value={year}>{year}</option>
+    ))}
+  </select>
+  <select
+    value={listTermFilter}
+    onChange={(e) => setListTermFilter(e.target.value)}
+    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+  >
+    <option value="all">All Terms</option>
+    {[...new Set(students.flatMap(s => (s.courses || []).map(c => c.term)).filter(t => {
+      if (!t) return false;
+      if (listYearFilter !== 'all' && !t.includes(listYearFilter)) return false;
+      return true;
+    }))].sort().reverse().map(term => (
+      <option key={term} value={term}>{term}</option>
+    ))}
+  </select>
+  {(profile.is_superuser || profile.role === 'viewer') && (
+    <select
+      value={counselorFilter}
+      onChange={(e) => setCounselorFilter(e.target.value)}
+      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+    >
+      <option value="all">All Counselors</option>
+      {[...new Set(students.map(s => s.counselor_name).filter(Boolean))].sort().map(name => (
+        <option key={name} value={name}>{name}</option>
+      ))}
+    </select>
+  )}
+  {(listYearFilter !== 'all' || listTermFilter !== 'all' || counselorFilter !== 'all') && (
+    <button
+      onClick={() => { setListYearFilter('all'); setListTermFilter('all'); setCounselorFilter('all'); }}
+      className="text-slate-400 hover:text-white text-sm px-2"
+    >
+      ✕ Clear filters
+    </button>
   )}
 </div>
 
