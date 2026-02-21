@@ -1175,7 +1175,6 @@ const StudentNotesLog = ({
     setContactDate: setEditContactDate,
     status: editNoteStatus,
     setStatus: setEditNoteStatus,
-    setEditContactDate(note.contact_date || '');
     saving: editSaving,
     onSave: handleEditNote,
     onCancel: cancelEditing,
