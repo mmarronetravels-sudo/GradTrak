@@ -10,6 +10,7 @@ import SendAdvisingEmail from './components/SendAdvisingEmail';
 import SendParentAlert from './components/SendParentAlert';
 import MTSSInterventionReport from './components/MTSSInterventionReport';
 import AcademicContractForm from './components/AcademicContractForm';
+import AttendanceContactExport from './components/AttendanceContactExport';
 const APP_VERSION = '2.14.0';
 
 
@@ -1492,6 +1493,16 @@ if (studentData) {
             className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
             📤 Data Sync
           </button>
+         <button
+  onClick={() => setActiveTab('attendance')}
+  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+    activeTab === 'attendance'
+      ? 'bg-emerald-600 text-white'
+      : 'bg-slate-800 text-slate-400 hover:text-white'
+  }`}
+>
+  📋 Attendance Export
+</button>         
          <button onClick={() => setActiveTab('at-risk')}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'at-risk' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
                 ⚠️ At-Risk
@@ -2204,6 +2215,12 @@ if (studentData) {
       }
       setActiveTab('student-detail');
     }}
+  />
+)}
+  {activeTab === 'attendance' && (
+  <AttendanceContactExport
+    supabaseClient={supabase}
+    schoolId={profile.school_id}
   />
 )}
       </main>
