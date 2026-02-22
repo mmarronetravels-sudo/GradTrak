@@ -1261,7 +1261,7 @@ if (counselorData) setCounselors(counselorData);
     // Fetch all students for admin management
 const { data: studentData } = await supabase
   .from('profiles')
-  .select('id, full_name, email, grade, graduation_year')
+  .select('id, full_name, email, grade, graduation_year, has_iep, has_504, is_ell, is_ged')
   .eq('school_id', profile.school_id)
   .eq('role', 'student')
   .order('full_name');
@@ -3143,7 +3143,7 @@ if (profile.role === 'viewer') {
 // Fetch all students for Link Parent modal
 const { data: allStudentData } = await supabase
   .from('profiles')
-  .select('id, full_name, email, grade, graduation_year')
+  .select('id, full_name, email, grade, graduation_year, has_iep, has_504, is_ell, is_ged')
   .eq('school_id', profile.school_id)
   .eq('role', 'student')
   .order('full_name');
@@ -3327,6 +3327,7 @@ advisingNotes.slice(0, 5)
     if (student.has_iep) flags.push('IEP');
     if (student.has_504) flags.push('504');
     if (student.is_ell) flags.push('ELL');
+    if (student.is_ged) flags.push('GED');
 
     const printContent = `
       <!DOCTYPE html>
@@ -3614,6 +3615,11 @@ const summaryStats = {
       🌐 ELL
     </span>
   )}
+  {student.is_ged && (
+    <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+      📝 GED
+    </span>
+ )}
   {student.diploma_types && (
     <span className="inline-block mt-1 mr-2 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
       🎓 {student.diploma_types.name}
@@ -4291,6 +4297,9 @@ const summaryStats = {
   {student.is_ell && (
     <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full text-xs font-medium">ELL</span>
   )}
+  {student.is_ged && (
+    <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full text-xs font-medium">GED</span>
+)}                    
   {(() => {
   const risk = getStudentRiskLevel(student);
   if (risk === 'critical') return (
