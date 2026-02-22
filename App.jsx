@@ -4314,13 +4314,6 @@ const summaryStats = {
     >
       ✕ Clear filters
     </button>
- {(listYearFilter !== 'all' || listTermFilter !== 'all' || counselorFilter !== 'all' || flagFilter !== 'all') && (
-    <button
-      onClick={() => { setListYearFilter('all'); setListTermFilter('all'); setCounselorFilter('all'); setFlagFilter('all'); }}
-      className="text-slate-400 hover:text-white text-sm px-2"
-    >
-      ✕ Clear filters
-    </button>
   )}
 </div>
 
