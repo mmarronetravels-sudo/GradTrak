@@ -1191,6 +1191,7 @@ function AdminDashboard({ user, profile, onLogout }) {
   const [allStudents, setAllStudents] = useState([]);
   const [parents, setParents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
+  const [flagFilterAdmin, setFlagFilterAdmin] = useState('all');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
@@ -1705,17 +1706,47 @@ if (studentData) {
       <svg className="absolute left-3 top-3.5 w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
+    </div
+    <div className="flex flex-wrap gap-2 mt-3">
+      <select
+        value={flagFilterAdmin}
+        onChange={(e) => setFlagFilterAdmin(e.target.value)}
+        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+      >
+        <option value="all">All Students</option>
+        <option value="iep">🟣 IEP</option>
+        <option value="504">🟠 504</option>
+        <option value="ell">🌐 ELL</option>
+        <option value="ged">📝 GED</option>
+        <option value="none">No Flags</option>
+      </select>
+      {flagFilterAdmin !== 'all' && (
+        <button
+          onClick={() => setFlagFilterAdmin('all')}
+          className="text-slate-400 hover:text-white text-sm px-2"
+        >
+          ✕ Clear filter
+        </button>
+      )}
     </div>
     
     {/* Student List */}
     <div className="space-y-2">
-      {allStudents
-        .filter(s => 
-          s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
-          s.email?.toLowerCase().includes(studentSearch.toLowerCase())
-        )
-        .slice(0, 50)
-        .map(student => (
+    {allStudents
+  .filter(s => {
+    if (!s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()) &&
+        !s.email?.toLowerCase().includes(studentSearch.toLowerCase())) return false;
+    if (flagFilterAdmin !== 'all') {
+      if (flagFilterAdmin === 'iep' && !s.has_iep) return false;
+      if (flagFilterAdmin === '504' && !s.has_504) return false;
+      if (flagFilterAdmin === 'ell' && !s.is_ell) return false;
+      if (flagFilterAdmin === 'ged' && !s.is_ged) return false;
+      if (flagFilterAdmin === 'none' && (s.has_iep || s.has_504 || s.is_ell || s.is_ged)) return false;
+    }
+    return true;
+  })
+  .slice(0, 50)
+  .map(student => (
           <div key={student.id} className="bg-slate-900/80 rounded-xl p-4 border border-slate-800 flex items-center justify-between">
             <div className="flex-1">
               <p className="text-white font-medium">{student.full_name}</p>
@@ -1929,9 +1960,10 @@ if (studentData) {
     </select>
   </div>
   <div className="flex gap-2 mt-3">
-    {selectedStudent.is_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
-    {selectedStudent.is_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
-    {selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
+    {selectedStudent.has_iep && <span className="px-2 py-1 text-xs rounded bg-pink-500/30 text-pink-300">IEP</span>}
+{selectedStudent.has_504 && <span className="px-2 py-1 text-xs rounded bg-purple-500/30 text-purple-300">504</span>}
+{selectedStudent.is_ell && <span className="px-2 py-1 text-xs rounded bg-cyan-500/30 text-cyan-300">ELL</span>}
+{selectedStudent.is_ged && <span className="px-2 py-1 text-xs rounded bg-amber-500/30 text-amber-300">GED</span>}
   </div>
 
   {/* Counselor Assignment */}
@@ -3011,6 +3043,7 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [listYearFilter, setListYearFilter] = useState('all');
 const [listTermFilter, setListTermFilter] = useState('all');
+  const [flagFilter, setFlagFilter] = useState('all');
 const [counselorFilter, setCounselorFilter] = useState('all');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
@@ -3546,7 +3579,13 @@ const filteredStudents = students
       });
       if (!hasMatchingCourse) return false;
     }
-    return true;
+    if (flagFilter !== 'all') {
+      if (flagFilter === 'iep' && !student.has_iep) return false;
+      if (flagFilter === '504' && !student.has_504) return false;
+      if (flagFilter === 'ell' && !student.is_ell) return false;
+      if (flagFilter === 'ged' && !student.is_ged) return false;
+      if (flagFilter === 'none' && (student.has_iep || student.has_504 || student.is_ell || student.is_ged)) return false;
+    }    return true;
   })
   .sort((a, b) => {
     const aLastName = a.full_name?.split(' ').slice(-1)[0] || '';
@@ -4254,11 +4293,30 @@ const summaryStats = {
       {[...new Set(students.map(s => s.counselor_name).filter(Boolean))].sort().map(name => (
         <option key={name} value={name}>{name}</option>
       ))}
-    </select>
+   </select>
   )}
-  {(listYearFilter !== 'all' || listTermFilter !== 'all' || counselorFilter !== 'all') && (
+  <select
+    value={flagFilter}
+    onChange={(e) => setFlagFilter(e.target.value)}
+    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
+  >
+    <option value="all">All Students</option>
+    <option value="iep">🟣 IEP</option>
+    <option value="504">🟠 504</option>
+    <option value="ell">🌐 ELL</option>
+    <option value="ged">📝 GED</option>
+    <option value="none">No Flags</option>
+  </select>
+  {(listYearFilter !== 'all' || listTermFilter !== 'all' || counselorFilter !== 'all' || flagFilter !== 'all') && (
     <button
-      onClick={() => { setListYearFilter('all'); setListTermFilter('all'); setCounselorFilter('all'); }}
+      onClick={() => { setListYearFilter('all'); setListTermFilter('all'); setCounselorFilter('all'); setFlagFilter('all'); }}
+      className="text-slate-400 hover:text-white text-sm px-2"
+    >
+      ✕ Clear filters
+    </button>
+ {(listYearFilter !== 'all' || listTermFilter !== 'all' || counselorFilter !== 'all' || flagFilter !== 'all') && (
+    <button
+      onClick={() => { setListYearFilter('all'); setListTermFilter('all'); setCounselorFilter('all'); setFlagFilter('all'); }}
       className="text-slate-400 hover:text-white text-sm px-2"
     >
       ✕ Clear filters
