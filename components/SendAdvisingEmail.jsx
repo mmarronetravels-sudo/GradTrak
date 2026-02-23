@@ -215,11 +215,36 @@ export default function SendAdvisingEmail({
         return;
       }
 
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) throw new Error('Not authenticated - please log in again');
+      // Get token — try Supabase client first, fall back to localStorage
+      let accessToken = null;
+      try {
+        const raceTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('getSession timeout')), 3000)
+        );
+        const { data: { session } } = await Promise.race([
+          supabaseClient.auth.getSession(),
+          raceTimeout
+        ]);
+        if (session?.access_token) accessToken = session.access_token;
+      } catch (e) {
+        console.log('SendAdvisingEmail: Supabase client frozen, using localStorage token');
+      }
 
-      // Determine Supabase URL from the client
-      const supabaseUrl = supabaseClient.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || '';
+      if (!accessToken) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token') || '{}');
+          accessToken = stored?.access_token;
+        } catch (e) { /* ignore */ }
+      }
+
+      if (!accessToken) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
 
       const response = await fetch(
         `${supabaseUrl}/functions/v1/send-advising-email`,
@@ -227,7 +252,7 @@ export default function SendAdvisingEmail({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             studentId: student.id,
@@ -243,7 +268,12 @@ export default function SendAdvisingEmail({
       );
 
       const data = await response.json();
-
+if (response.status === 401) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
       if (!response.ok) {
         throw new Error(data.error || data.details?.message || 'Failed to send email');
       }
