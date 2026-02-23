@@ -132,10 +132,7 @@ export default function SendParentAlert({
 
   // Build HTML email body from the message text
   function buildAlertHtml() {
-    const html = planHtml 
-  ? planHtml  // Parent alert and plan content include their own greeting
-  : `<p>Dear ${studentName},</p>${notesHtml}`;
-
+  const messageHtml = escapeHtml(message).replace(/\n/g, '<br>');
     let html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #dc2626, #ea580c); color: white; padding: 20px 24px; border-radius: 8px 8px 0 0;">
