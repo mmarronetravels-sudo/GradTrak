@@ -44,18 +44,53 @@ export default function SendParentAlert({
     async function fetchLinkedParent() {
       setLoadingParent(true);
       try {
-        // Look up parent_students link, then get parent profile
-        const { data: links } = await supabaseClient
-          .from('parent_students')
-          .select('parent_id')
-          .eq('student_id', student.id);
+        // Get token
+        let accessToken = null;
+        try {
+          const raceTimeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 3000)
+          );
+          const { data: { session } } = await Promise.race([
+            supabaseClient.auth.getSession(),
+            raceTimeout
+          ]);
+          if (session?.access_token) accessToken = session.access_token;
+        } catch (e) {
+          console.log('SendParentAlert: fetchLinkedParent using localStorage token');
+        }
+
+        if (!accessToken) {
+          try {
+            const stored = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token') || '{}');
+            accessToken = stored?.access_token;
+          } catch (e) { /* ignore */ }
+        }
+
+        if (!accessToken) return;
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
+        const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+        const headers = {
+          'apikey': ANON_KEY,
+          'Authorization': 'Bearer ' + accessToken,
+          'Content-Type': 'application/json',
+        };
+
+        // Look up parent_students link
+        const linksRes = await fetch(
+          `${supabaseUrl}/rest/v1/parent_students?student_id=eq.${student.id}&select=parent_id`,
+          { headers }
+        );
+        const links = await linksRes.json();
 
         if (links && links.length > 0) {
-          const { data: parentProfile } = await supabaseClient
-            .from('profiles')
-            .select('email, full_name')
-            .eq('id', links[0].parent_id)
-            .single();
+          // Get parent profile
+          const profileRes = await fetch(
+            `${supabaseUrl}/rest/v1/profiles?id=eq.${links[0].parent_id}&select=email,full_name`,
+            { headers }
+          );
+          const profiles = await profileRes.json();
+          const parentProfile = profiles?.[0];
 
           if (parentProfile?.email) {
             setLinkedParentEmail(parentProfile.email);
@@ -97,7 +132,9 @@ export default function SendParentAlert({
 
   // Build HTML email body from the message text
   function buildAlertHtml() {
-    const messageHtml = escapeHtml(message).replace(/\n/g, '<br>');
+    const html = planHtml 
+  ? planHtml  // Parent alert and plan content include their own greeting
+  : `<p>Dear ${studentName},</p>${notesHtml}`;
 
     let html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -179,10 +216,36 @@ export default function SendParentAlert({
     setError('');
 
     try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) throw new Error('Not authenticated — please log in again');
+      // Get token — try Supabase client first, fall back to localStorage
+      let accessToken = null;
+      try {
+        const raceTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('getSession timeout')), 3000)
+        );
+        const sessionPromise = supabaseClient.auth.getSession();
+        const { data: { session } } = await Promise.race([sessionPromise, raceTimeout]);
+        if (session?.access_token) accessToken = session.access_token;
+      } catch (e) {
+        console.log('SendParentAlert: Supabase client frozen, using localStorage token');
+      }
 
-      const supabaseUrl = supabaseClient.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || '';
+      // Fallback to localStorage if client was frozen
+      if (!accessToken) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token') || '{}');
+          accessToken = stored?.access_token;
+        } catch (e) { /* ignore parse error */ }
+      }
+
+      if (!accessToken) {
+        // Token completely gone — redirect to login
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
 
       // Send via the existing edge function
       const response = await fetch(
@@ -191,7 +254,7 @@ export default function SendParentAlert({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             studentId: student.id,
@@ -206,6 +269,13 @@ export default function SendParentAlert({
         }
       );
 
+      if (response.status === 401) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -214,14 +284,15 @@ export default function SendParentAlert({
 
       // Auto-log a parent_contact note on the student timeline
       try {
-        const token = session.access_token;
+        const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+
         await fetch(
           `${supabaseUrl}/rest/v1/student_notes`,
           {
             method: 'POST',
             headers: {
-              'apikey': supabaseClient.supabaseKey || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-              'Authorization': 'Bearer ' + token,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': 'Bearer ' + accessToken,
               'Content-Type': 'application/json',
               'Prefer': 'return=minimal',
             },
@@ -250,7 +321,6 @@ export default function SendParentAlert({
       setSending(false);
     }
   }
-
   // Reset & Close
   function handleClose() {
     setSent(false);
