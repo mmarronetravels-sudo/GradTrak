@@ -3315,16 +3315,66 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
   // ============================================
   // ADVISING PLAN PDF EXPORT — Feb 5, 2026
   // ============================================
-  async function generateAdvisingPlan() {
+ async function generateAdvisingPlan() {
     const student = selectedStudent;
     if (!student) return;
-    // Fetch fresh notes from Supabase
-    const { data: freshNotes } = await supabase
-      .from('student_notes')
-      .select('*')
-      .eq('student_id', student.id)
-      .order('created_at', { ascending: false });
-    const advisingNotes = freshNotes || [];
+
+    // Fetch fresh notes — direct fetch fallback for frozen client
+    let advisingNotes = [];
+    try {
+      let accessToken = null;
+      try {
+        const raceTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 3000)
+        );
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          raceTimeout
+        ]);
+        if (session?.access_token) accessToken = session.access_token;
+      } catch (e) {
+        console.log('generateAdvisingPlan: Supabase client frozen, using localStorage token');
+      }
+
+      if (!accessToken) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token') || '{}');
+          accessToken = stored?.access_token;
+        } catch (e) { /* ignore */ }
+      }
+
+      if (!accessToken) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
+      const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/student_notes?student_id=eq.${student.id}&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': 'Bearer ' + accessToken,
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      if (res.status === 401) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      advisingNotes = await res.json();
+    } catch (err) {
+      console.error('generateAdvisingPlan: Failed to fetch notes:', err);
+    }
 
 advisingNotes.slice(0, 5)
     const studentCourses = student.courses || [];
