@@ -3364,14 +3364,11 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
         }
       );
 
-      if (res.status === 401) {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.replace(window.location.origin);
-        return;
+     if (res.ok) {
+        advisingNotes = await res.json();
+      } else {
+        console.warn('generateAdvisingPlan: Notes fetch returned', res.status, '— continuing without notes');
       }
-
-      advisingNotes = await res.json();
     } catch (err) {
       console.error('generateAdvisingPlan: Failed to fetch notes:', err);
     }
