@@ -3294,33 +3294,35 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
         const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
         return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
       });
-// Attach counselor info to each student for filtering
-      const { data: allCounselorAssignments } = await supabase
-        .from('counselor_assignments')
-        .select('student_id, counselor_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name)')
-        .in('student_id', studentIds)
-        .eq('assignment_type', 'counselor');
-
+// Attach counselor info to each student for filtering (batched to avoid URL length limit)
       const counselorMap = {};
-      if (allCounselorAssignments) {
-        allCounselorAssignments.forEach(a => {
-          if (a.counselor) {
-            counselorMap[a.student_id] = {
-              counselor_id: a.counselor.id,
-              counselor_name: a.counselor.full_name
-            };
-          }
-        });
+      for (let i = 0; i < studentIds.length; i += batchSize) {
+        const batch = studentIds.slice(i, i + batchSize);
+        const { data: assignBatch } = await supabase
+          .from('counselor_assignments')
+          .select('student_id, counselor_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name)')
+          .in('student_id', batch)
+          .eq('assignment_type', 'counselor');
+        if (assignBatch) {
+          assignBatch.forEach(a => {
+            if (a.counselor) {
+              counselorMap[a.student_id] = {
+                counselor_id: a.counselor.id,
+                counselor_name: a.counselor.full_name
+              };
+            }
+          });
+        }
       }
 
       studentsWithCourses.forEach(s => {
         s.counselor_id = counselorMap[s.id]?.counselor_id || null;
         s.counselor_name = counselorMap[s.id]?.counselor_name || null;
-      });    
-  setStudents(studentsWithCourses);
+      });
+
+      setStudents(studentsWithCourses);
       if (cpData) setCoursePathways(cpData);
     }
-
     // Fetch parents
     const { data: parentData } = await supabase
       .from('profiles')
