@@ -3294,8 +3294,30 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
         const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
         return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
       });
+// Attach counselor info to each student for filtering
+      const { data: allCounselorAssignments } = await supabase
+        .from('counselor_assignments')
+        .select('student_id, counselor_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name)')
+        .in('student_id', studentIds)
+        .eq('assignment_type', 'counselor');
 
-     setStudents(studentsWithCourses);
+      const counselorMap = {};
+      if (allCounselorAssignments) {
+        allCounselorAssignments.forEach(a => {
+          if (a.counselor) {
+            counselorMap[a.student_id] = {
+              counselor_id: a.counselor.id,
+              counselor_name: a.counselor.full_name
+            };
+          }
+        });
+      }
+
+      studentsWithCourses.forEach(s => {
+        s.counselor_id = counselorMap[s.id]?.counselor_id || null;
+        s.counselor_name = counselorMap[s.id]?.counselor_name || null;
+      });    
+  setStudents(studentsWithCourses);
       if (cpData) setCoursePathways(cpData);
     }
 
@@ -3615,7 +3637,7 @@ const filteredStudents = students
     if (!student.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
-    if (counselorFilter !== 'all' && student.counselor_name !== counselorFilter) {
+    if (counselorFilter !== 'all' && student.counselor_id !== counselorFilter) {
       return false;
     }
     if (listYearFilter !== 'all' || listTermFilter !== 'all') {
@@ -4337,8 +4359,8 @@ const summaryStats = {
       className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm"
     >
       <option value="all">All Counselors</option>
-      {[...new Set(students.map(s => s.counselor_name).filter(Boolean))].sort().map(name => (
-        <option key={name} value={name}>{name}</option>
+      {[...new Map(students.filter(s => s.counselor_id).map(s => [s.counselor_id, s.counselor_name])).entries()].sort((a, b) => (a[1] || '').localeCompare(b[1] || '')).map(([id, name]) => (
+        <option key={id} value={id}>{name}</option>
       ))}
    </select>
   )}
@@ -4647,6 +4669,7 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
         .eq('assignment_type', 'counselor');
       if (counselorData) setCounselors(counselorData.filter(a => a.counselor?.scheduling_link));
     }
+
     setLoading(false);
   }
 
