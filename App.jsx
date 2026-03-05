@@ -4368,6 +4368,44 @@ const summaryStats = {
                   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
                   const res = await fetch(
                     `${supabaseUrl}/functions/v1/invite-parent`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`,
+                      },
+                      body: JSON.stringify({
+                        parentEmail: inviteParentEmail.trim(),
+                        studentId: student.id,
+                        studentName: student.full_name,
+                        counselorName: profile.full_name,
+                        schoolId: profile.school_id,
+                      }),
+                    }
+                  );
+                  const data = await res.json();
+                  if (!res.ok) {
+                    setInviteParentError(data.error || 'Failed to send invite. Please try again.');
+                  } else {
+                    setInviteParentSuccess(true);
+                  }
+                } catch (err) {
+                  setInviteParentError('Failed to send invite. Please try again.');
+                } finally {
+                  setInviteParentSending(false);
+                }
+              }}
+              disabled={inviteParentSending}
+              className="flex-1 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all"
+            >
+              {inviteParentSending ? 'Sending…' : 'Send Invite'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+)}
 
         
         {/* Add Course Modal for Counselors */}
