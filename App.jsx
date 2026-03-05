@@ -3201,6 +3201,11 @@ try {
     raceTimeout
   ]);
   if (session?.access_token) token = session.access_token;
+// Also try to refresh if we got a session
+try {
+  const { data: refreshed } = await supabase.auth.refreshSession();
+  if (refreshed?.session?.access_token) token = refreshed.session.access_token;
+} catch (e) { /* ignore, use existing token */ }
 } catch (e) {
   console.log('handleSavePreferredName: Supabase client frozen, trying localStorage');
 const raw = Object.entries(localStorage).find(([k]) => k.startsWith('sb-') && k.endsWith('-auth-token'))?.[1];
