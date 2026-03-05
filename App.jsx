@@ -3190,47 +3190,20 @@ async function handleSavePreferredName() {
   setPreferredNameSaving(true);
   try {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+
+    // Get token directly from localStorage — bypasses frozen Supabase client
     let token = null;
-try {
-  const raceTimeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), 3000)
-  );
-  const { data: { session } } = await Promise.race([
-    supabase.auth.getSession(),
-    raceTimeout
-  ]);
-  if (session?.access_token) token = session.access_token;
-// Also try to refresh if we got a session
-try {
- try {
-  const refreshTimeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), 3000)
-  );
-  const { data: refreshed } = await Promise.race([
-    supabase.auth.refreshSession(),
-    refreshTimeout
-  ]);
-  if (refreshed?.session?.access_token) token = refreshed.session.access_token;
-} catch (e) { /* ignore, use existing token */ }
-} catch (e) {
-  console.log('handleSavePreferredName: Supabase client frozen, trying localStorage');
-const raw = Object.entries(localStorage).find(([k]) => k.startsWith('sb-') && k.endsWith('-auth-token'))?.[1];
-if (raw) token = JSON.parse(raw)?.access_token;
-}
+    try {
+      const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
+      token = raw ? JSON.parse(raw)?.access_token : null;
+    } catch (e) { /* ignore */ }
 
-if (!token) {
-  try {
-    const stored = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token') || '{}');
-    token = stored?.access_token;
-  } catch (e) { /* ignore */ }
-}
-
-if (!token) {
-  alert('Session expired. Please refresh and try again.');
-  setPreferredNameSaving(false);
-  return;
-}
+    if (!token) {
+      alert('Session expired. Please refresh and try again.');
+      setPreferredNameSaving(false);
+      return;
+    }
 
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?id=eq.${selectedStudent.id}`,
@@ -3247,10 +3220,11 @@ if (!token) {
     );
 
     if (!res.ok) {
-  const errText = await res.text();
-  console.error('Save error response:', res.status, errText);
-  throw new Error(`Save failed: ${res.status}`);
-}
+      const errText = await res.text();
+      console.error('Save error response:', res.status, errText);
+      throw new Error(`Save failed: ${res.status}`);
+    }
+
     setSelectedStudent(prev => ({
       ...prev,
       preferred_name: preferredNameInput.trim() || null,
@@ -3269,7 +3243,7 @@ if (!token) {
   } finally {
     setPreferredNameSaving(false);
   }
-}  
+} 
   
   async function fetchData() {
     setLoading(true);
