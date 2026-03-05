@@ -3203,8 +3203,11 @@ async function handleSavePreferredName() {
       }
     );
 
-    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-
+    if (!res.ok) {
+  const errText = await res.text();
+  console.error('Save error response:', res.status, errText);
+  throw new Error(`Save failed: ${res.status}`);
+}
     setSelectedStudent(prev => ({
       ...prev,
       preferred_name: preferredNameInput.trim() || null,
