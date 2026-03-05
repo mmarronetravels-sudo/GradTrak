@@ -112,11 +112,12 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
             const batch = studentIds.slice(i, i + batchSize);
             const { data: profiles } = await supabaseClient
               .from('profiles')
-              .select('id, full_name, student_id_local, graduation_year')
+              .select('id, full_name, preferred_name, student_id_local, graduation_year')
               .in('id', batch);
             (profiles || []).forEach(p => {
               studentMap[p.id] = {
                 full_name: p.full_name || 'Unknown',
+                preferred_name: p.preferred_name || '',
                 student_id_local: p.student_id_local || '',
                 grade: getGradeLevel(p.graduation_year),
               };
@@ -140,6 +141,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
         const enriched = (notesData || []).map(note => ({
           ...note,
           student_name: studentMap[note.student_id]?.full_name || 'Unknown',
+          preferred_name: studentMap[note.student_id]?.preferred_name || '',
           student_id_local: studentMap[note.student_id]?.student_id_local || '',
           grade: studentMap[note.student_id]?.grade || '—',
           counselor_name: counselorMap[note.counselor_id] || 'Unknown',
@@ -237,6 +239,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
     const headers = [
       'Student_ID',
       'Student_Name',
+      'Preferred_Name',
       'Grade',
       'Contact_Date',
       'Contact_Type',
@@ -248,6 +251,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
     const rows = filteredNotes.map(n => [
       n.student_id_local,
       n.student_name,
+      n.preferred_name,
       n.grade,
       formatDateISO(n.effective_date),
       NOTE_TYPES[n.note_type]?.label || n.note_type || '',
@@ -378,6 +382,9 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
                   >
                     Student{getSortIndicator('student')}
                   </th>
+                  <th className="text-left px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                    Preferred Name
+                  </th>
                   <th className="text-center px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
                     ID
                   </th>
@@ -416,7 +423,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
               <tbody>
                 {filteredNotes.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="text-center py-12 text-slate-500">
+                    <td colSpan="9" className="text-center py-12 text-slate-500">
                       No attendance contacts found for this date range.
                     </td>
                   </tr>
@@ -431,6 +438,11 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
                       {/* Student name */}
                       <td className="px-4 py-3">
                         <span className="text-white font-medium text-sm">{note.student_name}</span>
+                      </td>
+
+                      {/* Preferred name */}
+                      <td className="px-3 py-3">
+                        <span className="text-slate-300 text-sm">{note.preferred_name || '—'}</span>
                       </td>
 
                       {/* Student ID */}
@@ -495,7 +507,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
       <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4">
         <p className="text-xs text-slate-500 font-medium mb-2">CSV Export Columns</p>
         <p className="text-xs text-slate-600">
-          Student_ID · Student_Name · Grade · Contact_Date · Contact_Type · Counselor_Name · Note · Status
+          Student_ID · Student_Name · Preferred_Name · Grade · Contact_Date · Contact_Type · Counselor_Name · Note · Status
         </p>
         <p className="text-xs text-slate-600 mt-1">
           Student_ID matches the Engage local ID for import matching.
