@@ -3203,6 +3203,8 @@ try {
   if (session?.access_token) token = session.access_token;
 } catch (e) {
   console.log('handleSavePreferredName: Supabase client frozen, trying localStorage');
+const raw = Object.entries(localStorage).find(([k]) => k.startsWith('sb-') && k.endsWith('-auth-token'))?.[1];
+if (raw) token = JSON.parse(raw)?.access_token;
 }
 
 if (!token) {
