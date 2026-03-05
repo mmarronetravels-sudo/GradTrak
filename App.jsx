@@ -1883,6 +1883,62 @@ if (studentData) {
     <div>
       <div className="flex items-center gap-3 mb-2">
         <h2 className="text-2xl font-bold text-white">{selectedStudent.full_name}</h2>
+
+{/* Preferred name — inline editable */}
+<div className="flex items-center gap-2 mt-0.5 min-h-[24px]">
+  {editingPreferredName ? (
+    <>
+      <input
+        type="text"
+        value={preferredNameInput}
+        onChange={e => setPreferredNameInput(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') handleSavePreferredName();
+          if (e.key === 'Escape') setEditingPreferredName(false);
+        }}
+        placeholder="Preferred name..."
+        maxLength={80}
+        autoFocus
+        className="bg-slate-700 border border-slate-500 text-white text-sm rounded px-2 py-0.5 w-44 focus:outline-none focus:border-indigo-400"
+      />
+      <button
+        onClick={handleSavePreferredName}
+        disabled={preferredNameSaving}
+        className="text-xs px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded transition-colors"
+      >
+        {preferredNameSaving ? 'Saving…' : 'Save'}
+      </button>
+      <button
+        onClick={() => setEditingPreferredName(false)}
+        className="text-xs text-slate-400 hover:text-white transition-colors"
+      >
+        Cancel
+      </button>
+    </>
+  ) : (
+    <>
+      {selectedStudent.preferred_name ? (
+        <span className="text-slate-400 text-sm italic">
+          "{selectedStudent.preferred_name}"
+        </span>
+      ) : (
+        <span className="text-slate-600 text-xs italic">No preferred name</span>
+      )}
+      {(profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'admin') && (
+        <button
+          onClick={() => {
+            setPreferredNameInput(selectedStudent.preferred_name || '');
+            setEditingPreferredName(true);
+          }}
+          title="Edit preferred name"
+          className="text-slate-600 hover:text-slate-300 transition-colors"
+        >
+          ✏️
+        </button>
+      )}
+    </>
+  )}
+</div>
         {selectedStudent.is_active === false && (
           <span className="px-2 py-1 bg-gray-600 text-gray-200 text-xs rounded-full">
             Archived
@@ -3042,13 +3098,16 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [mainView, setMainView] = useState('students');
   const [searchTerm, setSearchTerm] = useState('');
   const [listYearFilter, setListYearFilter] = useState('all');
-const [listTermFilter, setListTermFilter] = useState('all');
+  const [listTermFilter, setListTermFilter] = useState('all');
   const [flagFilter, setFlagFilter] = useState('all');
-const [counselorFilter, setCounselorFilter] = useState('all');
+  const [counselorFilter, setCounselorFilter] = useState('all');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [allStudents, setAllStudents] = useState([]);
+  const [editingPreferredName, setEditingPreferredName] = useState(false);
+  const [preferredNameInput, setPreferredNameInput] = useState('');
+  const [preferredNameSaving, setPreferredNameSaving] = useState(false);  
   const [isReactivating, setIsReactivating] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showParentAlertModal, setShowParentAlertModal] = useState(false);
@@ -3120,6 +3179,51 @@ async function fetchStudentDetail(studentId) {
     });
   }
 }
+
+async function handleSavePreferredName() {
+  if (!selectedStudent) return;
+  setPreferredNameSaving(true);
+  try {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || SUPABASE_ANON_KEY;
+
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${selectedStudent.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify({ preferred_name: preferredNameInput.trim() || null }),
+      }
+    );
+
+    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+
+    setSelectedStudent(prev => ({
+      ...prev,
+      preferred_name: preferredNameInput.trim() || null,
+    }));
+    setStudents(prev =>
+      prev.map(s =>
+        s.id === selectedStudent.id
+          ? { ...s, preferred_name: preferredNameInput.trim() || null }
+          : s
+      )
+    );
+    setEditingPreferredName(false);
+  } catch (err) {
+    console.error('Failed to save preferred name:', err);
+    alert('Could not save preferred name. Please try again.');
+  } finally {
+    setPreferredNameSaving(false);
+  }
+}  
   
   async function fetchData() {
     setLoading(true);
@@ -4401,6 +4505,8 @@ const summaryStats = {
   setActiveTab('progress');
   setTimeout(() => {
     setSelectedStudent(student);
+    setEditingPreferredName(false);
+    setPreferredNameInput('');   
     fetchCaseManager(student.id);
   }, 0);
 }}
