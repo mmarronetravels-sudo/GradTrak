@@ -3203,7 +3203,14 @@ try {
   if (session?.access_token) token = session.access_token;
 // Also try to refresh if we got a session
 try {
-  const { data: refreshed } = await supabase.auth.refreshSession();
+ try {
+  const refreshTimeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), 3000)
+  );
+  const { data: refreshed } = await Promise.race([
+    supabase.auth.refreshSession(),
+    refreshTimeout
+  ]);
   if (refreshed?.session?.access_token) token = refreshed.session.access_token;
 } catch (e) { /* ignore, use existing token */ }
 } catch (e) {
