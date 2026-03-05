@@ -3809,8 +3809,7 @@ const summaryStats = {
                   </svg>
                 </button>
                 <div>
-  <div>
-  <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
+   <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
 
   {/* Preferred name — inline editable */}
   <div className="flex items-center gap-2 mt-0.5 min-h-[24px]">
