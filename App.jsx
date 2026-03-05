@@ -3186,8 +3186,32 @@ async function handleSavePreferredName() {
   try {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token || SUPABASE_ANON_KEY;
+    let token = null;
+try {
+  const raceTimeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), 3000)
+  );
+  const { data: { session } } = await Promise.race([
+    supabase.auth.getSession(),
+    raceTimeout
+  ]);
+  if (session?.access_token) token = session.access_token;
+} catch (e) {
+  console.log('handleSavePreferredName: Supabase client frozen, trying localStorage');
+}
+
+if (!token) {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token') || '{}');
+    token = stored?.access_token;
+  } catch (e) { /* ignore */ }
+}
+
+if (!token) {
+  alert('Session expired. Please refresh and try again.');
+  setPreferredNameSaving(false);
+  return;
+}
 
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?id=eq.${selectedStudent.id}`,
