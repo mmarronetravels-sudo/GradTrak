@@ -5533,43 +5533,7 @@ export default function App() {
       console.warn('No profile found for user:', authUser.email);
       return null;
     }
-      const isInvitedParent = !!pendingInvite;
-      const resolvedRole = isInvitedParent ? 'parent' : 'student';
-      const resolvedSchoolId = isInvitedParent ? pendingInvite.school_id : schoolId;
-
-      const { data: newProfile } = await supabase
-        .from('profiles')
-        .insert({
-          id: authUser.id,
-          email: authUser.email,
-          full_name: fullName,
-          role: resolvedRole,
-          school_id: resolvedSchoolId,
-          is_active: true
-        })
-        .select('*')
-        .single();
-
-      // If invited as parent, auto-link to the student and mark invite accepted
-      if (isInvitedParent && newProfile) {
-        await supabase
-          .from('parent_students')
-          .insert({
-            parent_id: newProfile.id,
-            student_id: pendingInvite.student_id,
-            created_by: newProfile.id
-          });
-
-        await supabase
-          .from('parent_invites')
-          .update({ is_accepted: true, accepted_at: new Date().toISOString() })
-          .eq('id', pendingInvite.id);
-      }
-      
-      return newProfile;
-    }
-
-    initAuth();
+         initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
