@@ -2387,125 +2387,320 @@ if (studentData) {
   </div>
 )}
       {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-3xl w-full max-w-lg border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">📥 Import Student Data</h2>
-              <button onClick={() => { setShowImportModal(false); setImportStatus(null); }} className="text-slate-400 hover:text-white p-2">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            {!importStatus ? (
-              <div>
-                <p className="text-slate-400 text-sm mb-4">Upload an Excel file (.xlsx) with Students and Courses sheets.</p>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    setImportStatus({ stage: 'reading', message: 'Reading file...' });
-                    try {
-                      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
-                      const data = await file.arrayBuffer();
-                      const workbook = XLSX.read(data);
-                      const studentsSheet = workbook.Sheets['Students'];
-                      const coursesSheet = workbook.Sheets['Courses'];
-                      if (!studentsSheet) {
-                        setImportStatus({ stage: 'error', message: 'File must have a "Students" sheet.' });
-                        return;
-                      }
-                      const students = XLSX.utils.sheet_to_json(studentsSheet).filter(s => s.email);
-                      const courses = coursesSheet ? XLSX.utils.sheet_to_json(coursesSheet).filter(c => c.student_email && c.course_name) : [];
-                      setImportStatus({ stage: 'preview', students, courses, message: `Found ${students.length} students and ${courses.length} courses.` });
-                    } catch (err) {
-                      setImportStatus({ stage: 'error', message: 'Error reading file: ' + err.message });
+     {showImportModal && (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="bg-slate-900 rounded-3xl w-full max-w-lg border border-slate-700 p-6 max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-white">📥 Import Student Data</h2>
+        <button onClick={() => { setShowImportModal(false); setImportStatus(null); }} className="text-slate-400 hover:text-white p-2">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {!importStatus ? (
+        <div>
+          <p className="text-slate-400 text-sm mb-4">Upload an Excel file (.xlsx) with up to three sheets:</p>
+          <ul className="text-slate-500 text-xs mb-4 space-y-1">
+            <li>• <span className="text-white">Students</span> — Last_Name, First_name, Student_Email, Student_ID, Grade, Graduation_Year</li>
+            <li>• <span className="text-white">Classes</span> — Student_ID, Class_Name (sets status = in_progress, looks up category/credits from course mappings)</li>
+            <li>• <span className="text-white">Historical Grades</span> — Student_ID, Class, Credit_Ammount, Credit_Type, Term, Year, Final_Grade, Career_Path</li>
+          </ul>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              setImportStatus({ stage: 'reading', message: 'Reading file...' });
+              try {
+                const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+
+                const studentsSheet = workbook.Sheets['Students'];
+                const classesSheet = workbook.Sheets['Classes'];
+                const historySheet = workbook.Sheets['Historical Grades'];
+
+                const students = studentsSheet ? XLSX.utils.sheet_to_json(studentsSheet).filter(s => s.Student_Email || s.Student_ID) : [];
+                const classes = classesSheet ? XLSX.utils.sheet_to_json(classesSheet).filter(c => c.Student_ID && c.Class_Name) : [];
+                const history = historySheet ? XLSX.utils.sheet_to_json(historySheet).filter(h => h.Student_ID && h.Class) : [];
+
+                setImportStatus({
+                  stage: 'preview',
+                  students,
+                  classes,
+                  history,
+                  message: `Found ${students.length} students, ${classes.length} current classes, ${history.length} historical grades.`
+                });
+              } catch (err) {
+                setImportStatus({ stage: 'error', message: 'Error reading file: ' + err.message });
+              }
+            }}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:text-white file:cursor-pointer"
+          />
+        </div>
+      ) : importStatus.stage === 'error' ? (
+        <div className="text-center py-8">
+          <div className="text-4xl mb-4">❌</div>
+          <p className="text-red-400">{importStatus.message}</p>
+          <button onClick={() => setImportStatus(null)} className="mt-4 bg-slate-800 text-slate-300 px-4 py-2 rounded-xl">Try Again</button>
+        </div>
+      ) : importStatus.stage === 'preview' ? (
+        <div>
+          <div className="bg-slate-800/50 rounded-xl p-4 mb-4 space-y-1">
+            <p className="text-white font-medium">📊 Preview</p>
+            <p className="text-slate-400 text-sm">{importStatus.students.length} students</p>
+            <p className="text-slate-400 text-sm">{importStatus.classes.length} current classes</p>
+            <p className="text-slate-400 text-sm">{importStatus.history.length} historical grades</p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setImportStatus(null)} className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-xl">Cancel</button>
+            <button onClick={async () => {
+              setImportStatus({ stage: 'importing', message: 'Importing...', ...importStatus });
+
+              let studentsCreated = 0;
+              let classesAdded = 0;
+              let historyAdded = 0;
+              let errors = [];
+
+              // Build category map by name (case-insensitive)
+              const categoryMap = {};
+              categories.forEach(c => { categoryMap[c.name.toLowerCase()] = c.id; });
+
+              // Build course mappings map by course name (case-insensitive)
+              const { data: mappingData } = await supabase
+                .from('course_mappings')
+                .select('*')
+                .eq('school_id', profile.school_id);
+              const mappingMap = {};
+              (mappingData || []).forEach(m => {
+                mappingMap[m.course_name.toLowerCase()] = { category_id: m.category_id, credits: m.credits };
+              });
+
+              // Build pathway map by name (case-insensitive)
+              const { data: pathwayData } = await supabase
+                .from('cte_pathways')
+                .select('*')
+                .eq('school_id', profile.school_id);
+              const pathwayMap = {};
+              (pathwayData || []).forEach(p => { pathwayMap[p.name.toLowerCase()] = p.id; });
+
+              // Map engage_id -> profile id
+              const engageToProfileId = {};
+
+              // ── STEP 1: Students ──
+              for (const row of importStatus.students) {
+                try {
+                  const email = (row.Student_Email || '').trim().toLowerCase();
+                  const engageId = String(row.Student_ID || '').trim();
+                  const fullName = `${(row.First_name || row.First_Name || '').trim()} ${(row.Last_Name || row.Last_name || '').trim()}`.trim();
+                  const grade = parseInt(row.Grade) || null;
+                  const gradYear = parseInt(row.Graduation_Year) || null;
+
+                  if (!email && !engageId) continue;
+
+                  // Check if student already exists by engage_id or email
+                  let existingId = null;
+                  if (engageId) {
+                    const { data: byEngage } = await supabase
+                      .from('profiles')
+                      .select('id')
+                      .eq('engage_id', engageId)
+                      .eq('school_id', profile.school_id)
+                      .maybeSingle();
+                    if (byEngage) existingId = byEngage.id;
+                  }
+                  if (!existingId && email) {
+                    const { data: byEmail } = await supabase
+                      .from('profiles')
+                      .select('id')
+                      .eq('email', email)
+                      .maybeSingle();
+                    if (byEmail) existingId = byEmail.id;
+                  }
+
+                  if (existingId) {
+                    // Update existing student
+                    await supabase.from('profiles').update({
+                      full_name: fullName || undefined,
+                      grade: grade || undefined,
+                      graduation_year: gradYear || undefined,
+                      engage_id: engageId || undefined,
+                    }).eq('id', existingId);
+                    if (engageId) engageToProfileId[engageId] = existingId;
+                  } else if (email) {
+                    // Create new student via auth signup
+                    const { data: authData, error: authErr } = await supabase.auth.signUp({
+                      email,
+                      password: 'GradTrack2026!'
+                    });
+                    if (authErr && !authErr.message.includes('already registered')) {
+                      errors.push(`${fullName}: ${authErr.message}`);
+                      continue;
                     }
-                  }}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-500 file:text-white file:cursor-pointer"
-                />
-              </div>
-            ) : importStatus.stage === 'error' ? (
-              <div className="text-center py-8">
-                <div className="text-4xl mb-4">❌</div>
-                <p className="text-red-400">{importStatus.message}</p>
-                <button onClick={() => setImportStatus(null)} className="mt-4 bg-slate-800 text-slate-300 px-4 py-2 rounded-xl">Try Again</button>
-              </div>
-            ) : importStatus.stage === 'preview' ? (
-              <div>
-                <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-                  <p className="text-white font-medium">📊 Preview</p>
-                  <p className="text-slate-400 text-sm mt-1">{importStatus.students.length} students, {importStatus.courses.length} courses</p>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setImportStatus(null)} className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-xl">Cancel</button>
-                  <button onClick={async () => {
-                    setImportStatus({ stage: 'importing', message: 'Importing...', students: importStatus.students, courses: importStatus.courses });
-                    let created = 0, coursesAdded = 0, errors = [];
-                    const categoryMap = {};
-                    categories.forEach(c => { categoryMap[c.name.toLowerCase()] = c.id; });
-                    const emailToId = {};
-                    for (const student of importStatus.students) {
-                      try {
-                        const tempPassword = 'test123';
-                        const { data, error } = await supabase.auth.signUp({ email: student.email, password: tempPassword });
-                        if (error && error.message.includes('already registered')) {
-                          const { data: existing } = await supabase.from('profiles').select('id').eq('email', student.email).single();
-                          if (existing) emailToId[student.email] = existing.id;
-                          continue;
-                        }
-                        if (data?.user) {
-                          emailToId[student.email] = data.user.id;
-                          await supabase.from('profiles').update({ full_name: student.full_name, grade: parseInt(student.grade), graduation_year: parseInt(student.graduation_year), role: 'student', school_id: profile.school_id }).eq('id', data.user.id);
-                          created++;
-                        }
-                      } catch (err) { errors.push(student.email + ': ' + err.message); }
+                    const userId = authData?.user?.id;
+                    if (userId) {
+                      await supabase.from('profiles').upsert({
+                        id: userId,
+                        email,
+                        full_name: fullName,
+                        grade,
+                        graduation_year: gradYear,
+                        role: 'student',
+                        school_id: profile.school_id,
+                        engage_id: engageId || null,
+                        is_active: true,
+                      });
+                      if (engageId) engageToProfileId[engageId] = userId;
+                      studentsCreated++;
                     }
-                    for (const course of importStatus.courses) {
-                      const studentId = emailToId[course.student_email];
-                      if (!studentId) { errors.push(course.course_name + ': student not found'); continue; }
-                      const catId = categoryMap[(course.category || '').toLowerCase()];
-                      if (!catId) { errors.push(course.course_name + ': invalid category'); continue; }
-                      try {
-                        await supabase.from('courses').insert({ student_id: studentId, name: course.course_name, credits: parseFloat(course.credits) || 1, category_id: catId, term: course.term || 'Fall 2024', grade: course.grade || null, is_dual_credit: (course.is_dual_credit || '').toLowerCase() === 'yes', dual_credit_type: course.dual_credit_type || null });
-                        coursesAdded++;
-                      } catch (err) { errors.push(course.course_name + ': ' + err.message); }
-                    }
-                    setImportStatus({ stage: 'done', created, coursesAdded, errors });
-                  }} className="flex-1 bg-indigo-500 text-white py-3 rounded-xl font-semibold">Import</button>
-                </div>
-              </div>
-            ) : importStatus.stage === 'importing' ? (
-              <div className="text-center py-8">
-                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-slate-400">{importStatus.message}</p>
-              </div>
-            ) : importStatus.stage === 'done' ? (
-              <div className="text-center py-8">
-                <div className="text-4xl mb-4">✅</div>
-                <p className="text-white font-medium">Created {importStatus.created} students, added {importStatus.coursesAdded} courses</p>
-                {importStatus.errors.length > 0 && (
-                  <div className="mt-4 text-left bg-red-500/10 rounded-xl p-4 max-h-40 overflow-y-auto">
-                    <p className="text-red-400 text-sm font-medium mb-2">{importStatus.errors.length} issues:</p>
-                    {importStatus.errors.slice(0, 10).map((err, i) => <p key={i} className="text-red-400 text-xs">{err}</p>)}
-                    {importStatus.errors.length > 10 && <p className="text-red-400 text-xs">...and {importStatus.errors.length - 10} more</p>}
-                  </div>
-                )}
-                <button onClick={() => { setShowImportModal(false); setImportStatus(null); fetchData(); }} className="mt-4 bg-indigo-500 text-white px-6 py-2 rounded-xl">Done</button>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-slate-400">Processing...</p>
-             </div>
-            )}
+                  }
+                } catch (err) {
+                  errors.push(`Student row: ${err.message}`);
+                }
+              }
+
+              // Refresh engage_id map for students we didn't just create
+              if (importStatus.classes.length > 0 || importStatus.history.length > 0) {
+                const { data: allProfiles } = await supabase
+                  .from('profiles')
+                  .select('id, engage_id')
+                  .eq('school_id', profile.school_id)
+                  .eq('role', 'student')
+                  .not('engage_id', 'is', null);
+                (allProfiles || []).forEach(p => {
+                  if (p.engage_id) engageToProfileId[String(p.engage_id)] = p.id;
+                });
+              }
+
+              // ── STEP 2: Current Classes ──
+              for (const row of importStatus.classes) {
+                try {
+                  const engageId = String(row.Student_ID || '').trim();
+                  const className = (row.Class_Name || '').trim();
+                  if (!engageId || !className) continue;
+
+                  const studentId = engageToProfileId[engageId];
+                  if (!studentId) { errors.push(`Class "${className}": student ID ${engageId} not found`); continue; }
+
+                  // Look up category and credits from course mappings
+                  const mapping = mappingMap[className.toLowerCase()];
+                  const categoryId = mapping?.category_id || null;
+                  const credits = mapping?.credits || null;
+
+                  // Skip if this exact in_progress course already exists
+                  const { data: existing } = await supabase
+                    .from('courses')
+                    .select('id')
+                    .eq('student_id', studentId)
+                    .eq('name', className)
+                    .eq('status', 'in_progress')
+                    .maybeSingle();
+                  if (existing) continue;
+
+                  await supabase.from('courses').insert({
+                    student_id: studentId,
+                    name: className,
+                    status: 'in_progress',
+                    category_id: categoryId,
+                    credits: credits,
+                    term: 'T2 25/26',
+                  });
+                  classesAdded++;
+                } catch (err) {
+                  errors.push(`Class row: ${err.message}`);
+                }
+              }
+
+              // ── STEP 3: Historical Grades ──
+              for (const row of importStatus.history) {
+                try {
+                  const engageId = String(row.Student_ID || '').trim();
+                  const className = (row.Class || '').trim();
+                  const creditAmount = parseFloat(row.Credit_Ammount) || null;
+                  const creditType = (row.Credit_Type || '').trim();
+                  const term = (row.Term || '').trim();
+                  const year = (row.Year || '').trim();
+                  const grade = (row.Final_Grade || '').trim() || null;
+                  const careerPath = (row.Career_Path || '').trim();
+
+                  if (!engageId || !className) continue;
+
+                  const studentId = engageToProfileId[engageId];
+                  if (!studentId) { errors.push(`History "${className}": student ID ${engageId} not found`); continue; }
+
+                  // Build term string e.g. "T1 24/25" or "S1 23/24"
+                  const termString = term && year ? `${term} ${year}` : (term || year || 'Unknown');
+
+                  // Look up category from Credit_Type
+                  const categoryId = categoryMap[creditType.toLowerCase()] || null;
+
+                  // Look up pathway from Career_Path
+                  const pathwayId = careerPath ? (pathwayMap[careerPath.toLowerCase()] || null) : null;
+
+                  // Skip duplicates
+                  const { data: existing } = await supabase
+                    .from('courses')
+                    .select('id')
+                    .eq('student_id', studentId)
+                    .eq('name', className)
+                    .eq('term', termString)
+                    .maybeSingle();
+                  if (existing) continue;
+
+                  const insertData = {
+                    student_id: studentId,
+                    name: className,
+                    status: 'completed',
+                    credits: creditAmount,
+                    category_id: categoryId,
+                    term: termString,
+                    grade,
+                    pathway_id: pathwayId,
+                  };
+
+                  await supabase.from('courses').insert(insertData);
+                  historyAdded++;
+                } catch (err) {
+                  errors.push(`History row: ${err.message}`);
+                }
+              }
+
+              setImportStatus({ stage: 'done', studentsCreated, classesAdded, historyAdded, errors });
+            }} className="flex-1 bg-indigo-500 text-white py-3 rounded-xl font-semibold">Import</button>
           </div>
         </div>
+      ) : importStatus.stage === 'importing' ? (
+        <div className="text-center py-8">
+          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-400">{importStatus.message}</p>
+        </div>
+      ) : importStatus.stage === 'done' ? (
+        <div className="text-center py-8">
+          <div className="text-4xl mb-4">✅</div>
+          <p className="text-white font-medium">
+            {importStatus.studentsCreated} students created · {importStatus.classesAdded} classes added · {importStatus.historyAdded} historical grades added
+          </p>
+          {importStatus.errors.length > 0 && (
+            <div className="mt-4 text-left bg-red-500/10 rounded-xl p-4 max-h-40 overflow-y-auto">
+              <p className="text-red-400 text-sm font-medium mb-2">{importStatus.errors.length} issues:</p>
+              {importStatus.errors.slice(0, 10).map((err, i) => <p key={i} className="text-red-400 text-xs">{err}</p>)}
+              {importStatus.errors.length > 10 && <p className="text-red-400 text-xs">...and {importStatus.errors.length - 10} more</p>}
+            </div>
+          )}
+          <button onClick={() => { setShowImportModal(false); setImportStatus(null); fetchData(); }} className="mt-4 bg-indigo-500 text-white px-6 py-2 rounded-xl">Done</button>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-400">Processing...</p>
+        </div>
       )}
+    </div>
+  </div>
+)}
 
       {/* Course Mappings Modal */}
       {showMappingsModal && (
