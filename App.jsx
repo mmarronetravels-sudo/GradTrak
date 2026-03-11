@@ -3192,16 +3192,17 @@ async function handleSavePreferredName() {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
 
-    // Get token directly from localStorage — bypasses frozen Supabase client
+    // Skip frozen Supabase client — go straight to localStorage
     let token = null;
     try {
       const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
       token = raw ? JSON.parse(raw)?.access_token : null;
-    } catch (e) { /* ignore */ }
+    } catch (e) { token = null; }
 
     if (!token) {
-      alert('Session expired. Please refresh and try again.');
-      setPreferredNameSaving(false);
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.replace(window.location.origin);
       return;
     }
 
@@ -3218,6 +3219,13 @@ async function handleSavePreferredName() {
         body: JSON.stringify({ preferred_name: preferredNameInput.trim() || null }),
       }
     );
+
+    if (res.status === 401) {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.replace(window.location.origin);
+      return;
+    }
 
     if (!res.ok) {
       const errText = await res.text();
@@ -3243,7 +3251,7 @@ async function handleSavePreferredName() {
   } finally {
     setPreferredNameSaving(false);
   }
-} 
+}
   
   async function fetchData() {
     setLoading(true);
