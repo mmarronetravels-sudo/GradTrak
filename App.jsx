@@ -5582,7 +5582,7 @@ export default function App() {
         console.warn('Auth safety timeout — showing login screen');
         setLoading(false);
       }
-    }, 8000);
+    }, 20000);
 
     return () => {
       mounted = false;
