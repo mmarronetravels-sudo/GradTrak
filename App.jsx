@@ -5471,68 +5471,36 @@ export default function App() {
     // Shared helper: find profile by ID, then by email, or create one
     // Shared helper: find profile by ID, then by email, or create one
     // Uses direct fetch() to avoid frozen Supabase client on managed Chrome
-    async function findOrCreateProfile(authUser) {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
-      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+  async function findOrCreateProfile(authUser) {
+  // 1. Try by ID
+  let { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .single();
+  
+  if (data) return data;
 
-      // Token: try localStorage first, fall back to anon key (fresh login may not have written it yet)
-      let token = SUPABASE_ANON_KEY;
-      try {
-        const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
-        const parsed = raw ? JSON.parse(raw) : null;
-        if (parsed?.access_token) token = parsed.access_token;
-      } catch (e) {}
-
-      const headers = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-
-      // 1. Try by ID
-      try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.id}&select=*`,
-          { headers }
-        );
-        if (res.ok) {
-          const rows = await res.json();
-          if (rows.length > 0) return rows[0];
-        }
-      } catch (e) {
-        console.error('findOrCreateProfile ID lookup failed:', e);
-      }
-
-      // 2. Try by email
-      if (authUser.email) {
-        try {
-          const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(authUser.email)}&select=*`,
-            { headers }
-          );
-          if (res.ok) {
-            const rows = await res.json();
-            if (rows.length > 0) {
-              await fetch(
-                `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(authUser.email)}`,
-                {
-                  method: 'PATCH',
-                  headers: { ...headers, 'Prefer': 'return=minimal' },
-                  body: JSON.stringify({ id: authUser.id }),
-                }
-              );
-              return { ...rows[0], id: authUser.id };
-            }
-          }
-        } catch (e) {
-          console.error('findOrCreateProfile email lookup failed:', e);
-        }
-      }
-
-      // 3. No profile found — return null (admin fixes manually)
-      console.warn('No profile found for user:', authUser.email);
-      return null;
+  // 2. Try by email
+  if (authUser.email) {
+    const { data: emailMatch } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', authUser.email)
+      .single();
+    
+    if (emailMatch) {
+      await supabase
+        .from('profiles')
+        .update({ id: authUser.id })
+        .eq('email', authUser.email);
+      return { ...emailMatch, id: authUser.id };
     }
+  }
+
+  console.warn('No profile found for user:', authUser.email);
+  return null;
+}
          initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
