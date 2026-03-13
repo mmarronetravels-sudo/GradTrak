@@ -5436,59 +5436,76 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isReactivating, setIsReactivating] = useState(false);
 
- useEffect(() => {
+useEffect(() => {
   let mounted = true;
 
-  async function findOrCreateProfile(authUser) {
-    // Always use Supabase client — it has the valid session context.
-    // Direct fetch 401s occur because localStorage may have a stale
-    // token from before this login completed.
-    function withTimeout(promise, ms) {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('profile_fetch_timeout')), ms)
-        )
-      ]);
-    }
+  const SUPABASE_URL = 'https://vstiweftxjaszhnjwggb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
 
+  async function findOrCreateProfile(authUser, accessToken) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+    };
+
+    // 1. Try by ID
     try {
-      const { data } = await withTimeout(
-        supabase.from('profiles').select('*').eq('id', authUser.id).single(),
-        8000
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.id}&select=*&limit=1`,
+        { headers }
       );
-      if (data) return data;
-    } catch (e) {
-      if (e.message === 'profile_fetch_timeout') {
-        console.warn('findOrCreateProfile: client frozen (managed Chrome)');
-        return null;
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.length > 0) {
+          console.log('findOrCreateProfile: found by ID');
+          return data[0];
+        }
+      } else {
+        console.warn('findOrCreateProfile: byId fetch status', res.status);
       }
+    } catch (e) {
+      console.warn('findOrCreateProfile: byId fetch error', e.message);
     }
 
+    // 2. Try by email
     if (authUser.email) {
       try {
-        const { data } = await withTimeout(
-          supabase.from('profiles').select('*').eq('email', authUser.email).single(),
-          8000
+        const encodedEmail = encodeURIComponent(authUser.email);
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodedEmail}&select=*&limit=1`,
+          { headers }
         );
-        if (data) {
-          await supabase.from('profiles').update({ id: authUser.id }).eq('email', authUser.email);
-          return { ...data, id: authUser.id };
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.length > 0) {
+            console.log('findOrCreateProfile: found by email');
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodedEmail}`,
+              {
+                method: 'PATCH',
+                headers: { ...headers, 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ id: authUser.id }),
+              }
+            );
+            return { ...data[0], id: authUser.id };
+          }
+        } else {
+          console.warn('findOrCreateProfile: byEmail fetch status', res.status);
         }
       } catch (e) {
-        if (e.message === 'profile_fetch_timeout') return null;
+        console.warn('findOrCreateProfile: byEmail fetch error', e.message);
       }
     }
 
+    console.warn('findOrCreateProfile: no profile found for', authUser.email);
     return null;
   }
 
-  // ONLY use onAuthStateChange — remove the separate initAuth() call.
-  // initAuth() + onAuthStateChange both calling findOrCreateProfile
-  // simultaneously is what causes the race condition.
   const { data: { subscription } } = supabase.auth.onAuthStateChange(
     async (event, session) => {
       if (!mounted) return;
+      console.log('onAuthStateChange:', event, session?.user?.email);
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -5497,19 +5514,17 @@ export default function App() {
         return;
       }
 
-      if (
-        (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') 
-        && session?.user
-      ) {
+      if (session?.user) {
         setUser(session.user);
-        const profile = await findOrCreateProfile(session.user);
+        // Pass the access token directly from the session object —
+        // this is always valid at the moment onAuthStateChange fires
+        const profile = await findOrCreateProfile(session.user, session.access_token);
         if (mounted) {
           setProfile(profile);
           setLoading(false);
         }
       }
 
-      // Handle case where INITIAL_SESSION fires with no session (not logged in)
       if (event === 'INITIAL_SESSION' && !session) {
         if (mounted) setLoading(false);
       }
