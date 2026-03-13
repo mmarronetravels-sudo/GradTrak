@@ -3310,17 +3310,14 @@ function CounselorDashboard({ user, profile, onLogout }) {
   const [notesRefreshKey, setNotesRefreshKey] = useState(0);
   const [viewAllStudents, setViewAllStudents] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
-<<<<<<< HEAD
+
   const [showInviteParentModal, setShowInviteParentModal] = useState(false);
 const [inviteParentEmail, setInviteParentEmail] = useState('');
 const [inviteParentSending, setInviteParentSending] = useState(false);
 const [inviteParentError, setInviteParentError] = useState('');
 const [inviteParentSuccess, setInviteParentSuccess] = useState(false);
-=======
-  const [editingPreferredName, setEditingPreferredName] = useState(false);
-const [preferredNameInput, setPreferredNameInput] = useState('');
-const [preferredNameSaving, setPreferredNameSaving] = useState(false);
->>>>>>> c9363e5 (preferred name fix)
+
+
   const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
     const { error } = await supabase
       .from('profiles')
@@ -5044,7 +5041,7 @@ setPreferredNameInput('');
       ...student,
       stats: { totalEarned, totalRequired, percentage: Math.round((totalEarned / totalRequired) * 100) }
     });
->>>>>>> c9363e5 (preferred name fix)
+
     fetchCaseManager(student.id);
   }, 0);
 }}
