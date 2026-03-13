@@ -5436,151 +5436,71 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isReactivating, setIsReactivating] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
+ useEffect(() => {
+  let mounted = true;
 
-   async function initAuth() {
-     // Clean up any stale PKCE code verifier from previous config
-      try {
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (key.includes('code-verifier') || key.includes('code_verifier')) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (e) {}
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        
-        if (session?.user) {
-          setUser(session.user);
-          const profile = await findOrCreateProfile(session.user);
-          if (mounted) setProfile(profile);
-        }
-      } catch (err) {
-        // Ignore AbortError — React StrictMode double-mount causes this
-        if (err.name === 'AbortError') {
-          console.log('Auth init aborted (normal during mount) — retrying...');
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!mounted) return;
-            if (session?.user) {
-              setUser(session.user);
-              const profile = await findOrCreateProfile(session.user);
-              if (mounted) setProfile(profile);
-            }
-          } catch (retryErr) {
-            console.error('Auth retry also failed:', retryErr);
-          }
-        } else {
-          console.error('Auth init error:', err);
-        }
-      }
-      if (mounted) setLoading(false);
+  async function findOrCreateProfile(authUser) {
+    // Always use Supabase client — it has the valid session context.
+    // Direct fetch 401s occur because localStorage may have a stale
+    // token from before this login completed.
+    function withTimeout(promise, ms) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('profile_fetch_timeout')), ms)
+        )
+      ]);
     }
 
-    // Shared helper: find profile by ID, then by email, or create one
-    // Shared helper: find profile by ID, then by email, or create one
-    // Uses direct fetch() to avoid frozen Supabase client on managed Chrome
- async function findOrCreateProfile(authUser) {
-  const SUPABASE_URL = 'https://vstiweftxjaszhnjwggb.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
-
-  // Wait for Supabase to write the token to localStorage (up to 4 seconds)
-  // This is necessary because on a fresh Google SSO login, onAuthStateChange fires
-  // before localStorage is populated. Direct fetch needs the token to be present.
-  async function getTokenWithRetry() {
-    for (let i = 0; i < 8; i++) {
-      try {
-        const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.access_token) return parsed.access_token;
-        }
-      } catch (e) { /* ignore parse errors */ }
-      await new Promise(r => setTimeout(r, 500)); // wait 500ms, try again
-    }
-    return null; // gave up after 4 seconds
-  }
-
-  const token = await getTokenWithRetry();
-
-  if (!token) {
-    console.warn('findOrCreateProfile: no token in localStorage after retries');
-    // Fall back to Supabase client as last resort
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
-      return data || null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${token}`,
-  };
-
-  // 1. Try by ID
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.id}&select=*&limit=1`,
-      { headers }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.length > 0) return data[0];
-    }
-  } catch (e) {
-    console.warn('findOrCreateProfile: fetch by ID failed', e);
-  }
-
-  // 2. Try by email
-  if (authUser.email) {
-    try {
-      const encodedEmail = encodeURIComponent(authUser.email);
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodedEmail}&select=*&limit=1`,
-        { headers }
+      const { data } = await withTimeout(
+        supabase.from('profiles').select('*').eq('id', authUser.id).single(),
+        8000
       );
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.length > 0) {
-          // Update the ID to match the auth user
-          await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodedEmail}`,
-            {
-              method: 'PATCH',
-              headers: { ...headers, 'Prefer': 'return=representation' },
-              body: JSON.stringify({ id: authUser.id }),
-            }
-          );
-          return { ...data[0], id: authUser.id };
-        }
-      }
+      if (data) return data;
     } catch (e) {
-      console.warn('findOrCreateProfile: fetch by email failed', e);
+      if (e.message === 'profile_fetch_timeout') {
+        console.warn('findOrCreateProfile: client frozen (managed Chrome)');
+        return null;
+      }
     }
+
+    if (authUser.email) {
+      try {
+        const { data } = await withTimeout(
+          supabase.from('profiles').select('*').eq('email', authUser.email).single(),
+          8000
+        );
+        if (data) {
+          await supabase.from('profiles').update({ id: authUser.id }).eq('email', authUser.email);
+          return { ...data, id: authUser.id };
+        }
+      } catch (e) {
+        if (e.message === 'profile_fetch_timeout') return null;
+      }
+    }
+
+    return null;
   }
 
-  console.warn('findOrCreateProfile: no profile found for', authUser.email);
-  return null;
-}
-         initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+  // ONLY use onAuthStateChange — remove the separate initAuth() call.
+  // initAuth() + onAuthStateChange both calling findOrCreateProfile
+  // simultaneously is what causes the race condition.
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
       if (!mounted) return;
-      
+
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         setLoading(false);
         return;
       }
-      
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+
+      if (
+        (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') 
+        && session?.user
+      ) {
         setUser(session.user);
         const profile = await findOrCreateProfile(session.user);
         if (mounted) {
@@ -5588,21 +5508,27 @@ export default function App() {
           setLoading(false);
         }
       }
-    });
-    // Safety timeout — if auth doesn't resolve in 8 seconds, show login screen
-    const safetyTimeout = setTimeout(() => {
-  if (mounted) {
-    console.warn('Auth safety timeout — showing login screen');
-    setLoading(false);
-  }
-}, 20000);
 
-    return () => {
-      mounted = false;
-      clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
-    };
-  }, []);
+      // Handle case where INITIAL_SESSION fires with no session (not logged in)
+      if (event === 'INITIAL_SESSION' && !session) {
+        if (mounted) setLoading(false);
+      }
+    }
+  );
+
+  const safetyTimeout = setTimeout(() => {
+    if (mounted) {
+      console.warn('Auth safety timeout fired');
+      setLoading(false);
+    }
+  }, 20000);
+
+  return () => {
+    mounted = false;
+    clearTimeout(safetyTimeout);
+    subscription.unsubscribe();
+  };
+}, []);
 
   
  // ============================================
