@@ -5455,6 +5455,9 @@ useEffect(() => {
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.id}&select=*&limit=1`,
         { headers }
       );
+      console.log('fetch response status:', res.status);
+const responseText = await res.clone().text();
+console.log('fetch response body:', responseText);
       if (res.ok) {
         const data = await res.json();
         if (data?.length > 0) {
