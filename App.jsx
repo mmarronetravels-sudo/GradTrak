@@ -3957,62 +3957,7 @@ advisingNotes.slice(0, 5)
     return pathways.filter(p => pathwayIds.includes(p.id));
   };
 
-  async function handleSavePreferredName() {
-  if (!selectedStudent) return;
-  setPreferredNameSaving(true);
-  try {
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    let token = SUPABASE_ANON_KEY;
-    try {
-      const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        token = parsed?.access_token || SUPABASE_ANON_KEY;
-      }
-    } catch (e) {
-      console.warn('Could not parse auth token from localStorage:', e);
-    }
-
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${selectedStudent.id}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${token}`,
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify({ preferred_name: preferredNameInput.trim() || null }),
-      }
-    );
-
-    if (res.status === 401) {
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.replace(window.location.origin);
-      return;
-    }
-
-    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-
-    const newName = preferredNameInput.trim() || null;
-    setSelectedStudent(prev => ({ ...prev, preferred_name: newName }));
-    setStudents(prev =>
-      prev.map(s => s.id === selectedStudent.id ? { ...s, preferred_name: newName } : s)
-    );
-    setEditingPreferredName(false);
-  } catch (err) {
-    console.error('Failed to save preferred name:', err);
-    alert('Could not save preferred name. Please try again.');
-  } finally {
-    setPreferredNameSaving(false);
-  }
-}
-
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
+   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><LoadingSpinner /></div>;
 
 
 // Sort and filter students
