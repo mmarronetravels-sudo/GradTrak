@@ -5030,11 +5030,10 @@ const summaryStats = {
   setSelectedStudent(null);
   setActiveTab('progress');
   setTimeout(() => {
-<<<<<<< HEAD
+
     setSelectedStudent(student);
     setEditingPreferredName(false);
     setPreferredNameInput('');   
-=======
     const totalEarned = (student.courses || [])
       .filter(c => c.status === 'completed' && c.grade !== 'F')
       .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
