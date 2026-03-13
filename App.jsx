@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from './supabase';
+import { supabase, supabaseUrl, supabaseAnonKey } from './supabase'
 import DataSyncUpload from './components/DataSyncUpload';
 import AtRiskReport from './components/AtRiskReport';
 import ContactSnapshotReport from './components/ContactSnapshotReport';
@@ -5439,9 +5439,8 @@ export default function App() {
 useEffect(() => {
   let mounted = true;
 
-  const SUPABASE_URL = 'https://vstiweftxjaszhnjwggb.supabase.co';
-  const SUPABASE_ANON_KEY = '.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
-
+  const SUPABASE_URL = supabaseUrl;
+  const SUPABASE_ANON_KEY = supabaseAnonKey;
   async function findOrCreateProfile(authUser, accessToken) {
     const headers = {
       'Content-Type': 'application/json',
