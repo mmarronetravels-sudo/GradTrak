@@ -5455,7 +5455,7 @@ export default function App() {
         
         if (session?.user) {
           setUser(session.user);
-          const profile = await findOrCreateProfile(session.user, session.access_token);
+          const profile = await findOrCreateProfile(session.user);
           if (mounted) setProfile(profile);
         }
       } catch (err) {
@@ -5467,7 +5467,7 @@ export default function App() {
             if (!mounted) return;
             if (session?.user) {
               setUser(session.user);
-              const profile = await findOrCreateProfile(session.user, session.access_token);
+              const profile = await findOrCreateProfile(session.user);
               if (mounted) setProfile(profile);
             }
           } catch (retryErr) {
@@ -5483,93 +5483,35 @@ export default function App() {
     // Shared helper: find profile by ID, then by email, or create one
     // Shared helper: find profile by ID, then by email, or create one
     // Uses direct fetch() to avoid frozen Supabase client on managed Chrome
-  async function findOrCreateProfile(authUser, sessionToken) {
-  const SUPABASE_URL = 'https://vstiweftxjaszhnjwggb.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
-
-  // Get token — prefer passed-in sessionToken, fall back to localStorage
-  let token = sessionToken || null;
-  if (!token) {
-    try {
-      const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
-      token = raw ? JSON.parse(raw)?.access_token : null;
-    } catch (e) { token = null; }
-  }
-  if (!token) token = SUPABASE_ANON_KEY;
-
-  const headers = {
-    'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
-
+  async function findOrCreateProfile(authUser) {
   // 1. Try by ID
-  const res1 = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${authUser.id}&select=*`,
-    { headers }
-  );
-  if (res1.ok) {
-    const data = await res1.json();
-    if (data?.length > 0) return data[0];
-  }
+  let { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', authUser.id)
+    .single();
+  
+  if (data) return data;
 
   // 2. Try by email
   if (authUser.email) {
-    const res2 = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(authUser.email)}&select=*`,
-      { headers }
-    );
-    if (res2.ok) {
-      const data = await res2.json();
-      if (data?.length > 0) {
-        // Update ID to match auth
-        await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(authUser.email)}`,
-          {
-            method: 'PATCH',
-            headers: { ...headers, 'Prefer': 'return=representation' },
-            body: JSON.stringify({ id: authUser.id })
-          }
-        );
-        return { ...data[0], id: authUser.id };
-      }
+    const { data: emailMatch } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', authUser.email)
+      .single();
+    
+    if (emailMatch) {
+      await supabase
+        .from('profiles')
+        .update({ id: authUser.id })
+        .eq('email', authUser.email);
+      return { ...emailMatch, id: authUser.id };
     }
   }
 
-  // 3. Create new profile
-  const fullName = authUser.user_metadata?.full_name
-    || authUser.user_metadata?.name
-    || authUser.email?.split('@')[0]
-    || 'Unknown';
-
-  const emailDomain = authUser.email?.split('@')[1]?.toLowerCase();
-  const schoolDomainMap = {
-    'summitlc.org': 'c3c8b2d1-d01d-42ce-9e64-d2f8ed07c534'
-  };
-  const schoolId = schoolDomainMap[emailDomain] || null;
-
-  const res3 = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles`,
-    {
-      method: 'POST',
-      headers: { ...headers, 'Prefer': 'return=representation' },
-      body: JSON.stringify({
-        id: authUser.id,
-        email: authUser.email,
-        full_name: fullName,
-        role: 'student',
-        school_id: schoolId,
-        is_active: true
-      })
-    }
-  );
-  if (res3.ok) {
-    const data = await res3.json();
-    return Array.isArray(data) ? data[0] : data;
-  }
-
+  console.warn('No profile found for user:', authUser.email);
   return null;
-
 }
          initAuth();
 
@@ -5585,7 +5527,7 @@ export default function App() {
       
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         setUser(session.user);
-        const profile = await findOrCreateProfile(session.user, session.access_token);
+        const profile = await findOrCreateProfile(session.user);
         if (mounted) {
           setProfile(profile);
           setLoading(false);
