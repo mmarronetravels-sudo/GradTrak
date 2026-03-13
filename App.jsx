@@ -4092,59 +4092,7 @@ const summaryStats = {
                 <div>
    <h1 className="text-lg font-bold text-white">{student.displayName}</h1>
 
-  {/* Preferred name — inline editable */}
-  <div className="flex items-center gap-2 mt-0.5 min-h-[24px]">
-    {editingPreferredName ? (
-      <>
-        <input
-          type="text"
-          value={preferredNameInput}
-          onChange={e => setPreferredNameInput(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleSavePreferredName();
-            if (e.key === 'Escape') setEditingPreferredName(false);
-          }}
-          placeholder="Preferred name..."
-          maxLength={80}
-          autoFocus
-          className="bg-slate-700 border border-slate-500 text-white text-sm rounded px-2 py-0.5 w-44 focus:outline-none focus:border-indigo-400"
-        />
-        <button
-          onClick={handleSavePreferredName}
-          disabled={preferredNameSaving}
-          className="text-xs px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded transition-colors"
-        >
-          {preferredNameSaving ? 'Saving…' : 'Save'}
-        </button>
-        <button
-          onClick={() => setEditingPreferredName(false)}
-          className="text-xs text-slate-400 hover:text-white transition-colors"
-        >
-          Cancel
-        </button>
-      </>
-    ) : (
-      <>
-        {student.preferred_name ? (
-          <span className="text-slate-400 text-sm italic">"{student.preferred_name}"</span>
-        ) : (
-          <span className="text-slate-600 text-xs italic">No preferred name</span>
-        )}
-        {(profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'admin') && (
-          <button
-            onClick={() => {
-              setPreferredNameInput(student.preferred_name || '');
-              setEditingPreferredName(true);
-            }}
-            title="Edit preferred name"
-            className="text-slate-600 hover:text-slate-300 transition-colors"
-          >
-            ✏️
-          </button>
-        )}
-      </>
-    )}
-  </div>
+  
 
   <p className="text-slate-400 text-sm">Grade {student.grade} • Class of {student.graduation_year}</p>
   {student.has_iep && caseManager && (
