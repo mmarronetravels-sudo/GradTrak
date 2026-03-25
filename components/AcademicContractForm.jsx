@@ -129,7 +129,7 @@ export default function AcademicContractForm({
           note_type: 'academic_contract',
           note: noteText,
           status: 'open',
-          school_id: counselorProfile.school_id || 'c3c8b2d1-d01d-42ce-9e64-d2f8ed07c534',
+          school_id: counselorProfile.school_id,
         })
         .select('id')
         .single();
@@ -143,7 +143,7 @@ export default function AcademicContractForm({
           student_id: student.id,
           counselor_id: counselorProfile.id,
           note_id: noteData.id,
-          school_id: counselorProfile.school_id || 'c3c8b2d1-d01d-42ce-9e64-d2f8ed07c534',
+          school_id: counselorProfile.school_id,
           plan_start_date: planStartDate,
           plan_review_date: planReviewDate,
           reason_for_plan: reasonForPlan.trim(),
@@ -160,7 +160,7 @@ export default function AcademicContractForm({
       if (onSaved) onSaved();
       setTimeout(() => onClose(), 1200);
     } catch (err) {
-      console.error('Academic contract save error:', err);
+      console.error('Academic contract save failed');
       setError(err.message || 'Failed to save academic contract.');
     } finally {
       setSaving(false);
@@ -202,7 +202,7 @@ export default function AcademicContractForm({
       if (onSaved) onSaved();
       setTimeout(() => onClose(), 1200);
     } catch (err) {
-      console.error('Review save error:', err);
+      console.error('Review save failed');
       setError(err.message || 'Failed to save review.');
     } finally {
       setSaving(false);
@@ -423,7 +423,7 @@ export default function AcademicContractForm({
       setEmailSent(true);
       setSuccess('Contract emailed to ' + student.email);
     } catch (err) {
-      console.error('Email contract error:', err);
+      console.error('Email contract send failed');
       setError(err.message || 'Failed to send email');
     } finally {
       setSendingEmail(false);

@@ -114,6 +114,7 @@ export default function MTSSInterventionReport({
         const { data: notesData, error: notesError } = await supabaseClient
           .from('student_notes')
           .select('id, student_id, counselor_id, note_type, status, created_at, contact_date, is_attendance_contact')
+          .eq('school_id', schoolId)
           .gte('created_at', dateStart + 'T00:00:00')
           .lte('created_at', dateEnd + 'T23:59:59');
 
@@ -123,7 +124,8 @@ export default function MTSSInterventionReport({
         // 2. Fetch counselor assignments to get student→counselor mapping
         const { data: assignmentsData } = await supabaseClient
           .from('counselor_assignments')
-          .select('student_id, counselor_id, profiles!counselor_assignments_counselor_id_fkey (full_name)');
+          .select('student_id, counselor_id, profiles!counselor_assignments_counselor_id_fkey (full_name)')
+          .eq('school_id', schoolId);
 
         const assignmentMap = {};
         (assignmentsData || []).forEach(a => {

@@ -87,7 +87,7 @@ export default function AdminStudentManager({ schoolId, profile }) {
         const batch = studentIds.slice(i, i + 50);
         const ids = batch.map(id => `"${id}"`).join(',');
         const cRes = await directFetch(
-          `counselor_assignments?student_id=in.(${ids})&assignment_type=eq.counselor&select=student_id,counselor_id`
+          `counselor_assignments?student_id=in.(${ids})&school_id=eq.${schoolId}&assignment_type=eq.counselor&select=student_id,counselor_id`
         );
         if (cRes.ok) {
           const cData = await cRes.json();
@@ -107,7 +107,7 @@ export default function AdminStudentManager({ schoolId, profile }) {
       const dRes = await directFetch(`diploma_types?school_id=eq.${schoolId}&select=id,name,code`);
       if (dRes.ok) setDiplomaTypes(await dRes.json());
     } catch (e) {
-      console.error('AdminStudentManager fetch error', e);
+      console.error('Student roster load failed');
     }
     setLoading(false);
   }, [schoolId]);
@@ -206,6 +206,7 @@ export default function AdminStudentManager({ schoolId, profile }) {
             body: JSON.stringify({
               student_id: newStudent.id,
               counselor_id: form.counselor_id,
+              school_id: schoolId,
               assignment_type: 'counselor',
             }),
             prefer: 'return=minimal',
@@ -236,7 +237,7 @@ export default function AdminStudentManager({ schoolId, profile }) {
         if (form.counselor_id !== selectedStudent.counselor_id) {
           // Delete old assignment
           await directFetch(
-            `counselor_assignments?student_id=eq.${selectedStudent.id}&assignment_type=eq.counselor`,
+            `counselor_assignments?student_id=eq.${selectedStudent.id}&school_id=eq.${schoolId}&assignment_type=eq.counselor`,
             { method: 'DELETE', prefer: 'return=minimal' }
           );
           // Insert new one if selected
@@ -246,6 +247,7 @@ export default function AdminStudentManager({ schoolId, profile }) {
               body: JSON.stringify({
                 student_id: selectedStudent.id,
                 counselor_id: form.counselor_id,
+                school_id: schoolId,
                 assignment_type: 'counselor',
               }),
               prefer: 'return=minimal',

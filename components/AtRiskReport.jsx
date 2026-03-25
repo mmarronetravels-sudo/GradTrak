@@ -77,6 +77,7 @@ if (categoriesError) throw categoriesError;
 const { data: notesData, error: notesError } = await supabase
   .from('student_notes')
   .select('student_id, created_at')
+  .eq('school_id', schoolId)
   .order('created_at', { ascending: false });
 if (notesError) throw notesError;
 

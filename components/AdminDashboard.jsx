@@ -127,7 +127,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       setAllStudents(allStudentData || []);
 
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
+      console.error('Dashboard data load failed');
       setError(err.message);
     } finally {
       setLoading(false);
@@ -168,7 +168,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       setTimeout(() => setSuccessMessage(''), 3000);
 
     } catch (err) {
-      console.error('Error reassigning student:', err);
+      console.error('Student assignment failed');
       setError(err.message);
     } finally {
       setReassigning(false);

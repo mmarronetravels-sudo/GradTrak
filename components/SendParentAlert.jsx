@@ -68,10 +68,10 @@ export default function SendParentAlert({
 
         if (!accessToken) return;
 
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
-        const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k';
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         const headers = {
-          'apikey': ANON_KEY,
+          'apikey': anonKey,
           'Authorization': 'Bearer ' + accessToken,
           'Content-Type': 'application/json',
         };
@@ -236,13 +236,12 @@ export default function SendParentAlert({
 
       if (!accessToken) {
         // Token completely gone — redirect to login
-        localStorage.clear();
-        sessionStorage.clear();
+        localStorage.removeItem('sb-vstiweftxjaszhnjwggb-auth-token');
         window.location.replace(window.location.origin);
         return;
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
       // Send via the existing edge function
       const response = await fetch(
@@ -267,8 +266,7 @@ export default function SendParentAlert({
       );
 
       if (response.status === 401) {
-        localStorage.clear();
-        sessionStorage.clear();
+        localStorage.removeItem('sb-vstiweftxjaszhnjwggb-auth-token');
         window.location.replace(window.location.origin);
         return;
       }
@@ -281,7 +279,7 @@ export default function SendParentAlert({
 
       // Auto-log a parent_contact note on the student timeline
       try {
-        const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k';
+        const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
         await fetch(
           `${supabaseUrl}/rest/v1/student_notes`,

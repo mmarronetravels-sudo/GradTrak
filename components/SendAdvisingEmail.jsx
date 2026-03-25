@@ -238,13 +238,12 @@ export default function SendAdvisingEmail({
       }
 
       if (!accessToken) {
-        localStorage.clear();
-        sessionStorage.clear();
+        localStorage.removeItem('sb-vstiweftxjaszhnjwggb-auth-token');
         window.location.replace(window.location.origin);
         return;
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
       const response = await fetch(
         `${supabaseUrl}/functions/v1/send-advising-email`,
@@ -269,8 +268,7 @@ export default function SendAdvisingEmail({
 
       const data = await response.json();
 if (response.status === 401) {
-        localStorage.clear();
-        sessionStorage.clear();
+        localStorage.removeItem('sb-vstiweftxjaszhnjwggb-auth-token');
         window.location.replace(window.location.origin);
         return;
       }
