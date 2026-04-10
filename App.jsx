@@ -1693,9 +1693,35 @@ if (studentData) {
     schoolId={profile.school_id}
     profile={profile}
     onViewStudent={async (student) => {
-      await fetchStudentDetail(student.id);
-      setActiveTab('student-detail');
-    }}
+  const { data: studentData } = await supabase
+    .from('profiles')
+    .select('*, diploma_types(*)')
+    .eq('id', student.id)
+    .single();
+
+  const { data: courseData } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('student_id', student.id);
+
+  if (studentData && courseData) {
+    let diplomaReqs = null;
+    if (studentData.diploma_type_id) {
+      const { data: drData } = await supabase
+        .from('diploma_requirements')
+        .select('*')
+        .eq('diploma_type_id', studentData.diploma_type_id);
+      diplomaReqs = drData;
+    }
+    const stats = calculateStudentStats(courseData, categories, diplomaReqs);
+    setSelectedStudent({
+      ...studentData,
+      courses: courseData,
+      stats
+    });
+  }
+  setActiveTab('student-detail');
+}}
   />
 )}
 
