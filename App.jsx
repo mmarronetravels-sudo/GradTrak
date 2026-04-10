@@ -5117,7 +5117,6 @@ if (profile.role === 'admin') {
 }
 if (profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'viewer') {
   return <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
-}turn <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
 }
 
   if (profile.role === 'parent') {
