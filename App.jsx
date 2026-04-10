@@ -74,11 +74,14 @@ function calculateStudentStats(courses, categories, diplomaRequirements = null) 
       : categories;
     const totalRequired = effectiveCategories.reduce((sum, cat) => sum + Number(cat.credits_required), 0);
   
+  // Failed (F) and No-Pass (NP) grades do not earn credit toward graduation,
+  // even though the course remains visible in the student's history.
+  const earnsCredit = (c) => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP';
   const creditsByCategory = effectiveCategories.reduce((acc, cat) => {
-    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id && c.status === 'completed').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id && earnsCredit(c)).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
     return acc;
   }, {});
-  const totalEarned = Math.round(courses.filter(c => c.status === 'completed').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+  const totalEarned = Math.round(courses.filter(earnsCredit).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
     const allCategoriesComplete = effectiveCategories.every(cat => {
       const earned = creditsByCategory[cat.id] || 0;
       return earned >= Number(cat.credits_required);
@@ -119,9 +122,10 @@ function calculatePathwayProgress(courses, pathways, coursePathways) {
     const pathwayCourses = courses.filter(c => linkedCourseIds.includes(c.id));
     
     // NEW (sum credits) — Feb 20, 2026
+    // Exclude F and NP grades — failed/no-pass courses don't earn pathway credit.
 const earnedCredits = Math.round(
   pathwayCourses
-    .filter(c => c.status === 'completed')
+    .filter(c => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP')
     .reduce((sum, c) => sum + Number(c.credits || 0), 0) * 10
 ) / 10;
 const required = pathway.credits_required || 3.0;
@@ -1186,15 +1190,12 @@ function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const displayName = getDisplayName(profile);
-  const [selectedStudent, setSelectedStudent] = useState(null);
   const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
   const [counselors, setCounselors] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [parents, setParents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [flagFilterAdmin, setFlagFilterAdmin] = useState('all');
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState(null);
   const [showArchivedStudents, setShowArchivedStudents] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
   const [showLinkParentModal, setShowLinkParentModal] = useState(false);
@@ -1309,26 +1310,14 @@ if (studentData) {
       throw error;
     }
 
-    setAllStudents(prev => prev.map(s => 
-      s.id === studentId 
+    setAllStudents(prev => prev.map(s =>
+      s.id === studentId
         ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
         : s
     ));
-
-    if (selectedStudent?.id === studentId) {
-      setSelectedStudent(prev => ({ 
-        ...prev, 
-        is_active: isActive, 
-        withdrawal_date: withdrawalDate, 
-        withdrawal_reason: withdrawalReason 
-      }));
-    }
-
-    setShowArchiveModal(false);
-    setArchiveTarget(null);
   };
 
- 
+
   const handleDeleteCategory = async (id) => {
     if (!confirm('Delete this category? This cannot be undone.')) return;
     await supabase.from('credit_categories').delete().eq('id', id);
@@ -1528,12 +1517,6 @@ if (studentData) {
   className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
   👥 Students
 </button>
-              {selectedStudent && (
-                <button onClick={() => setActiveTab('student-detail')}
-                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === 'student-detail' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-                  👤 {selectedStudent.full_name}
-                </button>
-              )}
             </div>
 
   {/* Admin Dashboard Tab */}
@@ -1695,36 +1678,7 @@ if (studentData) {
   <AdminStudentManager
     schoolId={profile.school_id}
     profile={profile}
-    onViewStudent={async (student) => {
-  const { data: studentData } = await supabase
-    .from('profiles')
-    .select('*, diploma_types(*)')
-    .eq('id', student.id)
-    .single();
-
-  const { data: courseData } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('student_id', student.id);
-
-  if (studentData && courseData) {
-    let diplomaReqs = null;
-    if (studentData.diploma_type_id) {
-      const { data: drData } = await supabase
-        .from('diploma_requirements')
-        .select('*')
-        .eq('diploma_type_id', studentData.diploma_type_id);
-      diplomaReqs = drData;
-    }
-    const stats = calculateStudentStats(courseData, categories, diplomaReqs);
-    setSelectedStudent({
-      ...studentData,
-      courses: courseData,
-      stats
-    });
-  }
-  setActiveTab('student-detail');
-}}
+    onViewStudent={(student) => onSwitchToCounselor(student.id)}
   />
 )}
 
@@ -1744,41 +1698,7 @@ if (studentData) {
     userRole={profile.role}
     userId={profile.id}
     isAdmin={true}
-    onSelectStudent={async (student) => {
-      const { data: studentData } = await supabase
-        .from('profiles')
-        .select('*, diploma_types(*)')
-        .eq('id', student.id)
-        .single();
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('student_id', student.id);
-      const { data: assignmentData } = await supabase
-        .from('counselor_assignments')
-        .select('counselor_id, profiles!counselor_assignments_counselor_id_fkey(full_name)')
-        .eq('student_id', student.id)
-        .maybeSingle();
-      if (studentData) {
-        let diplomaReqs = null;
-        if (studentData.diploma_type_id) {
-          const { data: drData } = await supabase
-            .from('diploma_requirements')
-            .select('*')
-            .eq('diploma_type_id', studentData.diploma_type_id);
-          diplomaReqs = drData;
-        }
-        const stats = calculateStudentStats(courseData || [], categories, diplomaReqs);
-        setSelectedStudent({
-          ...studentData,
-          courses: courseData || [],
-          stats,
-          counselor_id: assignmentData?.counselor_id || null,
-          counselor_name: assignmentData?.profiles?.full_name || null
-        });
-      }
-      setActiveTab('student-detail');
-    }}
+    onSelectStudent={(student) => onSwitchToCounselor(student.id)}
   />
 )}
   {activeTab === 'attendance' && (
@@ -2744,7 +2664,7 @@ const getStudentRiskLevel = (student) => {
   return 'on-track';
 };
 
-function CounselorDashboard({ user, profile, onLogout, onSwitchToAdmin }) {
+function CounselorDashboard({ user, profile, onLogout, onSwitchToAdmin, initialStudentId, onInitialStudentConsumed }) {
   const [students, setStudents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
@@ -2825,6 +2745,21 @@ const [inviteParentSuccess, setInviteParentSuccess] = useState(false);
  useEffect(() => {
     fetchData();
   }, [profile, viewAllStudents]);
+
+  // Auto-select a student passed in by the parent (e.g. admin clicked
+  // "View" on the AdminStudentManager roster). Runs once the student list
+  // finishes loading. Clears the pending id regardless of whether the
+  // target student is in the loaded list.
+  useEffect(() => {
+    if (!initialStudentId || loading || students.length === 0) return;
+    const target = students.find(s => s.id === initialStudentId);
+    if (target) {
+      setSelectedStudent(target);
+      setActiveTab('progress');
+      fetchCaseManager(target.id);
+    }
+    onInitialStudentConsumed?.();
+  }, [initialStudentId, loading, students]);
 
 async function fetchStudentDetail(studentId) {
   const { data: studentData } = await supabase
@@ -2939,11 +2874,11 @@ async function handleSavePreferredName() {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-// Get students - viewers see all, superuser counselors depend on toggle, regular counselors see assigned only
+// Get students - viewers and admins see all, superuser counselors depend on toggle, regular counselors see assigned only
 let assignedStudentIds = [];
 
-if (profile.role === 'viewer') {
-  // Viewers always see all students
+if (profile.role === 'viewer' || profile.role === 'admin') {
+  // Viewers and admins always see all students in their school
   const { data: allStudentData } = await supabase
     .from('profiles')
     .select('id')
@@ -3042,7 +2977,7 @@ if (assignedStudentIds.length === 0) {
         )
       `);
     
-    if (profile.is_superuser || profile.role === 'viewer') {
+    if (profile.is_superuser || profile.role === 'viewer' || profile.role === 'admin') {
       // Fetch all students directly — no .in() needed, avoids URL length limit
       studentQuery = studentQuery
         .eq('school_id', profile.school_id)
@@ -3329,7 +3264,7 @@ advisingNotes.slice(0, 5)
         <!-- CTE Pathway Progress -->
         <div class="section">
           <div class="section-title">CTE Pathway Progress</div>
-          ${Object.keys(pathwayGroups).length === 0 ? '<p class="empty-message">No CTE pathway courses on record.</p>' : Object.entries(pathwayGroups).map(function([pwName, pwCourses]) { const completed = pwCourses.filter(c => c.status === 'completed').length; return '<div class="pathway-header">🎓 ' + pwName + ': ' + pwCourses.filter(c => c.status === 'completed').reduce((sum, c) => sum + Number(c.credits || 0), 0).toFixed(1) + '/3.0 credits earned</div><table><thead><tr><th>Course</th><th>Term</th><th>Status</th></tr></thead><tbody>' + pwCourses.map(c => '<tr><td>' + c.name + '</td><td>' + (c.term || '—') + '</td><td class="' + (c.status === 'completed' ? 'status-complete' : 'status-inprogress') + '">' + (c.status === 'completed' ? '✓ Completed' : '◯ In Progress') + '</td></tr>').join('') + '</tbody></table>'; }).join('')}
+          ${Object.keys(pathwayGroups).length === 0 ? '<p class="empty-message">No CTE pathway courses on record.</p>' : Object.entries(pathwayGroups).map(function([pwName, pwCourses]) { const earnsCredit = (c) => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP'; const completed = pwCourses.filter(earnsCredit).length; return '<div class="pathway-header">🎓 ' + pwName + ': ' + pwCourses.filter(earnsCredit).reduce((sum, c) => sum + Number(c.credits || 0), 0).toFixed(1) + '/3.0 credits earned</div><table><thead><tr><th>Course</th><th>Term</th><th>Status</th></tr></thead><tbody>' + pwCourses.map(c => '<tr><td>' + c.name + '</td><td>' + (c.term || '—') + '</td><td class="' + (c.status === 'completed' ? 'status-complete' : 'status-inprogress') + '">' + (c.status === 'completed' ? '✓ Completed' : '◯ In Progress') + '</td></tr>').join('') + '</tbody></table>'; }).join('')}
         </div>
 
         <!-- Recent Advising Notes -->
@@ -4388,24 +4323,16 @@ const summaryStats = {
               <button 
                 key={student.id} 
                 onClick={() => {
+  // Use the precomputed student.stats from fetchData (which already accounts
+  // for diploma_requirements, F/NP exclusion, and per-category breakdowns).
+  // Do NOT recompute a partial stub here — that was the cause of the
+  // "All requirements met" bug for every student.
   setSelectedStudent(null);
   setActiveTab('progress');
   setTimeout(() => {
-
     setSelectedStudent(student);
     setEditingPreferredName(false);
-    setPreferredNameInput('');   
-    const totalEarned = (student.courses || [])
-      .filter(c => c.status === 'completed' && c.grade !== 'F')
-      .reduce((sum, c) => sum + (parseFloat(c.credits) || 0), 0);
-    const totalRequired = 24;
-    setEditingPreferredName(false);
-setPreferredNameInput('');
-    setSelectedStudent({
-      ...student,
-      stats: { totalEarned, totalRequired, percentage: Math.round((totalEarned / totalRequired) * 100) }
-    });
-
+    setPreferredNameInput('');
     fetchCaseManager(student.id);
   }, 0);
 }}
@@ -4904,6 +4831,10 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
 export default function App() {
   const [user, setUser] = useState(null);
   const [adminViewMode, setAdminViewMode] = useState('admin');
+  // When an admin clicks "View" on a student in the roster, we record the
+  // student id here and switch to CounselorDashboard, which auto-selects
+  // that student once its student list finishes loading.
+  const [pendingStudentId, setPendingStudentId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isReactivating, setIsReactivating] = useState(false);
@@ -5105,14 +5036,19 @@ if (profile.role === 'admin') {
       user={user}
       profile={profile}
       onLogout={handleLogout}
-      onSwitchToAdmin={() => setAdminViewMode('admin')}
+      onSwitchToAdmin={() => { setPendingStudentId(null); setAdminViewMode('admin'); }}
+      initialStudentId={pendingStudentId}
+      onInitialStudentConsumed={() => setPendingStudentId(null)}
     />;
   }
   return <AdminDashboard
     user={user}
     profile={profile}
     onLogout={handleLogout}
-    onSwitchToCounselor={() => setAdminViewMode('counselor')}
+    onSwitchToCounselor={(studentId) => {
+      if (studentId) setPendingStudentId(studentId);
+      setAdminViewMode('counselor');
+    }}
   />;
 }
 if (profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'viewer') {

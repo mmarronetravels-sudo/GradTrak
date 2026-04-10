@@ -121,7 +121,11 @@ const filteredNotes = (notesData || []).filter(note =>
   
   const calculateStudentStats = (studentId) => {
     const studentCourses = courses.filter(c => c.student_id === studentId);
-    const totalEarned = studentCourses.filter(c => c.status === 'completed').reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+    // Failed (F) and No-Pass (NP) grades do not earn credit toward graduation,
+    // so they should not factor into risk classification either.
+    const totalEarned = studentCourses
+      .filter(c => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP')
+      .reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
     const totalRequired = 24;
     const percentage = Math.round((totalEarned / totalRequired) * 100);
     return { totalEarned, totalRequired, percentage };
