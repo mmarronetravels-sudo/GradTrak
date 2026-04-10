@@ -326,18 +326,7 @@ export default function DataSyncUpload({ schoolId }) {
     return { count, errors, studentIdMap };
   };
 
-  // Load all course mappings upfront
-const { data: courseMappings } = await supabase
-  .from('course_mappings')
-  .select('course_name, category_id')
-  .eq('school_id', schoolId);
-
-const courseMappingMap = {};
-courseMappings?.forEach(m => {
-  courseMappingMap[m.course_name.toLowerCase()] = m.category_id;
-});
-  
-  // Sync courses from the Courses sheet
+   // Sync courses from the Courses sheet
   const syncCourses = async (courses, studentIdMap = {}) => {
     const errors = [];
     let count = 0;
@@ -357,6 +346,18 @@ courseMappings?.forEach(m => {
         }
       });
     }
+
+     // Load all course mappings upfront
+const { data: courseMappings } = await supabase
+  .from('course_mappings')
+  .select('course_name, category_id')
+  .eq('school_id', schoolId);
+
+const courseMappingMap = {};
+courseMappings?.forEach(m => {
+  courseMappingMap[m.course_name.toLowerCase()] = m.category_id;
+});
+  
 
     for (const c of courses) {
       // Map Engage field names
