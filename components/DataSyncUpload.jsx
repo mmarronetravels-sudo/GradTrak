@@ -440,7 +440,6 @@ if (!category) {
           .from('courses')
           .insert({
             student_id: studentProfileId,
-            school_id: schoolId,
             name: courseName,
             credits: creditAmount,
             category_id: category.id,
