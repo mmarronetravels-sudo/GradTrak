@@ -1692,10 +1692,10 @@ if (studentData) {
   <AdminStudentManager
     schoolId={profile.school_id}
     profile={profile}
-    onViewStudent={(student) => {
-  setSelectedStudent(student);
-  setActiveTab('student-detail');
-}}
+    onViewStudent={async (student) => {
+      await fetchStudentDetail(student.id);
+      setActiveTab('student-detail');
+    }}
   />
 )}
 
