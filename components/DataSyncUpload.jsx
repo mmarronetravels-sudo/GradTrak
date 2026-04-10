@@ -326,6 +326,17 @@ export default function DataSyncUpload({ schoolId }) {
     return { count, errors, studentIdMap };
   };
 
+  // Load all course mappings upfront
+const { data: courseMappings } = await supabase
+  .from('course_mappings')
+  .select('course_name, category_id')
+  .eq('school_id', schoolId);
+
+const courseMappingMap = {};
+courseMappings?.forEach(m => {
+  courseMappingMap[m.course_name.toLowerCase()] = m.category_id;
+});
+  
   // Sync courses from the Courses sheet
   const syncCourses = async (courses, studentIdMap = {}) => {
     const errors = [];
@@ -384,13 +395,9 @@ if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
       // Find credit category — first try credit type code, then fall back to course_mappings
 let category = getCategoryByCode(creditType);
 if (!category) {
-  const { data: mapping } = await supabase
-    .from('course_mappings')
-    .select('category_id')
-    .ilike('course_name', courseName)
-    .single();
-  if (mapping?.category_id) {
-    category = creditCategories.find(c => c.id === mapping.category_id);
+  const categoryId = courseMappingMap[courseName.toLowerCase()];
+  if (categoryId) {
+    category = creditCategories.find(c => c.id === categoryId);
   }
 }
 if (!category) {
