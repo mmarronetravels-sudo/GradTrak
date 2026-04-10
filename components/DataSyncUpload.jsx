@@ -158,7 +158,7 @@ export default function DataSyncUpload({ schoolId }) {
         
         // Detect sheet type by column names
         const isStudentSheet = columns.some(c => 
-          c === 'student_id' || c === 'student_email' || c === 'first_name'
+          c === 'student_email' || c === 'first_name'
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
         
         const isCourseSheet = columns.some(c => 
