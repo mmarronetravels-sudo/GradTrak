@@ -112,12 +112,11 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
             const batch = studentIds.slice(i, i + batchSize);
             const { data: profiles } = await supabaseClient
               .from('profiles')
-              .select('id, full_name, preferred_name, student_id_local, graduation_year')
+              .select('id, full_name, student_id_local, graduation_year')
               .in('id', batch);
             (profiles || []).forEach(p => {
               studentMap[p.id] = {
                 full_name: p.full_name || 'Unknown',
-                preferred_name: p.preferred_name || '',
                 student_id_local: p.student_id_local || '',
                 grade: getGradeLevel(p.graduation_year),
               };
@@ -137,14 +136,26 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
           });
         }
 
-        // 5. Merge everything into enriched note records
+        // 5. Fetch Engage advisor IDs from advisor_mappings
+        let advisorIdMap = {};
+        if (counselorIds.length > 0) {
+          const { data: advisorMappings } = await supabaseClient
+            .from('advisor_mappings')
+            .select('counselor_id, engage_advisor_id')
+            .in('counselor_id', counselorIds);
+          (advisorMappings || []).forEach(m => {
+            advisorIdMap[m.counselor_id] = m.engage_advisor_id || '';
+          });
+        }
+
+        // 6. Merge everything into enriched note records
         const enriched = (notesData || []).map(note => ({
           ...note,
           student_name: studentMap[note.student_id]?.full_name || 'Unknown',
-          preferred_name: studentMap[note.student_id]?.preferred_name || '',
           student_id_local: studentMap[note.student_id]?.student_id_local || '',
           grade: studentMap[note.student_id]?.grade || '—',
           counselor_name: counselorMap[note.counselor_id] || 'Unknown',
+          engage_advisor_id: advisorIdMap[note.counselor_id] || '',
           effective_date: note.contact_date || note.created_at?.slice(0, 10),
         }));
 
@@ -238,26 +249,18 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
   function exportCSV() {
     const headers = [
       'Student_ID',
-      'Student_Name',
-      'Preferred_Name',
-      'Grade',
-      'Contact_Date',
-      'Contact_Type',
-      'Counselor_Name',
-      'Note',
-      'Status',
+      'Date',
+      'Type',
+      'Staff_ID',
+      'Staff_Name',
     ];
 
     const rows = filteredNotes.map(n => [
       n.student_id_local,
-      n.student_name,
-      n.preferred_name,
-      n.grade,
       formatDateISO(n.effective_date),
       NOTE_TYPES[n.note_type]?.label || n.note_type || '',
+      n.engage_advisor_id,
       n.counselor_name,
-      (n.note || '').replace(/[\r\n]+/g, ' '),
-      n.status || '',
     ]);
 
     const csv = [headers, ...rows].map(row =>
@@ -376,29 +379,14 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-800/80">
-                  <th
-                    onClick={() => toggleSort('student')}
-                    className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider cursor-pointer hover:text-white"
-                  >
-                    Student{getSortIndicator('student')}
-                  </th>
-                  <th className="text-left px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                    Preferred Name
-                  </th>
-                  <th className="text-center px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th
-                    onClick={() => toggleSort('grade')}
-                    className="text-center px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider cursor-pointer hover:text-white"
-                  >
-                    Grade{getSortIndicator('grade')}
+                  <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                    Student ID
                   </th>
                   <th
                     onClick={() => toggleSort('date')}
                     className="text-left px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider cursor-pointer hover:text-white"
                   >
-                    Contact Date{getSortIndicator('date')}
+                    Date{getSortIndicator('date')}
                   </th>
                   <th
                     onClick={() => toggleSort('type')}
@@ -406,24 +394,21 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
                   >
                     Type{getSortIndicator('type')}
                   </th>
+                  <th className="text-left px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                    Staff ID
+                  </th>
                   <th
                     onClick={() => toggleSort('counselor')}
                     className="text-left px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider cursor-pointer hover:text-white"
                   >
-                    Counselor{getSortIndicator('counselor')}
-                  </th>
-                  <th className="text-left px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                    Note
-                  </th>
-                  <th className="text-center px-3 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                    Status
+                    Staff Name{getSortIndicator('counselor')}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredNotes.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="text-center py-12 text-slate-500">
+                    <td colSpan="5" className="text-center py-12 text-slate-500">
                       No attendance contacts found for this date range.
                     </td>
                   </tr>
@@ -435,28 +420,15 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
                         idx % 2 === 0 ? '' : 'bg-slate-800/20'
                       }`}
                     >
-                      {/* Student name */}
-                      <td className="px-4 py-3">
-                        <span className="text-white font-medium text-sm">{note.student_name}</span>
-                      </td>
-
-                      {/* Preferred name */}
-                      <td className="px-3 py-3">
-                        <span className="text-slate-300 text-sm">{note.preferred_name || '—'}</span>
-                      </td>
-
                       {/* Student ID */}
-                      <td className="text-center px-3 py-3">
-                        <span className="text-slate-400 text-xs font-mono">{note.student_id_local || '—'}</span>
+                      <td className="px-4 py-3">
+                        <span className="text-slate-300 text-xs font-mono">{note.student_id_local || '—'}</span>
                       </td>
 
-                      {/* Grade */}
-                      <td className="text-center px-3 py-3 text-slate-400 text-sm">{note.grade}</td>
-
-                      {/* Contact date */}
+                      {/* Date */}
                       <td className="px-3 py-3 text-slate-300 text-sm">{formatDate(note.effective_date)}</td>
 
-                      {/* Contact type */}
+                      {/* Type */}
                       <td className="px-3 py-3">
                         <span className="inline-flex items-center gap-1 text-sm text-slate-300">
                           <span>{NOTE_TYPES[note.note_type]?.icon || '📝'}</span>
@@ -464,26 +436,13 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
                         </span>
                       </td>
 
-                      {/* Counselor */}
-                      <td className="px-3 py-3 text-slate-400 text-xs">{note.counselor_name}</td>
-
-                      {/* Note text */}
+                      {/* Staff ID */}
                       <td className="px-3 py-3">
-                        <span className="text-slate-400 text-xs line-clamp-2 max-w-[300px] block">
-                          {note.note || '—'}
-                        </span>
+                        <span className="text-slate-400 text-xs font-mono">{note.engage_advisor_id || '—'}</span>
                       </td>
 
-                      {/* Status */}
-                      <td className="text-center px-3 py-3">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                          note.status === 'completed'
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : 'bg-amber-500/20 text-amber-400'
-                        }`}>
-                          {note.status || 'open'}
-                        </span>
-                      </td>
+                      {/* Staff Name */}
+                      <td className="px-3 py-3 text-slate-300 text-sm">{note.counselor_name}</td>
                     </tr>
                   ))
                 )}
@@ -507,7 +466,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
       <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4">
         <p className="text-xs text-slate-500 font-medium mb-2">CSV Export Columns</p>
         <p className="text-xs text-slate-600">
-          Student_ID · Student_Name · Preferred_Name · Grade · Contact_Date · Contact_Type · Counselor_Name · Note · Status
+          Student_ID · Date · Type · Staff_ID · Staff_Name
         </p>
         <p className="text-xs text-slate-600 mt-1">
           Student_ID matches the Engage local ID for import matching.

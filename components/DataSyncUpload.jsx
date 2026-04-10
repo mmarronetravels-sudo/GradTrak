@@ -158,12 +158,12 @@ export default function DataSyncUpload({ schoolId }) {
         
         // Detect sheet type by column names
         const isStudentSheet = columns.some(c => 
-          c === 'student_id' || c === 'student_email' || c === 'first_name'
+          c === 'student_email' || c === 'first_name'
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
         
         const isCourseSheet = columns.some(c => 
-          c === 'class' || c === 'credit_amount' || c === 'credit_type'
-        );
+  c === 'class' || c === 'class_name' || c === 'credit_amount' || c === 'credit_type'
+);
 
         if (sheetName.toLowerCase() === 'students' || isStudentSheet) {
           students = normalized;
@@ -239,11 +239,11 @@ export default function DataSyncUpload({ schoolId }) {
 
       // Check if student exists (by email)
       const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('school_id', schoolId)
-        .eq('email', email)
-        .single();
+  .from('profiles')
+  .select('id')
+  .ilike('email', email)
+  .eq('school_id', schoolId)
+  .single();
 
       let studentProfileId = existing?.id;
 
@@ -326,7 +326,7 @@ export default function DataSyncUpload({ schoolId }) {
     return { count, errors, studentIdMap };
   };
 
-  // Sync courses from the Courses sheet
+   // Sync courses from the Courses sheet
   const syncCourses = async (courses, studentIdMap = {}) => {
     const errors = [];
     let count = 0;
@@ -347,10 +347,22 @@ export default function DataSyncUpload({ schoolId }) {
       });
     }
 
+     // Load all course mappings upfront
+const { data: courseMappings } = await supabase
+  .from('course_mappings')
+  .select('course_name, category_id')
+  .eq('school_id', schoolId);
+
+const courseMappingMap = {};
+courseMappings?.forEach(m => {
+  courseMappingMap[m.course_name.toLowerCase()] = m.category_id;
+});
+  
+
     for (const c of courses) {
       // Map Engage field names
       const studentIdLocal = (c.student_id || c['student id'])?.trim();
-      const courseName = (c.class || c.course_name)?.trim();
+      const courseName = (c.class || c.class_name || c.course_name)?.trim();
       const creditAmount = parseFloat(c.credit_amount || c.credits || 0);
       const creditType = (c.credit_type || c.category)?.trim().toUpperCase();
       const term = (c.term || '')?.trim();
@@ -368,10 +380,11 @@ export default function DataSyncUpload({ schoolId }) {
         continue;
       }
 
-      // Skip courses with no credit (W, I with 0 credits)
-      if (creditAmount === 0 || isNaN(creditAmount)) {
-        continue;
-      }
+      // Only skip zero-credit rows if this is a completed course
+// In-progress courses may not have credit amount yet
+if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
+  continue;
+}
 
       // Find student profile ID
       const studentProfileId = studentIdMap[studentIdLocal];
@@ -380,13 +393,18 @@ export default function DataSyncUpload({ schoolId }) {
         continue;
       }
 
-      // Find credit category
-      const category = getCategoryByCode(creditType);
-      if (!category) {
-        errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
-        continue;
-      }
-
+      // Find credit category — first try credit type code, then fall back to course_mappings
+let category = getCategoryByCode(creditType);
+if (!category) {
+  const categoryId = courseMappingMap[courseName.toLowerCase()];
+  if (categoryId) {
+    category = creditCategories.find(c => c.id === categoryId);
+  }
+}
+if (!category) {
+  errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
+  continue;
+}
       // Format term (e.g., "T1 25/26" or "T1")
       const termFormatted = year ? `${term} ${year}` : term;
 
@@ -395,7 +413,7 @@ export default function DataSyncUpload({ schoolId }) {
         .from('courses')
         .select('id')
         .eq('student_id', studentProfileId)
-        .eq('course_name', courseName)
+        .eq('name', courseName)
         .eq('term', termFormatted)
         .single();
 
@@ -407,7 +425,7 @@ export default function DataSyncUpload({ schoolId }) {
             credits: creditAmount,
             category_id: category.id,
             grade: finalGrade,
-            status: 'completed',
+            status: finalGrade ? 'completed' : 'in_progress',
           })
           .eq('id', existingCourse.id);
 
@@ -422,13 +440,12 @@ export default function DataSyncUpload({ schoolId }) {
           .from('courses')
           .insert({
             student_id: studentProfileId,
-            school_id: schoolId,
-            course_name: courseName,
+            name: courseName,
             credits: creditAmount,
             category_id: category.id,
             term: termFormatted,
             grade: finalGrade,
-            status: 'completed',
+            status: finalGrade ? 'completed' : 'in_progress',
           });
 
         if (error) {

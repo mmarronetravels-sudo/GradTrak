@@ -1169,7 +1169,7 @@ function AuthScreen({ onLogin }) {
 // ADMIN DASHBOARD
 // ============================================
 
-function AdminDashboard({ user, profile, onLogout }) {
+function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
   const [activeTab, setActiveTab] = useState('categories');
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
@@ -1458,6 +1458,9 @@ if (studentData) {
               <button onClick={() => setShowSettingsModal(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl transition-all" title="Settings">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               </button>
+              <button onClick={onSwitchToCounselor} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm font-medium">
+  👤 Student View
+</button>
               <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 Sign Out
@@ -1688,10 +1691,40 @@ if (studentData) {
           <DataSyncUpload schoolId={profile?.school_id} />
         )}
   {/* Students Tab */}
-  {activeTab === 'students' && (
+{activeTab === 'students' && (
   <AdminStudentManager
     schoolId={profile.school_id}
     profile={profile}
+    onViewStudent={async (student) => {
+  const { data: studentData } = await supabase
+    .from('profiles')
+    .select('*, diploma_types(*)')
+    .eq('id', student.id)
+    .single();
+
+  const { data: courseData } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('student_id', student.id);
+
+  if (studentData && courseData) {
+    let diplomaReqs = null;
+    if (studentData.diploma_type_id) {
+      const { data: drData } = await supabase
+        .from('diploma_requirements')
+        .select('*')
+        .eq('diploma_type_id', studentData.diploma_type_id);
+      diplomaReqs = drData;
+    }
+    const stats = calculateStudentStats(courseData, categories, diplomaReqs);
+    setSelectedStudent({
+      ...studentData,
+      courses: courseData,
+      stats
+    });
+  }
+  setActiveTab('student-detail');
+}}
   />
 )}
 
@@ -2711,7 +2744,7 @@ const getStudentRiskLevel = (student) => {
   return 'on-track';
 };
 
-function CounselorDashboard({ user, profile, onLogout }) {
+function CounselorDashboard({ user, profile, onLogout, onSwitchToAdmin }) {
   const [students, setStudents] = useState([]);
   const [categories, setCategories] = useState([]);
   const [pathways, setPathways] = useState([]);
@@ -2830,10 +2863,10 @@ async function handleSavePreferredName() {
   if (!selectedStudent) return;
   setPreferredNameSaving(true);
   try {
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
-    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    // Skip frozen Supabase client — go straight to localStorage
+    // ✅ Use localStorage directly — don't rely on frozen Supabase client
     let token = null;
     try {
       const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
@@ -2868,22 +2901,12 @@ async function handleSavePreferredName() {
       return;
     }
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Save error response:', res.status, errText);
-      throw new Error(`Save failed: ${res.status}`);
-    }
+    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
 
-    setSelectedStudent(prev => ({
-      ...prev,
-      preferred_name: preferredNameInput.trim() || null,
-    }));
+    const newName = preferredNameInput.trim() || null;
+    setSelectedStudent(prev => ({ ...prev, preferred_name: newName }));
     setStudents(prev =>
-      prev.map(s =>
-        s.id === selectedStudent.id
-          ? { ...s, preferred_name: preferredNameInput.trim() || null }
-          : s
-      )
+      prev.map(s => s.id === selectedStudent.id ? { ...s, preferred_name: newName } : s)
     );
     setEditingPreferredName(false);
   } catch (err) {
@@ -4140,6 +4163,11 @@ const summaryStats = {
               <button onClick={() => setShowSettingsModal(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl transition-all" title="Settings">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               </button>
+              {onSwitchToAdmin && (
+  <button onClick={onSwitchToAdmin} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm font-medium">
+    ⚙️ Admin Panel
+  </button>
+)}
               <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 py-2 rounded-xl transition-all flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 Sign Out
@@ -4875,6 +4903,7 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [adminViewMode, setAdminViewMode] = useState('admin');
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isReactivating, setIsReactivating] = useState(false);
@@ -5070,11 +5099,23 @@ useEffect(() => {
 
   if (!user || !profile) { return <AuthScreen onLogin={(user) => { setUser(user); }} />; }
 
-  if (profile.role === 'admin') {
-    return <AdminDashboard user={user} profile={profile} onLogout={handleLogout} />;
+if (profile.role === 'admin') {
+  if (adminViewMode === 'counselor') {
+    return <CounselorDashboard
+      user={user}
+      profile={profile}
+      onLogout={handleLogout}
+      onSwitchToAdmin={() => setAdminViewMode('admin')}
+    />;
   }
-
-  if (profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'viewer') {
+  return <AdminDashboard
+    user={user}
+    profile={profile}
+    onLogout={handleLogout}
+    onSwitchToCounselor={() => setAdminViewMode('counselor')}
+  />;
+}
+if (profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'viewer') {
   return <CounselorDashboard user={user} profile={profile} onLogout={handleLogout} />;
 }
 
