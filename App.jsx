@@ -1693,9 +1693,9 @@ if (studentData) {
     schoolId={profile.school_id}
     profile={profile}
     onViewStudent={(student) => {
-      setSelectedStudent(student);
-      setActiveTab(null);
-    }}
+  setSelectedStudent(student);
+  setActiveTab('student-detail');
+}}
   />
 )}
 
