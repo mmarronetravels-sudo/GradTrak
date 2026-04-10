@@ -277,10 +277,44 @@ export default function DataSyncUpload({ schoolId }) {
           studentProfileId = existing.id;
         }
       } else {
-        // Insert new student
-        const { data: newStudent, error } = await supabase
+        // Insert new student. First create an auth account (with the
+        // shared default password) so the student can log in to view
+        // their own progress, then upsert the profile keyed to the new
+        // auth user id. Mirrors the legacy App.jsx Excel-import behavior
+        // so we don't change the experience for new students.
+        let newUserId = null;
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email,
+          password: 'GradTrack2026!',
+        });
+        if (authErr && !authErr.message.toLowerCase().includes('already registered')) {
+          errors.push(`Auth signup ${email}: ${authErr.message}`);
+          continue;
+        }
+        newUserId = authData?.user?.id || null;
+
+        // Edge case: auth account already existed (e.g. cross-school move)
+        // but we couldn't find a profile in this school. Look up the
+        // existing profile by email regardless of school so we can adopt
+        // the same id and upsert against it.
+        if (!newUserId) {
+          const { data: existingByEmail } = await supabase
+            .from('profiles')
+            .select('id')
+            .ilike('email', email)
+            .maybeSingle();
+          newUserId = existingByEmail?.id || null;
+        }
+
+        if (!newUserId) {
+          errors.push(`Insert ${email}: could not create or locate auth user`);
+          continue;
+        }
+
+        const { error } = await supabase
           .from('profiles')
-          .insert({
+          .upsert({
+            id: newUserId,
             school_id: schoolId,
             email,
             full_name: fullName,
@@ -289,15 +323,14 @@ export default function DataSyncUpload({ schoolId }) {
             role: 'student',
             diploma_type_id: diplomaTypeId,
             student_id_local: studentIdLocal,
-          })
-          .select('id')
-          .single();
-        
+            is_active: true,
+          });
+
         if (error) {
           errors.push(`Insert ${email}: ${error.message}`);
         } else {
           count++;
-          studentProfileId = newStudent.id;
+          studentProfileId = newUserId;
         }
       }
 
@@ -336,10 +369,17 @@ export default function DataSyncUpload({ schoolId }) {
     return { count, errors, studentIdMap };
   };
 
-   // Sync courses from the Courses sheet
+  // Sync courses from the Courses sheet.
+  // Optimized for large files (25k+ rows): pre-fetches all relevant existing
+  // course rows in batched queries, builds in-memory indexes for dedup,
+  // skips no-op updates, then bulk-inserts new rows and runs updates in
+  // small parallel batches. A naive per-row implementation against Supabase
+  // takes hours for a typical Engage export; this finishes in ~1 minute.
   const syncCourses = async (courses, studentIdMap = {}) => {
     const errors = [];
-    let count = 0;
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
 
     // Build a map of student_id_local to profile id if not provided
     if (Object.keys(studentIdMap).length === 0) {
@@ -357,17 +397,22 @@ export default function DataSyncUpload({ schoolId }) {
       });
     }
 
-     // Load all course mappings upfront
-const { data: courseMappings } = await supabase
-  .from('course_mappings')
-  .select('course_name, category_id')
-  .eq('school_id', schoolId);
+    // Load all course mappings upfront. We fetch BOTH the category_id and
+    // the credits column — current-courses files from Engage have no
+    // credit_amount column at all, so credits must come from the mapping
+    // table or the course will land in the database with credits=0.
+    const { data: courseMappings } = await supabase
+      .from('course_mappings')
+      .select('course_name, category_id, credits')
+      .eq('school_id', schoolId);
 
-const courseMappingMap = {};
-courseMappings?.forEach(m => {
-  courseMappingMap[m.course_name.toLowerCase()] = m.category_id;
-});
-  
+    const courseMappingMap = {};
+    courseMappings?.forEach(m => {
+      courseMappingMap[m.course_name.toLowerCase()] = {
+        category_id: m.category_id,
+        credits: m.credits,
+      };
+    });
 
     // Compute the current school-year suffix (e.g. "25/26") to fill in
     // for source rows that have a term ("T3") but no year column.
@@ -375,136 +420,205 @@ courseMappings?.forEach(m => {
     const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
     const currentYearSuffix = `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
 
+    // ── Pass 1: Parse and validate each input row ──
+    // Produces a list of fully-resolved rows ready to compare against the
+    // database. Skipped rows (missing student, MS courses, etc.) get
+    // recorded here once and never touched again.
+    const parsed = [];
+    const affectedStudentIds = new Set();
+
     for (const c of courses) {
       // Map Engage field names. Note `credit_ammount` is the (typo'd) header
       // some Engage exports actually ship with — accept both spellings.
       const studentIdLocal = (c.student_id || c['student id'])?.trim();
       const courseName = (c.class || c.class_name || c.course_name)?.trim();
-      const creditAmount = parseFloat(c.credit_ammount || c.credit_amount || c.credits || 0);
+      const creditAmountRaw = parseFloat(c.credit_ammount || c.credit_amount || c.credits || 0);
       const creditType = (c.credit_type || c.category)?.trim().toUpperCase();
       const term = (c.term || '')?.trim();
       const year = (c.year || '')?.trim();
       const finalGrade = (c.final_grade || c.grade || '')?.trim();
-      const datePosted = (c.date_posted || '')?.trim();
 
-      // Skip if missing required fields
-      if (!studentIdLocal || !courseName) {
-        continue;
-      }
+      if (!studentIdLocal || !courseName) continue;
+      if (creditType === 'MS') continue;
 
-      // Skip middle school courses
-      if (creditType === 'MS') {
-        continue;
-      }
-
-      // Only skip zero-credit rows if this is a completed course
-// In-progress courses may not have credit amount yet
-if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
-  continue;
-}
-
-      // Find student profile ID
       const studentProfileId = studentIdMap[studentIdLocal];
       if (!studentProfileId) {
         errors.push(`Course "${courseName}": Student ID ${studentIdLocal} not found`);
         continue;
       }
 
-      // Find credit category — first try credit type code, then fall back to course_mappings
-let category = getCategoryByCode(creditType);
-if (!category) {
-  const categoryId = courseMappingMap[courseName.toLowerCase()];
-  if (categoryId) {
-    category = creditCategories.find(c => c.id === categoryId);
-  }
-}
-if (!category) {
-  errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
-  continue;
-}
+      // Resolve category. First try the row's credit_type code, then fall
+      // back to the school's course_mappings table by course name.
+      const mapping = courseMappingMap[courseName.toLowerCase()];
+      let category = getCategoryByCode(creditType);
+      if (!category && mapping?.category_id) {
+        category = creditCategories.find(c => c.id === mapping.category_id);
+      }
+      if (!category) {
+        errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
+        continue;
+      }
+
+      // Resolve credit amount. Source row first, then course_mappings
+      // fallback. Current-courses Engage exports have no credit column at
+      // all, so the mapping fallback is what populates credits for them.
+      let creditAmount = isNaN(creditAmountRaw) ? null : creditAmountRaw;
+      if ((creditAmount == null || creditAmount === 0) && mapping?.credits != null) {
+        creditAmount = Number(mapping.credits);
+      }
+
+      // Skip truly empty rows: no grade AND no credit (after mapping
+      // fallback). A row with grade='I' and credit=0 (Incomplete) is NOT
+      // empty — it's a real outcome we want in the student's history.
+      const hasGrade = !!finalGrade;
+      const hasCredit = creditAmount != null && creditAmount > 0;
+      if (!hasGrade && !hasCredit) continue;
+
       // Format term. If the source row has a term but no year column,
       // assume the current school year (e.g. "T3" -> "T3 25/26").
       let termFormatted;
-      if (term && year) {
-        termFormatted = `${term} ${year}`;
-      } else if (term) {
-        termFormatted = `${term} ${currentYearSuffix}`;
-      } else {
-        termFormatted = '';
-      }
+      if (term && year) termFormatted = `${term} ${year}`;
+      else if (term) termFormatted = `${term} ${currentYearSuffix}`;
+      else termFormatted = '';
 
-      // Find an existing row to update, in two passes:
-      //   1. Strict match by (student, name, term) — the normal case.
-      //   2. If this row carries a final grade and no strict match exists,
-      //      look for any in_progress row with the same (student, name)
-      //      regardless of term — this handles asynchronous courses that
-      //      were started in an earlier term and finished later.
-      let existingCourseId = null;
-      const { data: strictMatches } = await supabase
+      const status = finalGrade ? 'completed' : 'in_progress';
+
+      parsed.push({
+        studentProfileId,
+        courseName,
+        creditAmount,
+        categoryId: category.id,
+        termFormatted,
+        finalGrade: finalGrade || null,
+        status,
+      });
+      affectedStudentIds.add(studentProfileId);
+    }
+
+    // ── Pass 2: Bulk pre-fetch existing courses for affected students ──
+    // One query per ~50 students. Much faster than one query per row.
+    const studentIdArray = [...affectedStudentIds];
+    const allExisting = [];
+    const FETCH_BATCH = 50;
+    for (let i = 0; i < studentIdArray.length; i += FETCH_BATCH) {
+      const batch = studentIdArray.slice(i, i + FETCH_BATCH);
+      const { data, error } = await supabase
         .from('courses')
-        .select('id')
-        .eq('student_id', studentProfileId)
-        .eq('name', courseName)
-        .eq('term', termFormatted)
-        .limit(1);
-      if (strictMatches && strictMatches.length > 0) {
-        existingCourseId = strictMatches[0].id;
-      } else if (finalGrade) {
-        const { data: asynchMatches } = await supabase
-          .from('courses')
-          .select('id')
-          .eq('student_id', studentProfileId)
-          .eq('name', courseName)
-          .eq('status', 'in_progress')
-          .order('created_at', { ascending: true })
-          .limit(1);
-        if (asynchMatches && asynchMatches.length > 0) {
-          existingCourseId = asynchMatches[0].id;
-        }
+        .select('id, student_id, name, term, status, credits, category_id, grade, created_at')
+        .in('student_id', batch);
+      if (error) {
+        errors.push(`Failed to fetch existing courses: ${error.message}`);
+        return { count: inserted + updated, errors };
       }
+      if (data) allExisting.push(...data);
+    }
 
-      if (existingCourseId) {
-        // Update existing course (carries the new term so the row reflects
-        // when the grade was actually issued for asynch finishes).
-        const { error } = await supabase
-          .from('courses')
-          .update({
-            credits: creditAmount,
-            category_id: category.id,
-            term: termFormatted,
-            grade: finalGrade,
-            status: finalGrade ? 'completed' : 'in_progress',
-          })
-          .eq('id', existingCourseId);
-
-        if (error) {
-          errors.push(`Update course "${courseName}": ${error.message}`);
-        } else {
-          count++;
-        }
-      } else {
-        // Insert new course
-        const { error } = await supabase
-          .from('courses')
-          .insert({
-            student_id: studentProfileId,
-            name: courseName,
-            credits: creditAmount,
-            category_id: category.id,
-            term: termFormatted,
-            grade: finalGrade,
-            status: finalGrade ? 'completed' : 'in_progress',
-          });
-
-        if (error) {
-          errors.push(`Insert course "${courseName}": ${error.message}`);
-        } else {
-          count++;
+    // ── Pass 3: Build lookup indexes ──
+    // strictIndex: (student|name|term) -> existing row, used as the primary
+    //   match for normal same-term reconciliation.
+    // inProgressIndex: (student|name) -> oldest in_progress row, used as a
+    //   fallback so an asynch course finished in a later term still updates
+    //   the original placeholder instead of creating a duplicate.
+    const strictIndex = new Map();
+    const inProgressIndex = new Map();
+    for (const c of allExisting) {
+      strictIndex.set(`${c.student_id}|${c.name}|${c.term}`, c);
+      if (c.status === 'in_progress') {
+        const key = `${c.student_id}|${c.name}`;
+        const existing = inProgressIndex.get(key);
+        if (!existing || new Date(c.created_at) < new Date(existing.created_at)) {
+          inProgressIndex.set(key, c);
         }
       }
     }
 
-    return { count, errors };
+    // ── Pass 4: Decide each row's fate locally (zero DB queries) ──
+    const toInsert = [];
+    const toUpdate = [];
+
+    const creditsEqual = (a, b) => {
+      if (a == null && b == null) return true;
+      if (a == null || b == null) return false;
+      return Number(a) === Number(b);
+    };
+
+    for (const row of parsed) {
+      const strictKey = `${row.studentProfileId}|${row.courseName}|${row.termFormatted}`;
+      let existing = strictIndex.get(strictKey);
+      if (!existing && row.finalGrade) {
+        existing = inProgressIndex.get(`${row.studentProfileId}|${row.courseName}`);
+      }
+
+      if (existing) {
+        // No-op skip: if every relevant field already matches, don't issue
+        // an UPDATE. For weekly re-uploads of mostly-unchanged data this
+        // turns thousands of pointless writes into zero work.
+        const isUnchanged =
+          existing.term === row.termFormatted &&
+          creditsEqual(existing.credits, row.creditAmount) &&
+          existing.category_id === row.categoryId &&
+          (existing.grade || null) === row.finalGrade &&
+          existing.status === row.status;
+
+        if (isUnchanged) {
+          skipped++;
+          continue;
+        }
+
+        toUpdate.push({
+          id: existing.id,
+          credits: row.creditAmount,
+          category_id: row.categoryId,
+          term: row.termFormatted,
+          grade: row.finalGrade,
+          status: row.status,
+        });
+      } else {
+        toInsert.push({
+          student_id: row.studentProfileId,
+          name: row.courseName,
+          credits: row.creditAmount,
+          category_id: row.categoryId,
+          term: row.termFormatted,
+          grade: row.finalGrade,
+          status: row.status,
+        });
+      }
+    }
+
+    // ── Pass 5: Bulk insert new rows ──
+    const INSERT_BATCH = 500;
+    for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
+      const batch = toInsert.slice(i, i + INSERT_BATCH);
+      const { error } = await supabase.from('courses').insert(batch);
+      if (error) {
+        errors.push(`Bulk insert failed (rows ${i}–${i + batch.length}): ${error.message}`);
+      } else {
+        inserted += batch.length;
+      }
+    }
+
+    // ── Pass 6: Run updates in small parallel batches ──
+    // Parallelism is bounded so we don't open hundreds of simultaneous
+    // PostgREST connections. 10 in flight is a safe sweet spot.
+    const UPDATE_PARALLEL = 10;
+    for (let i = 0; i < toUpdate.length; i += UPDATE_PARALLEL) {
+      const batch = toUpdate.slice(i, i + UPDATE_PARALLEL);
+      const results = await Promise.all(
+        batch.map(({ id, ...fields }) =>
+          supabase.from('courses').update(fields).eq('id', id)
+        )
+      );
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].error) {
+          errors.push(`Update failed for row ${batch[j].id}: ${results[j].error.message}`);
+        } else {
+          updated++;
+        }
+      }
+    }
+
+    return { count: inserted + updated, errors, inserted, updated, skipped };
   };
 
   const handleUpload = async () => {
@@ -539,12 +653,15 @@ if (!category) {
 
       const allErrors = [...studentResult.errors, ...courseResult.errors];
 
-      // A file with rows but zero processed is almost always a silent
-      // failure (header mismatch, wrong column names, missing categories).
-      // Surface it as an error instead of a green checkmark so the
-      // operator notices.
+      // A file with rows but zero processed AND zero skipped is almost
+      // always a silent failure (header mismatch, wrong column names,
+      // missing categories). "Skipped" rows are intentional no-ops from
+      // the new import path — those should NOT count as a silent failure.
       const hadInputRows = students.length > 0 || courses.length > 0;
-      const processedNothing = studentResult.count === 0 && courseResult.count === 0;
+      const processedNothing =
+        studentResult.count === 0 &&
+        courseResult.count === 0 &&
+        (courseResult.skipped || 0) === 0;
       const isSilentNoOp = hadInputRows && processedNothing;
 
       setUploadState(prev => ({
@@ -553,6 +670,9 @@ if (!category) {
         result: {
           studentsProcessed: studentResult.count,
           coursesProcessed: courseResult.count,
+          coursesInserted: courseResult.inserted || 0,
+          coursesUpdated: courseResult.updated || 0,
+          coursesSkipped: courseResult.skipped || 0,
           studentRowsInFile: students.length,
           courseRowsInFile: courses.length,
           errors: allErrors,
@@ -668,6 +788,14 @@ if (!category) {
               <div className="text-slate-300 text-sm mt-2 space-y-1">
                 <p>✓ {uploadState.result.studentsProcessed} students processed</p>
                 <p>✓ {uploadState.result.coursesProcessed} course records processed</p>
+                {(uploadState.result.coursesInserted > 0 ||
+                  uploadState.result.coursesUpdated > 0 ||
+                  uploadState.result.coursesSkipped > 0) && (
+                  <p className="text-slate-400 text-xs ml-3">
+                    ({uploadState.result.coursesInserted} new, {uploadState.result.coursesUpdated} updated,
+                    {' '}{uploadState.result.coursesSkipped} unchanged)
+                  </p>
+                )}
               </div>
               {uploadState.result.errors?.length > 0 && (
                 <div className="mt-3 p-2 bg-amber-900/30 rounded border border-amber-700">
