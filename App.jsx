@@ -1688,10 +1688,14 @@ if (studentData) {
           <DataSyncUpload schoolId={profile?.school_id} />
         )}
   {/* Students Tab */}
-  {activeTab === 'students' && (
+{activeTab === 'students' && (
   <AdminStudentManager
     schoolId={profile.school_id}
     profile={profile}
+    onViewStudent={(student) => {
+      setSelectedStudent(student);
+      setActiveTab(null);
+    }}
   />
 )}
 
