@@ -162,8 +162,8 @@ export default function DataSyncUpload({ schoolId }) {
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
         
         const isCourseSheet = columns.some(c => 
-          c === 'class' || c === 'credit_amount' || c === 'credit_type'
-        );
+  c === 'class' || c === 'class_name' || c === 'credit_amount' || c === 'credit_type'
+);
 
         if (sheetName.toLowerCase() === 'students' || isStudentSheet) {
           students = normalized;
@@ -350,7 +350,7 @@ export default function DataSyncUpload({ schoolId }) {
     for (const c of courses) {
       // Map Engage field names
       const studentIdLocal = (c.student_id || c['student id'])?.trim();
-      const courseName = (c.class || c.course_name)?.trim();
+      const courseName = (c.class || c.class_name || c.course_name)?.trim();
       const creditAmount = parseFloat(c.credit_amount || c.credits || 0);
       const creditType = (c.credit_type || c.category)?.trim().toUpperCase();
       const term = (c.term || '')?.trim();
@@ -368,10 +368,11 @@ export default function DataSyncUpload({ schoolId }) {
         continue;
       }
 
-      // Skip courses with no credit (W, I with 0 credits)
-      if (creditAmount === 0 || isNaN(creditAmount)) {
-        continue;
-      }
+      // Only skip zero-credit rows if this is a completed course
+// In-progress courses may not have credit amount yet
+if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
+  continue;
+}
 
       // Find student profile ID
       const studentProfileId = studentIdMap[studentIdLocal];
@@ -407,7 +408,7 @@ export default function DataSyncUpload({ schoolId }) {
             credits: creditAmount,
             category_id: category.id,
             grade: finalGrade,
-            status: 'completed',
+            status: 'completed' : 'in progress',
           })
           .eq('id', existingCourse.id);
 
@@ -428,7 +429,7 @@ export default function DataSyncUpload({ schoolId }) {
             category_id: category.id,
             term: termFormatted,
             grade: finalGrade,
-            status: 'completed',
+            status: 'completed' : 'in progress',
           });
 
         if (error) {
