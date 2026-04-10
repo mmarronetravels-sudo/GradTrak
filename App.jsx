@@ -2830,10 +2830,10 @@ async function handleSavePreferredName() {
   if (!selectedStudent) return;
   setPreferredNameSaving(true);
   try {
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://vstiweftxjaszhnjwggb.supabase.co';
-    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMzMyNTYsImV4cCI6MjA1MjcwOTI1Nn0.sFwMRkzEalYSBMnSMcMModEceIH6M5jbWCdaGR96Hag';
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    // Skip frozen Supabase client — go straight to localStorage
+    // ✅ Use localStorage directly — don't rely on frozen Supabase client
     let token = null;
     try {
       const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
@@ -2868,22 +2868,12 @@ async function handleSavePreferredName() {
       return;
     }
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Save error response:', res.status, errText);
-      throw new Error(`Save failed: ${res.status}`);
-    }
+    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
 
-    setSelectedStudent(prev => ({
-      ...prev,
-      preferred_name: preferredNameInput.trim() || null,
-    }));
+    const newName = preferredNameInput.trim() || null;
+    setSelectedStudent(prev => ({ ...prev, preferred_name: newName }));
     setStudents(prev =>
-      prev.map(s =>
-        s.id === selectedStudent.id
-          ? { ...s, preferred_name: preferredNameInput.trim() || null }
-          : s
-      )
+      prev.map(s => s.id === selectedStudent.id ? { ...s, preferred_name: newName } : s)
     );
     setEditingPreferredName(false);
   } catch (err) {
