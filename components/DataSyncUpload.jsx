@@ -413,7 +413,7 @@ if (!category) {
         .from('courses')
         .select('id')
         .eq('student_id', studentProfileId)
-        .eq('course_name', courseName)
+        .eq('name', courseName)
         .eq('term', termFormatted)
         .single();
 
@@ -441,7 +441,7 @@ if (!category) {
           .insert({
             student_id: studentProfileId,
             school_id: schoolId,
-            course_name: courseName,
+            name: courseName,
             credits: creditAmount,
             category_id: category.id,
             term: termFormatted,
