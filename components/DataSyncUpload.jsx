@@ -47,7 +47,12 @@ export default function DataSyncUpload({ schoolId }) {
     if (!creditTypeCode) return null;
     const code = creditTypeCode.toUpperCase().trim();
     
-    // Map Engage credit type codes to category names
+    // Map Engage credit type codes to credit category names. These names
+    // must match the school's credit_categories.name values exactly
+    // (case-insensitive). Whether a category contributes to a particular
+    // student's graduation requirements is determined elsewhere via the
+    // diploma_requirements override table — this map only resolves which
+    // category an imported course belongs to.
     const codeToName = {
       'MA': 'Mathematics',
       'LA': 'English Language Arts',
@@ -58,9 +63,9 @@ export default function DataSyncUpload({ schoolId }) {
       'HE': 'Health',
       'RE': 'CTE/Art/Language',
       'PF': 'Personal Financial Education',
-      'CC': 'Higher Ed & Career Path Skills',
+      'CC': 'Career & College',
       'EL': 'Electives',
-      'MS': null, // Middle School - don't count
+      'MS': null, // Middle School — don't count toward HS credits
     };
 
     const categoryName = codeToName[code];
