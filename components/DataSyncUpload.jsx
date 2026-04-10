@@ -408,7 +408,7 @@ if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
             credits: creditAmount,
             category_id: category.id,
             grade: finalGrade,
-            status: 'completed' : 'in progress',
+            status: finalGrade ? 'completed' : 'in_progress',
           })
           .eq('id', existingCourse.id);
 
@@ -429,7 +429,7 @@ if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
             category_id: category.id,
             term: termFormatted,
             grade: finalGrade,
-            status: 'completed' : 'in progress',
+            status: finalGrade ? 'completed' : 'in_progress',
           });
 
         if (error) {
