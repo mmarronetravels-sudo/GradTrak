@@ -462,8 +462,18 @@ export default function DataSyncUpload({ schoolId }) {
       // Resolve credit amount. Source row first, then course_mappings
       // fallback. Current-courses Engage exports have no credit column at
       // all, so the mapping fallback is what populates credits for them.
+      //
+      // IMPORTANT: only fall back to mapping credits when the row has NO
+      // grade. A graded row with credit=0 means "graded outcome with no
+      // credit earned" (Incomplete, Fail) — that 0 is intentional and
+      // overriding it from the mapping would inflate the student's earned
+      // credit total.
       let creditAmount = isNaN(creditAmountRaw) ? null : creditAmountRaw;
-      if ((creditAmount == null || creditAmount === 0) && mapping?.credits != null) {
+      if (
+        (creditAmount == null || creditAmount === 0) &&
+        !finalGrade &&
+        mapping?.credits != null
+      ) {
         creditAmount = Number(mapping.credits);
       }
 
@@ -542,11 +552,50 @@ export default function DataSyncUpload({ schoolId }) {
       return Number(a) === Number(b);
     };
 
+    // Convert a term string like "T1 25/26", "T3 24/25", "SU 24/25" into a
+    // sortable numeric value so we can compare which term came earlier.
+    // Returns null for unparseable terms (in which case the asynch fallback
+    // will be skipped to avoid wrong-row matches).
+    const termOrder = (t) => {
+      if (!t) return null;
+      const yearMatch = t.match(/(\d{2})\/\d{2}\s*$/);
+      if (!yearMatch) return null;
+      const year = parseInt(yearMatch[1], 10);
+      const triMatch = t.match(/^(SU|S(\d)|T(\d))/);
+      let pos = 0;
+      if (triMatch) {
+        if (triMatch[3]) pos = parseInt(triMatch[3], 10);          // T1=1, T2=2, T3=3
+        else if (triMatch[2]) pos = parseInt(triMatch[2], 10) * 2; // S1=2, S2=4
+        else pos = 4; // SU (after T3 but before next year's T1)
+      }
+      return year * 10 + pos;
+    };
+
     for (const row of parsed) {
       const strictKey = `${row.studentProfileId}|${row.courseName}|${row.termFormatted}`;
       let existing = strictIndex.get(strictKey);
       if (!existing && row.finalGrade) {
-        existing = inProgressIndex.get(`${row.studentProfileId}|${row.courseName}`);
+        // Asynch fallback: only match an in_progress row whose term is
+        // EARLIER THAN OR EQUAL TO the new grade's term. The whole point
+        // of the fallback is "course started earlier, finished later" —
+        // matching a LATER in_progress row to satisfy an EARLIER grade
+        // is the retake case (e.g. student got Incomplete in T2, is
+        // currently retaking in T3) and would silently destroy the
+        // current attempt's row.
+        const candidate = inProgressIndex.get(
+          `${row.studentProfileId}|${row.courseName}`
+        );
+        if (candidate) {
+          const candidateOrder = termOrder(candidate.term);
+          const newOrder = termOrder(row.termFormatted);
+          if (
+            candidateOrder != null &&
+            newOrder != null &&
+            candidateOrder <= newOrder
+          ) {
+            existing = candidate;
+          }
+        }
       }
 
       if (existing) {
