@@ -381,13 +381,22 @@ if ((creditAmount === 0 || isNaN(creditAmount)) && finalGrade) {
         continue;
       }
 
-      // Find credit category
-      const category = getCategoryByCode(creditType);
-      if (!category) {
-        errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
-        continue;
-      }
-
+      // Find credit category — first try credit type code, then fall back to course_mappings
+let category = getCategoryByCode(creditType);
+if (!category) {
+  const { data: mapping } = await supabase
+    .from('course_mappings')
+    .select('category_id')
+    .ilike('course_name', courseName)
+    .single();
+  if (mapping?.category_id) {
+    category = creditCategories.find(c => c.id === mapping.category_id);
+  }
+}
+if (!category) {
+  errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
+  continue;
+}
       // Format term (e.g., "T1 25/26" or "T1")
       const termFormatted = year ? `${term} ${year}` : term;
 
