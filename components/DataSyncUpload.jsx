@@ -239,11 +239,11 @@ export default function DataSyncUpload({ schoolId }) {
 
       // Check if student exists (by email)
       const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('school_id', schoolId)
-        .eq('email', email)
-        .single();
+  .from('profiles')
+  .select('id')
+  .ilike('email', email)
+  .eq('school_id', schoolId)
+  .single();
 
       let studentProfileId = existing?.id;
 
