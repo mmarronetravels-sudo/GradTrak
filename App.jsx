@@ -77,11 +77,15 @@ function calculateStudentStats(courses, categories, diplomaRequirements = null) 
   // Failed (F) and No-Pass (NP) grades do not earn credit toward graduation,
   // even though the course remains visible in the student's history.
   const earnsCredit = (c) => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP';
+  // Round credit totals to 3 decimal places — graduation depends on these
+  // numbers being exact, and Summit Learning Charter uses 0.125-credit
+  // increments (eighth-credits) for some courses, so 2-decimal rounding
+  // would lose precision.
   const creditsByCategory = effectiveCategories.reduce((acc, cat) => {
-    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id && earnsCredit(c)).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+    acc[cat.id] = Math.round(courses.filter(c => c.category_id === cat.id && earnsCredit(c)).reduce((sum, c) => sum + Number(c.credits), 0) * 1000) / 1000;
     return acc;
   }, {});
-  const totalEarned = Math.round(courses.filter(earnsCredit).reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+  const totalEarned = Math.round(courses.filter(earnsCredit).reduce((sum, c) => sum + Number(c.credits), 0) * 1000) / 1000;
     const allCategoriesComplete = effectiveCategories.every(cat => {
       const earned = creditsByCategory[cat.id] || 0;
       return earned >= Number(cat.credits_required);
@@ -89,13 +93,13 @@ function calculateStudentStats(courses, categories, diplomaRequirements = null) 
 const rawPercentage = totalRequired > 0 ? Math.round((totalEarned / totalRequired) * 100) : 0;
 const percentage = allCategoriesComplete ? rawPercentage : Math.min(99, rawPercentage);
   const dualCreditCourses = courses.filter(c => c.is_dual_credit);
-  const associateCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'associate' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
-  const transferCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'transfer' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100;
+  const associateCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'associate' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 1000) / 1000;
+  const transferCredits = Math.round(dualCreditCourses.filter(c => c.dual_credit_type === 'transfer' || c.dual_credit_type === 'both').reduce((sum, c) => sum + Number(c.credits), 0) * 1000) / 1000;
   const deficiencies = effectiveCategories.map(cat => {
       const earned = creditsByCategory[cat.id] || 0;
       const required = Number(cat.credits_required);
     if (earned < required) {
-      return { category: cat, needed: Math.round((required - earned) * 100) / 100, earned, required };
+      return { category: cat, needed: Math.round((required - earned) * 1000) / 1000, earned, required };
     }
     return null;
   }).filter(Boolean);
@@ -109,7 +113,7 @@ const percentage = allCategoriesComplete ? rawPercentage : Math.min(99, rawPerce
     deficiencies,
     isOnTrack: percentage >= 50,
     categories: effectiveCategories,
-    totalDualCredits: Math.round(dualCreditCourses.reduce((sum, c) => sum + Number(c.credits), 0) * 100) / 100
+    totalDualCredits: Math.round(dualCreditCourses.reduce((sum, c) => sum + Number(c.credits), 0) * 1000) / 1000
   };
 }
 
@@ -781,7 +785,7 @@ function TranscriptModal({ isOpen, onClose, profile, courses, categories, pathwa
           <h2>Graduation Progress</h2>
           <div class="progress-grid">
             <div class="progress-item"><div class="number">${stats.percentage}%</div><div class="label">Complete</div></div>
-            <div class="progress-item"><div class="number">${parseFloat(stats.totalEarned.toFixed(2))}</div><div class="label">Credits Earned</div></div>
+            <div class="progress-item"><div class="number">${parseFloat(stats.totalEarned.toFixed(3))}</div><div class="label">Credits Earned</div></div>
             <div class="progress-item"><div class="number">${stats.totalRequired}</div><div class="label">Credits Required</div></div>
             <div class="progress-item"><div class="number">${stats.totalRequired - stats.totalEarned}</div><div class="label">Remaining</div></div>
           </div>
@@ -2542,7 +2546,7 @@ const getPathwaysForCourse = (course) => {
                 <div>
                   <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
                   <p className="text-slate-300">
-                   <span className="text-2xl font-bold text-white">{parseFloat((stats.totalEarned || 0).toFixed(2))}</span>
+                   <span className="text-2xl font-bold text-white">{parseFloat((stats.totalEarned || 0).toFixed(3))}</span>
                     <span className="text-slate-400"> / {stats.totalRequired} credits</span>
                   </p>
                   <p className="text-slate-400 text-sm mt-1">{Math.round((stats.totalRequired - stats.totalEarned) * 10) / 10} credits remaining</p>
@@ -3650,7 +3654,7 @@ const summaryStats = {
               <div>
                 <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
                 <p className="text-slate-300">
-                  <span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(2))}</span>
+                  <span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(3))}</span>
                   <span className="text-slate-400"> / {student.stats.totalRequired} credits</span>
                 </p>
                 {student.stats.deficiencies?.length > 0 ? (
@@ -4736,7 +4740,7 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
               </div>
               <div>
                 <h2 className="text-white font-bold text-lg mb-1">Graduation Progress</h2>
-                <p className="text-slate-300"><span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(2))}</span><span className="text-slate-400"> / {student.stats.totalRequired} credits</span></p>
+                <p className="text-slate-300"><span className="text-2xl font-bold text-white">{parseFloat((student.stats.totalEarned || 0).toFixed(3))}</span><span className="text-slate-400"> / {student.stats.totalRequired} credits</span></p>
               </div>
             </div>
           </div>
