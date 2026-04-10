@@ -121,8 +121,18 @@ export default function DataSyncUpload({ schoolId }) {
   });
 
   const parseExcel = async (file) => {
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array' });
+    let workbook;
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      // Read CSV as text and normalize line endings before parsing.
+      // SheetJS can usually handle CR/LF/CRLF, but some Engage exports come
+      // with classic Mac CR-only terminators that have caused silent failures.
+      const text = await file.text();
+      const normalized = text.replace(/\r\n?/g, '\n');
+      workbook = XLSX.read(normalized, { type: 'string' });
+    } else {
+      const buffer = await file.arrayBuffer();
+      workbook = XLSX.read(buffer, { type: 'array' });
+    }
     
     let students = [];
     let courses = [];
@@ -359,11 +369,18 @@ courseMappings?.forEach(m => {
 });
   
 
+    // Compute the current school-year suffix (e.g. "25/26") to fill in
+    // for source rows that have a term ("T3") but no year column.
+    const now = new Date();
+    const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+    const currentYearSuffix = `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
+
     for (const c of courses) {
-      // Map Engage field names
+      // Map Engage field names. Note `credit_ammount` is the (typo'd) header
+      // some Engage exports actually ship with — accept both spellings.
       const studentIdLocal = (c.student_id || c['student id'])?.trim();
       const courseName = (c.class || c.class_name || c.course_name)?.trim();
-      const creditAmount = parseFloat(c.credit_amount || c.credits || 0);
+      const creditAmount = parseFloat(c.credit_ammount || c.credit_amount || c.credits || 0);
       const creditType = (c.credit_type || c.category)?.trim().toUpperCase();
       const term = (c.term || '')?.trim();
       const year = (c.year || '')?.trim();
@@ -405,29 +422,60 @@ if (!category) {
   errors.push(`Course "${courseName}": Unknown credit type "${creditType}"`);
   continue;
 }
-      // Format term (e.g., "T1 25/26" or "T1")
-      const termFormatted = year ? `${term} ${year}` : term;
+      // Format term. If the source row has a term but no year column,
+      // assume the current school year (e.g. "T3" -> "T3 25/26").
+      let termFormatted;
+      if (term && year) {
+        termFormatted = `${term} ${year}`;
+      } else if (term) {
+        termFormatted = `${term} ${currentYearSuffix}`;
+      } else {
+        termFormatted = '';
+      }
 
-      // Check if course already exists (same student, course name, term)
-      const { data: existingCourse } = await supabase
+      // Find an existing row to update, in two passes:
+      //   1. Strict match by (student, name, term) — the normal case.
+      //   2. If this row carries a final grade and no strict match exists,
+      //      look for any in_progress row with the same (student, name)
+      //      regardless of term — this handles asynchronous courses that
+      //      were started in an earlier term and finished later.
+      let existingCourseId = null;
+      const { data: strictMatches } = await supabase
         .from('courses')
         .select('id')
         .eq('student_id', studentProfileId)
         .eq('name', courseName)
         .eq('term', termFormatted)
-        .single();
+        .limit(1);
+      if (strictMatches && strictMatches.length > 0) {
+        existingCourseId = strictMatches[0].id;
+      } else if (finalGrade) {
+        const { data: asynchMatches } = await supabase
+          .from('courses')
+          .select('id')
+          .eq('student_id', studentProfileId)
+          .eq('name', courseName)
+          .eq('status', 'in_progress')
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (asynchMatches && asynchMatches.length > 0) {
+          existingCourseId = asynchMatches[0].id;
+        }
+      }
 
-      if (existingCourse) {
-        // Update existing course
+      if (existingCourseId) {
+        // Update existing course (carries the new term so the row reflects
+        // when the grade was actually issued for asynch finishes).
         const { error } = await supabase
           .from('courses')
           .update({
             credits: creditAmount,
             category_id: category.id,
+            term: termFormatted,
             grade: finalGrade,
             status: finalGrade ? 'completed' : 'in_progress',
           })
-          .eq('id', existingCourse.id);
+          .eq('id', existingCourseId);
 
         if (error) {
           errors.push(`Update course "${courseName}": ${error.message}`);
@@ -491,13 +539,24 @@ if (!category) {
 
       const allErrors = [...studentResult.errors, ...courseResult.errors];
 
+      // A file with rows but zero processed is almost always a silent
+      // failure (header mismatch, wrong column names, missing categories).
+      // Surface it as an error instead of a green checkmark so the
+      // operator notices.
+      const hadInputRows = students.length > 0 || courses.length > 0;
+      const processedNothing = studentResult.count === 0 && courseResult.count === 0;
+      const isSilentNoOp = hadInputRows && processedNothing;
+
       setUploadState(prev => ({
         ...prev,
-        status: allErrors.length > 0 && (studentResult.count === 0 && courseResult.count === 0) ? 'error' : 'success',
+        status: (allErrors.length > 0 && processedNothing) || isSilentNoOp ? 'error' : 'success',
         result: {
           studentsProcessed: studentResult.count,
           coursesProcessed: courseResult.count,
+          studentRowsInFile: students.length,
+          courseRowsInFile: courses.length,
           errors: allErrors,
+          silentNoOp: isSilentNoOp,
         },
       }));
     } catch (error) {
@@ -641,10 +700,22 @@ if (!category) {
             <span className="text-2xl">❌</span>
             <div>
               <h4 className="text-red-400 font-semibold">Import Failed</h4>
-              <ul className="text-slate-400 text-sm mt-2">
-                {uploadState.result.errors?.map((err, i) => (
+              {uploadState.result.silentNoOp && (
+                <p className="text-amber-300 text-sm mt-2">
+                  The file had {uploadState.result.studentRowsInFile} student row(s) and{' '}
+                  {uploadState.result.courseRowsInFile} course row(s), but none were processed.
+                  This usually means a column header doesn't match the expected names
+                  (Student ID, Class, Credit_Ammount/Credit_Amount, Credit_Type, Term, Year, Final_Grade)
+                  or that no rows had a recognized credit type code.
+                </p>
+              )}
+              <ul className="text-slate-400 text-sm mt-2 max-h-40 overflow-y-auto">
+                {uploadState.result.errors?.slice(0, 20).map((err, i) => (
                   <li key={i}>• {err}</li>
                 ))}
+                {uploadState.result.errors?.length > 20 && (
+                  <li>• ...and {uploadState.result.errors.length - 20} more</li>
+                )}
               </ul>
               <button
                 onClick={resetUpload}

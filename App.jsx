@@ -1972,6 +1972,20 @@ if (studentData) {
               }
 
               // ── STEP 2: Current Classes ──
+              // Compute the current trimester string (e.g. "T3 25/26") instead
+              // of hardcoding it. School year starts in August (month 7).
+              const _now = new Date();
+              const _month = _now.getMonth() + 1; // 1-12
+              const _startYear = _month >= 8 ? _now.getFullYear() : _now.getFullYear() - 1;
+              const _yearSuffix = `${String(_startYear).slice(-2)}/${String(_startYear + 1).slice(-2)}`;
+              // Summit Learning Charter trimesters: Fall T1 (Aug-Nov),
+              // Winter T2 (Dec-Feb), Spring T3 (Mar-Jun/Jul).
+              let _currentTri;
+              if (_month >= 8 && _month <= 11) _currentTri = 'T1';
+              else if (_month === 12 || _month <= 2) _currentTri = 'T2';
+              else _currentTri = 'T3';
+              const currentTermString = `${_currentTri} ${_yearSuffix}`;
+
               for (const row of importStatus.classes) {
                 try {
                   const engageId = String(row.Student_ID || '').trim();
@@ -1987,14 +2001,17 @@ if (studentData) {
                   const credits = mapping?.credits || null;
 
                   // Skip if this exact in_progress course already exists
-                  const { data: existing } = await supabase
+                  // for the current term. Using .limit(1) instead of
+                  // .maybeSingle() so duplicates don't blow up the dedup.
+                  const { data: existingRows } = await supabase
                     .from('courses')
                     .select('id')
                     .eq('student_id', studentId)
                     .eq('name', className)
                     .eq('status', 'in_progress')
-                    .maybeSingle();
-                  if (existing) continue;
+                    .eq('term', currentTermString)
+                    .limit(1);
+                  if (existingRows && existingRows.length > 0) continue;
 
                   await supabase.from('courses').insert({
                     student_id: studentId,
@@ -2002,7 +2019,7 @@ if (studentData) {
                     status: 'in_progress',
                     category_id: categoryId,
                     credits: credits,
-                    term: 'T2 25/26',
+                    term: currentTermString,
                   });
                   classesAdded++;
                 } catch (err) {
@@ -2015,7 +2032,10 @@ if (studentData) {
                 try {
                   const engageId = String(row.Student_ID || '').trim();
                   const className = (row.Class || '').trim();
-                  const creditAmount = parseFloat(row.Credit_Ammount) || null;
+                  // Engage exports historically used the typo'd header
+                  // `Credit_Ammount` (double m); accept the corrected
+                  // spelling too in case future exports clean it up.
+                  const creditAmount = parseFloat(row.Credit_Ammount || row.Credit_Amount) || null;
                   const creditType = (row.Credit_Type || '').trim();
                   const term = (row.Term || '').trim();
                   const year = (row.Year || '').trim();
@@ -2027,8 +2047,18 @@ if (studentData) {
                   const studentId = engageToProfileId[engageId];
                   if (!studentId) { errors.push(`History "${className}": student ID ${engageId} not found`); continue; }
 
-                  // Build term string e.g. "T1 24/25" or "S1 23/24"
-                  const termString = term && year ? `${term} ${year}` : (term || year || 'Unknown');
+                  // Build term string e.g. "T1 24/25" or "S1 23/24". If no year
+                  // is provided, fall back to the current school year.
+                  let termString;
+                  if (term && year) {
+                    termString = `${term} ${year}`;
+                  } else if (term) {
+                    const _hgNow = new Date();
+                    const _hgStartYear = _hgNow.getMonth() >= 7 ? _hgNow.getFullYear() : _hgNow.getFullYear() - 1;
+                    termString = `${term} ${String(_hgStartYear).slice(-2)}/${String(_hgStartYear + 1).slice(-2)}`;
+                  } else {
+                    termString = year || 'Unknown';
+                  }
 
                   // Look up category from Credit_Type
                   const categoryId = categoryMap[creditType.toLowerCase()] || null;
@@ -2036,28 +2066,59 @@ if (studentData) {
                   // Look up pathway from Career_Path
                   const pathwayId = careerPath ? (pathwayMap[careerPath.toLowerCase()] || null) : null;
 
-                  // Skip duplicates
-                  const { data: existing } = await supabase
+                  // Find an existing row to update, in two passes:
+                  //   1. Strict match by (student, name, term).
+                  //   2. If no strict match, look for any in_progress row
+                  //      with the same student+name regardless of term —
+                  //      handles asynch courses that started in an earlier
+                  //      term and finished in a later one. Pick the oldest.
+                  let existingId = null;
+                  const { data: strictRows } = await supabase
                     .from('courses')
                     .select('id')
                     .eq('student_id', studentId)
                     .eq('name', className)
                     .eq('term', termString)
-                    .maybeSingle();
-                  if (existing) continue;
+                    .limit(1);
+                  if (strictRows && strictRows.length > 0) {
+                    existingId = strictRows[0].id;
+                  } else if (grade) {
+                    const { data: asynchRows } = await supabase
+                      .from('courses')
+                      .select('id')
+                      .eq('student_id', studentId)
+                      .eq('name', className)
+                      .eq('status', 'in_progress')
+                      .order('created_at', { ascending: true })
+                      .limit(1);
+                    if (asynchRows && asynchRows.length > 0) {
+                      existingId = asynchRows[0].id;
+                    }
+                  }
 
-                  const insertData = {
-                    student_id: studentId,
-                    name: className,
-                    status: 'completed',
-                    credits: creditAmount,
-                    category_id: categoryId,
-                    term: termString,
-                    grade,
-                    pathway_id: pathwayId,
-                  };
-
-                  await supabase.from('courses').insert(insertData);
+                  if (existingId) {
+                    // Update the existing row in place. Carries the new term
+                    // so the row reflects when the grade was issued.
+                    await supabase.from('courses').update({
+                      status: 'completed',
+                      credits: creditAmount,
+                      category_id: categoryId,
+                      term: termString,
+                      grade,
+                      pathway_id: pathwayId,
+                    }).eq('id', existingId);
+                  } else {
+                    await supabase.from('courses').insert({
+                      student_id: studentId,
+                      name: className,
+                      status: 'completed',
+                      credits: creditAmount,
+                      category_id: categoryId,
+                      term: termString,
+                      grade,
+                      pathway_id: pathwayId,
+                    });
+                  }
                   historyAdded++;
                 } catch (err) {
                   errors.push(`History row: ${err.message}`);
