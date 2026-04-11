@@ -3187,8 +3187,8 @@ const summaryStats = {
       </button>
     </>
   ) : (
-    <div className="flex items-center gap-1">
-      <span className="text-slate-400 text-xs italic">
+    <div className="flex items-center gap-2">
+      <span className="text-slate-300 text-base font-medium">
         {student.preferred_name || 'No preferred name'}
       </span>
       <button
@@ -3196,7 +3196,7 @@ const summaryStats = {
           setPreferredNameInput(student.preferred_name || '');
           setEditingPreferredName(true);
         }}
-        className="text-slate-500 hover:text-slate-300 text-xs ml-1 transition-colors"
+        className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
         title="Edit preferred name"
       >
         ✏️
@@ -3239,6 +3239,27 @@ const summaryStats = {
                   >
                     {student.is_adult_student ? '🔒 18+ Adult Student (FERPA)' : '+ Mark as 18+ Adult'}
                   </button>
+                  {/* Tabs — vertical list tucked under the student metadata */}
+                  <div className="flex flex-col items-start gap-2 mt-4">
+                    <button
+                      onClick={() => setActiveTab('progress')}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'progress' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                    >
+                      📊 Credits
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('courses')}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'courses' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                    >
+                      📚 Courses
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('notes')}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'notes' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                    >
+                      📝 Notes
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3262,28 +3283,6 @@ const summaryStats = {
               {student.is_active === false ? '↩️ Reactivate' : '📦 Archive'}
             </button>
           </div>
-          
-          {/* Tabs */}
-          <div className="flex gap-2 mt-4">
-            <button 
-              onClick={() => setActiveTab('progress')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'progress' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-            >
-              📊 Credits
-            </button>
-            <button 
-              onClick={() => setActiveTab('courses')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'courses' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-            >
-              📚 Courses
-            </button>
-            <button 
-              onClick={() => setActiveTab('notes')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'notes' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-            >
-              📝 Notes
-            </button>
-          </div>        
         </header>
         <main className="relative max-w-4xl mx-auto px-4 py-6 space-y-6">
           {/* Alerts */}
