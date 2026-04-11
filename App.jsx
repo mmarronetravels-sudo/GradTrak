@@ -2537,25 +2537,38 @@ async function handleSavePreferredName() {
   
   async function fetchData() {
     setLoading(true);
-    
-    await logAudit('view_counselor_dashboard', 'profiles', null);
 
-    const { data: catData } = await supabase
-      .from('credit_categories')
-      .select('*')
-      .eq('school_id', profile.school_id)
-      .order('display_order');
+    // Fire and forget — audit logging shouldn't block the UI.
+    logAudit('view_counselor_dashboard', 'profiles', null);
 
-    // Fetch diploma-specific requirements for per-diploma credit overrides
-      const { data: diplomaReqData } = await supabase
+    // Run the independent reference-data queries in parallel instead of
+    // sequentially. These don't depend on each other and were previously
+    // adding ~2-3s of dead time at the start of every load.
+    const [
+      { data: catData },
+      { data: diplomaReqData },
+      { data: pathData },
+      { data: cpData },
+    ] = await Promise.all([
+      supabase
+        .from('credit_categories')
+        .select('*')
+        .eq('school_id', profile.school_id)
+        .order('display_order'),
+      // TODO: diploma_requirements fetch is missing a school_id filter —
+      // cross-tenant concern flagged for a separate security commit.
+      supabase
         .from('diploma_requirements')
-        .select('*');
-
-    const { data: pathData } = await supabase
-      .from('cte_pathways')
-      .select('*')
-      .eq('school_id', profile.school_id)
-      .order('display_order');
+        .select('*'),
+      supabase
+        .from('cte_pathways')
+        .select('*')
+        .eq('school_id', profile.school_id)
+        .order('display_order'),
+      supabase
+        .from('course_pathways')
+        .select('*'),
+    ]);
 
 // Get students - viewers and admins see all, superuser counselors depend on toggle, regular counselors see assigned only
 let assignedStudentIds = [];
@@ -2700,10 +2713,6 @@ if (studentData) {
   const courseData = allCourses;
   console.log('Total courses fetched:', courseData.length, 'for', studentIds.length, 'students');
 
-  const { data: cpData } = await supabase
-    .from('course_pathways')
-    .select('*');
-
   const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
         const studentDiplomaReqs = student.diploma_type_id 
@@ -2715,24 +2724,36 @@ const stats = calculateStudentStats(studentCourses, catData || [], studentDiplom
         const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
         return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
       });
-// Attach counselor info to each student for filtering (batched to avoid URL length limit)
+// Attach counselor info to each student for filtering (batched to avoid URL
+      // length limit). Same parallelization as the course fetch above — previously
+      // these ran in serial, contributing ~7s to a ~1500-student initial load.
       const counselorMap = {};
+      const assignBatches = [];
       for (let i = 0; i < studentIds.length; i += batchSize) {
-        const batch = studentIds.slice(i, i + batchSize);
-        const { data: assignBatch } = await supabase
-          .from('counselor_assignments')
-          .select('student_id, counselor_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name)')
-          .in('student_id', batch)
-          .eq('assignment_type', 'counselor');
-        if (assignBatch) {
-          assignBatch.forEach(a => {
-            if (a.counselor) {
-              counselorMap[a.student_id] = {
-                counselor_id: a.counselor.id,
-                counselor_name: a.counselor.full_name
-              };
-            }
-          });
+        assignBatches.push(studentIds.slice(i, i + batchSize));
+      }
+      for (let i = 0; i < assignBatches.length; i += FETCH_PARALLEL) {
+        const chunk = assignBatches.slice(i, i + FETCH_PARALLEL);
+        const results = await Promise.all(
+          chunk.map(batch =>
+            supabase
+              .from('counselor_assignments')
+              .select('student_id, counselor_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name)')
+              .in('student_id', batch)
+              .eq('assignment_type', 'counselor')
+          )
+        );
+        for (const { data: assignBatch } of results) {
+          if (assignBatch) {
+            assignBatch.forEach(a => {
+              if (a.counselor) {
+                counselorMap[a.student_id] = {
+                  counselor_id: a.counselor.id,
+                  counselor_name: a.counselor.full_name,
+                };
+              }
+            });
+          }
         }
       }
 
@@ -4643,9 +4664,13 @@ useEffect(() => {
     }
   );
 
+  // Safety net in case the auth flow gets stuck — forces the loading
+  // screen off after 30 seconds so the user can see *something*. Uses a
+  // ref to check whether loading has already completed by then; otherwise
+  // the warning would log on every successful load as a false alarm.
   const safetyTimeout = setTimeout(() => {
-    if (mounted) {
-      console.warn('Auth safety timeout fired');
+    if (mounted && loadedProfileIdRef.current === null) {
+      console.warn('Auth safety timeout fired — profile load did not complete in 30s');
       setLoading(false);
     }
   }, 30000);
