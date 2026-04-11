@@ -438,7 +438,7 @@ if (response.status === 401) {
           <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
             <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">&#x1F4AC; Preview</h4>
             <div className="text-sm space-y-1">
-              <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">From:</span> GradTrack ({counselorProfile?.email})</p>
+              <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">From:</span> ScholarPath Graduation Progress ({counselorProfile?.email})</p>
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">To:</span> {includeStudent ? student.email : '(CC recipients only)'}</p>
               {ccEmails.trim() && <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">CC:</span> {ccEmails.split(/[,;\n]+/).filter(e => e.trim()).join(', ')}</p>}
               <p className="text-slate-400"><span className="text-slate-600 inline-block w-16">Subject:</span> {subject}</p>

@@ -96,7 +96,7 @@ serve(async (req) => {
     const ccEmails = recipientEmails.filter((e: string) => e && e.includes("@"));
 
     const resendPayload: Record<string, unknown> = {
-      from: `GradTrack Advising <${FROM_EMAIL}>`,
+      from: `ScholarPath Graduation Progress Advising <${FROM_EMAIL}>`,
       to: toEmails,
       subject: subject,
       html: emailHtml,
@@ -229,7 +229,7 @@ function buildEmailHtml({
           <tr>
             <td style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 32px 40px; border-radius: 16px 16px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">
-                🎓 GradTrack
+                🎓 ScholarPath Graduation Progress
               </h1>
               <p style="margin: 6px 0 0 0; color: #c7d2fe; font-size: 14px;">
                 ${contentTitle} — ${studentName}
@@ -244,7 +244,7 @@ function buildEmailHtml({
                 Hi ${studentName},
               </p>
               <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 24px 0;">
-                Your counselor, <strong>${senderName}</strong>, has shared your ${contentTitle.toLowerCase()} from GradTrack. Please review the information below.
+                Your counselor, <strong>${senderName}</strong>, has shared your ${contentTitle.toLowerCase()} from ScholarPath Graduation Progress. Please review the information below.
               </p>
 
               ${bodyContent}
@@ -253,7 +253,7 @@ function buildEmailHtml({
               <div style="margin: 32px 0; text-align: center;">
                 <a href="https://gradtrak.scholarpathsystems.org"
                    style="display: inline-block; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-size: 14px; font-weight: 600;">
-                  View My Progress in GradTrack →
+                  View My Progress in ScholarPath Graduation Progress →
                 </a>
               </div>
 
@@ -283,7 +283,7 @@ function buildEmailHtml({
           <tr>
             <td style="padding: 20px 40px; text-align: center; border-radius: 0 0 16px 16px; background: #f8fafc;">
               <p style="font-size: 12px; color: #94a3b8; margin: 0;">
-                Sent by GradTrack · Summit Learning Charter
+                Sent by ScholarPath Graduation Progress · Summit Learning Charter
               </p>
               <p style="font-size: 11px; color: #cbd5e1; margin: 4px 0 0 0;">
                 gradtrak.scholarpathsystems.org · © 2026 ScholarPath Systems

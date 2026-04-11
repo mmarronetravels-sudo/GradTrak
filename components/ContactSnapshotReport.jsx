@@ -620,7 +620,7 @@ export default function ContactSnapshotReport({
       doc.setTextColor(150);
       doc.setFont('helvetica', 'normal');
       doc.text(
-        `Page ${i} of ${totalPages} | GradTrack Contact Report | ${new Date().toLocaleDateString()}`,
+        `Page ${i} of ${totalPages} | ScholarPath Graduation Progress Contact Report | ${new Date().toLocaleDateString()}`,
         pageWidth / 2, pageHeight - 8, { align: 'center' }
       );
     }

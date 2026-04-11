@@ -1,4 +1,4 @@
-# 🎓 GradTrack
+# 🎓 ScholarPath Graduation Progress
 
 A mobile-friendly credit tracking app for high school students to monitor their progress toward graduation, with special support for dual credit courses.
 

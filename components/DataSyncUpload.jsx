@@ -765,7 +765,7 @@ export default function DataSyncUpload({ schoolId }) {
       {/* Template download link */}
       <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
         <p className="text-slate-300 text-sm">
-          📋 Use the <strong>GradTrack Engage Import Template</strong> with two sheets:
+          📋 Use the <strong>ScholarPath Graduation Progress Engage Import Template</strong> with two sheets:
         </p>
         <ul className="text-slate-400 text-xs mt-1 ml-4 list-disc">
           <li><strong>Students</strong>: Student_ID, Last_Name, First_Name, Student Email, Grade, Advisor</li>

@@ -51,7 +51,7 @@ serve(async (req) => {
 
     if (existingProfile) {
       return new Response(JSON.stringify({ 
-        error: 'A GradTrack account already exists for this email. Use the Link Parent button instead.' 
+        error: 'A ScholarPath Graduation Progress account already exists for this email. Use the Link Parent button instead.'
       }), {
         status: 409,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

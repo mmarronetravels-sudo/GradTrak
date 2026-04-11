@@ -286,7 +286,7 @@ export default function AttendanceContactExport({ supabaseClient, schoolId }) {
             📋 Attendance Contact Export
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            Attendance contacts logged in GradTrack · Export CSV for Engage import
+            Attendance contacts logged in ScholarPath Graduation Progress · Export CSV for Engage import
           </p>
         </div>
         <div className="flex items-center gap-3">
