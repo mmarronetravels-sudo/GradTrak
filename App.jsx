@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, supabaseUrl, supabaseAnonKey } from './supabase'
 import DataSyncUpload from './components/DataSyncUpload';
 import AtRiskReport from './components/AtRiskReport';
@@ -2677,15 +2677,24 @@ if (studentData) {
   const studentIds = studentData.map(s => s.id);
   const batchSize = 20;
   let allCourses = [];
+  // Build the list of batches first, then run them in parallel groups.
+  // Previously these ran sequentially — for a school with ~1500 students,
+  // that was ~77 round-trips in series, producing a 20-30s initial load.
+  // Running 10 in parallel drops the wall-clock to ~3-4s.
+  const allBatches = [];
   for (let i = 0; i < studentIds.length; i += batchSize) {
-    const batch = studentIds.slice(i, i + batchSize);
-   const { data: courseData } = await supabase
-  .from('courses')
-  .select('*')
-  .in('student_id', batch)
-  .limit(5000);
-    if (courseData) {
-      allCourses = allCourses.concat(courseData);
+    allBatches.push(studentIds.slice(i, i + batchSize));
+  }
+  const FETCH_PARALLEL = 10;
+  for (let i = 0; i < allBatches.length; i += FETCH_PARALLEL) {
+    const chunk = allBatches.slice(i, i + FETCH_PARALLEL);
+    const results = await Promise.all(
+      chunk.map(batch =>
+        supabase.from('courses').select('*').in('student_id', batch).limit(5000)
+      )
+    );
+    for (const { data: courseData } of results) {
+      if (courseData) allCourses = allCourses.concat(courseData);
     }
   }
   const courseData = allCourses;
@@ -2695,8 +2704,6 @@ if (studentData) {
     .from('course_pathways')
     .select('*');
 
-      const bellasCourses = courseData.filter(c => c.student_id === '9a0b98a9-1077-4383-be87-aa9e1f52ed62');
-console.log('Bellas courses in fetched data:', bellasCourses.length);      
   const studentsWithCourses = studentData.map(student => {
         const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
         const studentDiplomaReqs = student.diploma_type_id 
@@ -4522,6 +4529,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isReactivating, setIsReactivating] = useState(false);
 
+  // Tracks the currently loaded profile id. Used by the onAuthStateChange
+  // handler to short-circuit when Supabase re-fires SIGNED_IN events on
+  // tab return — we don't want to re-run findOrCreateProfile (and trigger
+  // a full dashboard re-mount + data refetch) just because the browser
+  // tab became visible again.
+  const loadedProfileIdRef = useRef(null);
+
 useEffect(() => {
   let mounted = true;
 
@@ -4594,6 +4608,7 @@ useEffect(() => {
       console.log('onAuthStateChange:', event, session?.user?.email);
 
       if (event === 'SIGNED_OUT') {
+        loadedProfileIdRef.current = null;
         setUser(null);
         setProfile(null);
         setLoading(false);
@@ -4601,11 +4616,22 @@ useEffect(() => {
       }
 
       if (session?.user) {
+        // Skip the profile-lookup chain if we've already loaded this user's
+        // profile. getSession() can re-fire SIGNED_IN / TOKEN_REFRESHED
+        // events when the tab becomes visible again — those are informational,
+        // not fresh logins. Re-running findOrCreateProfile here would cause
+        // the dashboard to remount and refetch every student's data,
+        // which kills in-flight imports and looks like a page reload.
+        if (loadedProfileIdRef.current === session.user.id) {
+          return;
+        }
+
         setUser(session.user);
         // Pass the access token directly from the session object —
         // this is always valid at the moment onAuthStateChange fires
         const profile = await findOrCreateProfile(session.user, session.access_token);
         if (mounted) {
+          loadedProfileIdRef.current = profile?.id || null;
           setProfile(profile);
           setLoading(false);
         }
@@ -4695,6 +4721,7 @@ useEffect(() => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user]);
   const handleLogout = () => {
+    loadedProfileIdRef.current = null;
     setUser(null);
     setProfile(null);
     localStorage.clear();
