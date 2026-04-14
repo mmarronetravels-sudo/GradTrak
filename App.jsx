@@ -3078,9 +3078,10 @@ const filteredStudents = students
     if (!showArchivedStudents && student.is_active === false) {
       return false;
     }
-    if (!student.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
+    if (searchTerm && !student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) && 
+    !student.preferred_name?.toLowerCase().includes(searchTerm.toLowerCase())) {
+  return false;
+}
     if (counselorFilter !== 'all' && student.counselor_id !== counselorFilter) {
       return false;
     }
