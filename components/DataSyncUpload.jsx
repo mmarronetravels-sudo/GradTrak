@@ -745,8 +745,8 @@ if (studentProfileId && counselorId) {
         courseResult = await syncCourses(courses, studentResult.studentIdMap);
       }
 
-      const allErrors = [...studentResult.errors, ...courseResult.errors];
-
+      let allErrors = [...studentResult.errors, ...courseResult.errors];
+      
       // A file with rows but zero processed AND zero skipped is almost
       // always a silent failure (header mismatch, wrong column names,
       // missing categories). "Skipped" rows are intentional no-ops from
