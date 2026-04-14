@@ -204,6 +204,12 @@ export default function DataSyncUpload({ schoolId }) {
       const grade = parseInt(s.grade, 10);
       
       let graduationYear = parseInt(s.graduation_year, 10);
+      // Guard against 2-digit graduation years (e.g. "28" instead of "2028")
+      // that some Engage exports produce. Without this, getGradeLevel() in
+      // AdminStudentManager computes absurd grade values and returns null.
+      if (!isNaN(graduationYear) && graduationYear < 100) {
+        graduationYear += 2000;
+      }
       if (isNaN(graduationYear) && !isNaN(grade)) {
         graduationYear = calculateGraduationYear(grade);
       }
