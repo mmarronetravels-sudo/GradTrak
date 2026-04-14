@@ -47,12 +47,6 @@ export default function DataSyncUpload({ schoolId }) {
     if (!creditTypeCode) return null;
     const code = creditTypeCode.toUpperCase().trim();
     
-    // Map Engage credit type codes to credit category names. These names
-    // must match the school's credit_categories.name values exactly
-    // (case-insensitive). Whether a category contributes to a particular
-    // student's graduation requirements is determined elsewhere via the
-    // diploma_requirements override table — this map only resolves which
-    // category an imported course belongs to.
     const codeToName = {
       'MA': 'Mathematics',
       'LA': 'English Language Arts',
@@ -65,7 +59,7 @@ export default function DataSyncUpload({ schoolId }) {
       'PF': 'Personal Financial Education',
       'CC': 'Career & College',
       'EL': 'Electives',
-      'MS': null, // Middle School — don't count toward HS credits
+      'MS': null,
     };
 
     const categoryName = codeToName[code];
@@ -96,15 +90,10 @@ export default function DataSyncUpload({ schoolId }) {
   // Calculate graduation year from grade level
   const calculateGraduationYear = (grade) => {
     const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth(); // 0-11
-    
-    // If we're in the fall (Aug-Dec), use current school year; otherwise, use previous
+    const currentMonth = new Date().getMonth();
     const schoolYear = currentMonth >= 7 ? currentYear : currentYear - 1;
-    
     const gradeNum = parseInt(grade, 10);
     if (isNaN(gradeNum) || gradeNum < 9 || gradeNum > 12) return null;
-    
-    // Grade 9 = 4 years to graduation, Grade 12 = 1 year
     return schoolYear + (13 - gradeNum);
   };
 
@@ -128,9 +117,6 @@ export default function DataSyncUpload({ schoolId }) {
   const parseExcel = async (file) => {
     let workbook;
     if (file.name.toLowerCase().endsWith('.csv')) {
-      // Read CSV as text and normalize line endings before parsing.
-      // SheetJS can usually handle CR/LF/CRLF, but some Engage exports come
-      // with classic Mac CR-only terminators that have caused silent failures.
       const text = await file.text();
       const normalized = text.replace(/\r\n?/g, '\n');
       workbook = XLSX.read(normalized, { type: 'string' });
@@ -144,7 +130,6 @@ export default function DataSyncUpload({ schoolId }) {
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
-      // Skip instruction/reference sheets
       if (sheetName.toLowerCase().includes('instruction') || 
           sheetName.toLowerCase().includes('credit type')) {
         continue;
@@ -152,7 +137,6 @@ export default function DataSyncUpload({ schoolId }) {
       
       const data = XLSX.utils.sheet_to_json(sheet, { defval: '' });
       
-      // Skip header description row (row 2 in template)
       const filteredData = data.filter(row => {
         const firstValue = Object.values(row)[0]?.toString().toLowerCase() || '';
         return !firstValue.includes('required') && !firstValue.includes('optional');
@@ -161,7 +145,6 @@ export default function DataSyncUpload({ schoolId }) {
       const normalized = filteredData.map(row => {
         const newRow = {};
         for (const [key, value] of Object.entries(row)) {
-          // Normalize column names: lowercase, trim, replace spaces with underscores
           const normalizedKey = key.toLowerCase().trim().replace(/\s+/g, '_');
           newRow[normalizedKey] = String(value).trim();
         }
@@ -171,14 +154,13 @@ export default function DataSyncUpload({ schoolId }) {
       if (normalized.length > 0) {
         const columns = Object.keys(normalized[0]);
         
-        // Detect sheet type by column names
         const isStudentSheet = columns.some(c => 
           c === 'student_email' || c === 'first_name'
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
         
         const isCourseSheet = columns.some(c => 
-  c === 'class' || c === 'class_name' || c === 'credit_amount' || c === 'credit_type'
-);
+          c === 'class' || c === 'class_name' || c === 'credit_amount' || c === 'credit_type'
+        );
 
         if (sheetName.toLowerCase() === 'students' || isStudentSheet) {
           students = normalized;
@@ -195,16 +177,15 @@ export default function DataSyncUpload({ schoolId }) {
   const syncStudents = async (students) => {
     const errors = [];
     let count = 0;
-    const studentIdMap = {}; // Maps Student_ID to profile UUID
+    const studentIdMap = {};
 
     // Get all counselors for this school
     const { data: counselors } = await supabase
       .from('profiles')
       .select('id, email, full_name')
       .eq('school_id', schoolId)
-      .eq('role', 'counselor');
+      .in('role', ['counselor', 'case_manager']);
 
-    // Create maps for counselor lookup (by email and by name)
     const counselorEmailMap = {};
     const counselorNameMap = {};
     counselors?.forEach(c => {
@@ -214,10 +195,7 @@ export default function DataSyncUpload({ schoolId }) {
       }
     });
 
-    const { data: { user } } = await supabase.auth.getUser();
-
     for (const s of students) {
-      // Map Engage field names to our fields
       const studentIdLocal = s.student_id?.trim();
       const email = (s.student_email || s.email)?.trim().toLowerCase();
       const firstName = s.first_name?.trim();
@@ -225,17 +203,15 @@ export default function DataSyncUpload({ schoolId }) {
       const fullName = s.full_name?.trim() || `${firstName} ${lastName}`.trim();
       const grade = parseInt(s.grade, 10);
       
-      // Calculate graduation year if not provided
       let graduationYear = parseInt(s.graduation_year, 10);
       if (isNaN(graduationYear) && !isNaN(grade)) {
         graduationYear = calculateGraduationYear(grade);
       }
       
-      // Look up advisor/counselor (can be email or name)
+      // Look up advisor/counselor — accept Advisor_Name or Advisor column
       const advisorField = (s.advisor_name || s.advisor || s.counselor_email || '')?.trim().toLowerCase();
       let counselorId = counselorEmailMap[advisorField] || counselorNameMap[advisorField] || null;
 
-      // Skip rows without required fields
       if (!email || !fullName || fullName === ' ') {
         if (studentIdLocal) {
           errors.push(`Skipped Student_ID ${studentIdLocal}: missing email or name`);
@@ -243,23 +219,20 @@ export default function DataSyncUpload({ schoolId }) {
         continue;
       }
 
-      // Skip middle school students (grades below 9)
-      if (grade < 9) {
-        continue;
-      }
+      if (grade < 9) continue;
 
-      // Determine diploma type
       const diplomaType = getDefaultDiplomaType(graduationYear);
       const diplomaTypeId = diplomaType?.id || null;
 
-      // Check if student exists (by email)
+      // Check if student exists by email — use maybeSingle + is_active filter
+      // to avoid .single() errors when inactive duplicates exist
       const { data: existing } = await supabase
-  .from('profiles')
-  .select('id')
-  .ilike('email', email)
-  .eq('school_id', schoolId)
-  .eq('is_active', true)
-  .maybeSingle();
+        .from('profiles')
+        .select('id')
+        .ilike('email', email)
+        .eq('school_id', schoolId)
+        .eq('is_active', true)
+        .maybeSingle();
 
       let studentProfileId = existing?.id;
 
@@ -273,6 +246,7 @@ export default function DataSyncUpload({ schoolId }) {
             graduation_year: graduationYear,
             diploma_type_id: diplomaTypeId,
             student_id_local: studentIdLocal,
+            engage_id: studentIdLocal,
           })
           .eq('id', existing.id);
         
@@ -283,33 +257,28 @@ export default function DataSyncUpload({ schoolId }) {
           studentProfileId = existing.id;
         }
       } else {
-        // Insert new student. First create an auth account (with the
-        // shared default password) so the student can log in to view
-        // their own progress, then upsert the profile keyed to the new
-        // auth user id. Mirrors the legacy App.jsx Excel-import behavior
-        // so we don't change the experience for new students.
+        // New student — try auth signup first, but don't stop if signups are disabled
         let newUserId = null;
         const { data: authData, error: authErr } = await supabase.auth.signUp({
           email,
           password: 'GradTrack2026!',
         });
-        if (authErr) {
-  const msg = authErr.message.toLowerCase();
-  if (msg.includes('already registered')) {
-    // fine — will look up existing profile below
-  } else if (msg.includes('signups not allowed') || msg.includes('not allowed')) {
-    // signups disabled — skip auth creation but still upsert profile
-  } else {
-    errors.push(`Auth signup ${email}: ${authErr.message}`);
-    continue;
-  }
-}
-        newUserId = authData?.user?.id || null;
 
-        // Edge case: auth account already existed (e.g. cross-school move)
-        // but we couldn't find a profile in this school. Look up the
-        // existing profile by email regardless of school so we can adopt
-        // the same id and upsert against it.
+        if (authErr) {
+          const msg = authErr.message.toLowerCase();
+          if (msg.includes('already registered')) {
+            // Auth account exists — will look up profile below
+          } else if (msg.includes('signups not allowed') || msg.includes('not allowed')) {
+            // Signups disabled — skip auth creation, still upsert profile
+          } else {
+            errors.push(`Auth signup ${email}: ${authErr.message}`);
+            continue;
+          }
+        } else {
+          newUserId = authData?.user?.id || null;
+        }
+
+        // If no auth user ID yet, look up existing profile by email
         if (!newUserId) {
           const { data: existingByEmail } = await supabase
             .from('profiles')
@@ -319,52 +288,54 @@ export default function DataSyncUpload({ schoolId }) {
           newUserId = existingByEmail?.id || null;
         }
 
+        // If still no ID, insert profile directly (signups disabled case)
         if (!newUserId) {
-  // No auth account and signups disabled — insert profile directly with a generated ID
-  const { data: newProfile, error: insertErr } = await supabase
-    .from('profiles')
-    .insert({
-      school_id: schoolId,
-      email,
-      full_name: fullName,
-      grade,
-      graduation_year: graduationYear,
-      role: 'student',
-      diploma_type_id: diplomaTypeId,
-      student_id_local: studentIdLocal,
-      engage_id: studentIdLocal,
-      is_active: true,
-    })
-    .select('id')
-    .single();
-  if (insertErr || !newProfile) {
-    errors.push(`Insert ${email}: could not create profile`);
-    continue;
-  }
-  newUserId = newProfile.id;
-}
-
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: newUserId,
-            school_id: schoolId,
-            email,
-            full_name: fullName,
-            grade,
-            graduation_year: graduationYear,
-            role: 'student',
-            diploma_type_id: diplomaTypeId,
-            student_id_local: studentIdLocal,
-            is_active: true,
-          });
-
-        if (error) {
-          errors.push(`Insert ${email}: ${error.message}`);
+          const { data: newProfile, error: insertErr } = await supabase
+            .from('profiles')
+            .insert({
+              school_id: schoolId,
+              email,
+              full_name: fullName,
+              grade,
+              graduation_year: graduationYear,
+              role: 'student',
+              diploma_type_id: diplomaTypeId,
+              student_id_local: studentIdLocal,
+              engage_id: studentIdLocal,
+              is_active: true,
+            })
+            .select('id')
+            .single();
+          if (insertErr || !newProfile) {
+            errors.push(`Insert ${email}: could not create profile`);
+            continue;
+          }
+          newUserId = newProfile.id;
         } else {
-          count++;
-          studentProfileId = newUserId;
+          // Upsert profile with known ID
+          const { error } = await supabase
+            .from('profiles')
+            .upsert({
+              id: newUserId,
+              school_id: schoolId,
+              email,
+              full_name: fullName,
+              grade,
+              graduation_year: graduationYear,
+              role: 'student',
+              diploma_type_id: diplomaTypeId,
+              student_id_local: studentIdLocal,
+              engage_id: studentIdLocal,
+              is_active: true,
+            });
+          if (error) {
+            errors.push(`Insert ${email}: ${error.message}`);
+            continue;
+          }
         }
+
+        count++;
+        studentProfileId = newUserId;
       }
 
       // Store mapping from local Student_ID to profile UUID
@@ -372,57 +343,51 @@ export default function DataSyncUpload({ schoolId }) {
         studentIdMap[studentIdLocal] = studentProfileId;
       }
 
-     // Assign counselor if found — delete old assignment first, then insert new one
-if (studentProfileId && counselorId) {
-  const { data: existingAssignment } = await supabase
-    .from('counselor_assignments')
-    .select('id, counselor_id')
-    .eq('student_id', studentProfileId)
-    .eq('assignment_type', 'counselor')
-    .maybeSingle();
+      // Assign counselor — update if changed, insert if new
+      if (studentProfileId && counselorId) {
+        const { data: existingAssignment } = await supabase
+          .from('counselor_assignments')
+          .select('id, counselor_id')
+          .eq('student_id', studentProfileId)
+          .eq('assignment_type', 'counselor')
+          .maybeSingle();
 
-  if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
-    // Student changed advisors — delete old assignment
-    await supabase
-      .from('counselor_assignments')
-      .delete()
-      .eq('id', existingAssignment.id);
-  }
+        if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
+          // Advisor changed — delete old assignment
+          await supabase
+            .from('counselor_assignments')
+            .delete()
+            .eq('id', existingAssignment.id);
+        }
 
-  if (!existingAssignment || existingAssignment.counselor_id !== counselorId) {
-    // Insert new assignment
-    const { error: assignError } = await supabase
-      .from('counselor_assignments')
-      .insert({
-        student_id: studentProfileId,
-        counselor_id: counselorId,
-        school_id: schoolId,
-        assignment_type: 'counselor',
-        assigned_by: null,
-        assigned_at: new Date().toISOString()
-      });
-    if (assignError && !assignError.message.includes('duplicate')) {
-      errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
+        if (!existingAssignment || existingAssignment.counselor_id !== counselorId) {
+          // Insert new assignment
+          const { error: assignError } = await supabase
+            .from('counselor_assignments')
+            .insert({
+              student_id: studentProfileId,
+              counselor_id: counselorId,
+              school_id: schoolId,
+              assignment_type: 'counselor',
+              assigned_at: new Date().toISOString(),
+            });
+          if (assignError && !assignError.message.includes('duplicate')) {
+            errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
+          }
+        }
+      }
     }
-  }
-}
 
     return { count, errors, studentIdMap };
   };
 
   // Sync courses from the Courses sheet.
-  // Optimized for large files (25k+ rows): pre-fetches all relevant existing
-  // course rows in batched queries, builds in-memory indexes for dedup,
-  // skips no-op updates, then bulk-inserts new rows and runs updates in
-  // small parallel batches. A naive per-row implementation against Supabase
-  // takes hours for a typical Engage export; this finishes in ~1 minute.
   const syncCourses = async (courses, studentIdMap = {}) => {
     const errors = [];
     let inserted = 0;
     let updated = 0;
     let skipped = 0;
 
-    // Build a map of student_id_local to profile id if not provided
     if (Object.keys(studentIdMap).length === 0) {
       const { data: students } = await supabase
         .from('profiles')
@@ -438,10 +403,6 @@ if (studentProfileId && counselorId) {
       });
     }
 
-    // Load all course mappings upfront. We fetch BOTH the category_id and
-    // the credits column — current-courses files from Engage have no
-    // credit_amount column at all, so credits must come from the mapping
-    // table or the course will land in the database with credits=0.
     const { data: courseMappings } = await supabase
       .from('course_mappings')
       .select('course_name, category_id, credits')
@@ -455,22 +416,14 @@ if (studentProfileId && counselorId) {
       };
     });
 
-    // Compute the current school-year suffix (e.g. "25/26") to fill in
-    // for source rows that have a term ("T3") but no year column.
     const now = new Date();
     const startYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
     const currentYearSuffix = `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
 
-    // ── Pass 1: Parse and validate each input row ──
-    // Produces a list of fully-resolved rows ready to compare against the
-    // database. Skipped rows (missing student, MS courses, etc.) get
-    // recorded here once and never touched again.
     const parsed = [];
     const affectedStudentIds = new Set();
 
     for (const c of courses) {
-      // Map Engage field names. Note `credit_ammount` is the (typo'd) header
-      // some Engage exports actually ship with — accept both spellings.
       const studentIdLocal = (c.student_id || c['student id'])?.trim();
       const courseName = (c.class || c.class_name || c.course_name)?.trim();
       const creditAmountRaw = parseFloat(c.credit_ammount || c.credit_amount || c.credits || 0);
@@ -488,8 +441,6 @@ if (studentProfileId && counselorId) {
         continue;
       }
 
-      // Resolve category. First try the row's credit_type code, then fall
-      // back to the school's course_mappings table by course name.
       const mapping = courseMappingMap[courseName.toLowerCase()];
       let category = getCategoryByCode(creditType);
       if (!category && mapping?.category_id) {
@@ -500,15 +451,6 @@ if (studentProfileId && counselorId) {
         continue;
       }
 
-      // Resolve credit amount. Source row first, then course_mappings
-      // fallback. Current-courses Engage exports have no credit column at
-      // all, so the mapping fallback is what populates credits for them.
-      //
-      // IMPORTANT: only fall back to mapping credits when the row has NO
-      // grade. A graded row with credit=0 means "graded outcome with no
-      // credit earned" (Incomplete, Fail) — that 0 is intentional and
-      // overriding it from the mapping would inflate the student's earned
-      // credit total.
       let creditAmount = isNaN(creditAmountRaw) ? null : creditAmountRaw;
       if (
         (creditAmount == null || creditAmount === 0) &&
@@ -518,15 +460,10 @@ if (studentProfileId && counselorId) {
         creditAmount = Number(mapping.credits);
       }
 
-      // Skip truly empty rows: no grade AND no credit (after mapping
-      // fallback). A row with grade='I' and credit=0 (Incomplete) is NOT
-      // empty — it's a real outcome we want in the student's history.
       const hasGrade = !!finalGrade;
       const hasCredit = creditAmount != null && creditAmount > 0;
       if (!hasGrade && !hasCredit) continue;
 
-      // Format term. If the source row has a term but no year column,
-      // assume the current school year (e.g. "T3" -> "T3 25/26").
       let termFormatted;
       if (term && year) termFormatted = `${term} ${year}`;
       else if (term) termFormatted = `${term} ${currentYearSuffix}`;
@@ -546,8 +483,6 @@ if (studentProfileId && counselorId) {
       affectedStudentIds.add(studentProfileId);
     }
 
-    // ── Pass 2: Bulk pre-fetch existing courses for affected students ──
-    // One query per ~50 students. Much faster than one query per row.
     const studentIdArray = [...affectedStudentIds];
     const allExisting = [];
     const FETCH_BATCH = 50;
@@ -564,12 +499,6 @@ if (studentProfileId && counselorId) {
       if (data) allExisting.push(...data);
     }
 
-    // ── Pass 3: Build lookup indexes ──
-    // strictIndex: (student|name|term) -> existing row, used as the primary
-    //   match for normal same-term reconciliation.
-    // inProgressIndex: (student|name) -> oldest in_progress row, used as a
-    //   fallback so an asynch course finished in a later term still updates
-    //   the original placeholder instead of creating a duplicate.
     const strictIndex = new Map();
     const inProgressIndex = new Map();
     for (const c of allExisting) {
@@ -583,7 +512,6 @@ if (studentProfileId && counselorId) {
       }
     }
 
-    // ── Pass 4: Decide each row's fate locally (zero DB queries) ──
     const toInsert = [];
     const toUpdate = [];
 
@@ -593,10 +521,6 @@ if (studentProfileId && counselorId) {
       return Number(a) === Number(b);
     };
 
-    // Convert a term string like "T1 25/26", "T3 24/25", "SU 24/25" into a
-    // sortable numeric value so we can compare which term came earlier.
-    // Returns null for unparseable terms (in which case the asynch fallback
-    // will be skipped to avoid wrong-row matches).
     const termOrder = (t) => {
       if (!t) return null;
       const yearMatch = t.match(/(\d{2})\/\d{2}\s*$/);
@@ -605,9 +529,9 @@ if (studentProfileId && counselorId) {
       const triMatch = t.match(/^(SU|S(\d)|T(\d))/);
       let pos = 0;
       if (triMatch) {
-        if (triMatch[3]) pos = parseInt(triMatch[3], 10);          // T1=1, T2=2, T3=3
-        else if (triMatch[2]) pos = parseInt(triMatch[2], 10) * 2; // S1=2, S2=4
-        else pos = 4; // SU (after T3 but before next year's T1)
+        if (triMatch[3]) pos = parseInt(triMatch[3], 10);
+        else if (triMatch[2]) pos = parseInt(triMatch[2], 10) * 2;
+        else pos = 4;
       }
       return year * 10 + pos;
     };
@@ -616,13 +540,6 @@ if (studentProfileId && counselorId) {
       const strictKey = `${row.studentProfileId}|${row.courseName}|${row.termFormatted}`;
       let existing = strictIndex.get(strictKey);
       if (!existing && row.finalGrade) {
-        // Asynch fallback: only match an in_progress row whose term is
-        // EARLIER THAN OR EQUAL TO the new grade's term. The whole point
-        // of the fallback is "course started earlier, finished later" —
-        // matching a LATER in_progress row to satisfy an EARLIER grade
-        // is the retake case (e.g. student got Incomplete in T2, is
-        // currently retaking in T3) and would silently destroy the
-        // current attempt's row.
         const candidate = inProgressIndex.get(
           `${row.studentProfileId}|${row.courseName}`
         );
@@ -640,9 +557,6 @@ if (studentProfileId && counselorId) {
       }
 
       if (existing) {
-        // No-op skip: if every relevant field already matches, don't issue
-        // an UPDATE. For weekly re-uploads of mostly-unchanged data this
-        // turns thousands of pointless writes into zero work.
         const isUnchanged =
           existing.term === row.termFormatted &&
           creditsEqual(existing.credits, row.creditAmount) &&
@@ -676,7 +590,6 @@ if (studentProfileId && counselorId) {
       }
     }
 
-    // ── Pass 5: Bulk insert new rows ──
     const INSERT_BATCH = 500;
     for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
       const batch = toInsert.slice(i, i + INSERT_BATCH);
@@ -688,9 +601,6 @@ if (studentProfileId && counselorId) {
       }
     }
 
-    // ── Pass 6: Run updates in small parallel batches ──
-    // Parallelism is bounded so we don't open hundreds of simultaneous
-    // PostgREST connections. 10 in flight is a safe sweet spot.
     const UPDATE_PARALLEL = 10;
     for (let i = 0; i < toUpdate.length; i += UPDATE_PARALLEL) {
       const batch = toUpdate.slice(i, i + UPDATE_PARALLEL);
@@ -731,22 +641,53 @@ if (studentProfileId && counselorId) {
       let studentResult = { count: 0, errors: [], studentIdMap: {} };
       let courseResult = { count: 0, errors: [] };
 
-      // Sync students first
       if (students.length > 0) {
         studentResult = await syncStudents(students);
       }
 
-      // Then sync courses (passing the student ID map)
       if (courses.length > 0) {
         courseResult = await syncCourses(courses, studentResult.studentIdMap);
       }
 
       let allErrors = [...studentResult.errors, ...courseResult.errors];
-      
-      // A file with rows but zero processed AND zero skipped is almost
-      // always a silent failure (header mismatch, wrong column names,
-      // missing categories). "Skipped" rows are intentional no-ops from
-      // the new import path — those should NOT count as a silent failure.
+
+      // Archive students not in the import file (withdrawn students)
+      // Only runs when file looks like a full export (500+ students)
+      let archivedCount = 0;
+      if (students.length > 500) {
+        const importedEngageIds = new Set(
+          students.map(s => s.student_id?.toString().trim()).filter(Boolean)
+        );
+        const importedEmails = new Set(
+          students.map(s => s.student_email?.trim().toLowerCase()).filter(Boolean)
+        );
+
+        const { data: activeStudents } = await supabase
+          .from('profiles')
+          .select('id, email, engage_id, full_name')
+          .eq('school_id', schoolId)
+          .eq('role', 'student')
+          .eq('is_active', true);
+
+        const toArchive = (activeStudents || []).filter(s => {
+          const inByEngageId = s.engage_id && importedEngageIds.has(s.engage_id.toString().trim());
+          const inByEmail = s.email && importedEmails.has(s.email.toLowerCase());
+          return !inByEngageId && !inByEmail;
+        });
+
+        for (const s of toArchive) {
+          await supabase
+            .from('profiles')
+            .update({
+              is_active: false,
+              withdrawal_date: new Date().toISOString().split('T')[0],
+            })
+            .eq('id', s.id);
+          archivedCount++;
+          allErrors.push(`Archived (withdrew): ${s.full_name} (${s.email})`);
+        }
+      }
+
       const hadInputRows = students.length > 0 || courses.length > 0;
       const processedNothing =
         studentResult.count === 0 &&
@@ -754,43 +695,6 @@ if (studentProfileId && counselorId) {
         (courseResult.skipped || 0) === 0;
       const isSilentNoOp = hadInputRows && processedNothing;
 
-      // Archive students not in the import file (they have withdrawn)
-let archivedCount = 0;
-if (students.length > 500) {
-  // Only run archive logic if this looks like a full student export (not partial)
-  const importedEngageIds = new Set(
-    students.map(s => s.student_id?.toString().trim()).filter(Boolean)
-  );
-  const importedEmails = new Set(
-    students.map(s => s.student_email?.trim().toLowerCase()).filter(Boolean)
-  );
-
-  const { data: activeStudents } = await supabase
-    .from('profiles')
-    .select('id, email, engage_id, full_name')
-    .eq('school_id', schoolId)
-    .eq('role', 'student')
-    .eq('is_active', true);
-
-  const toArchive = (activeStudents || []).filter(s => {
-    const inByEngageId = s.engage_id && importedEngageIds.has(s.engage_id.toString().trim());
-    const inByEmail = s.email && importedEmails.has(s.email.toLowerCase());
-    return !inByEngageId && !inByEmail;
-  });
-
-  for (const s of toArchive) {
-    await supabase
-      .from('profiles')
-      .update({
-        is_active: false,
-        withdrawal_date: new Date().toISOString().split('T')[0],
-      })
-      .eq('id', s.id);
-    archivedCount++;
-    allErrors.push(`Archived (withdrew): ${s.full_name} (${s.email})`);
-  }
-}
-      
       setUploadState(prev => ({
         ...prev,
         status: (allErrors.length > 0 && processedNothing) || isSilentNoOp ? 'error' : 'success',
@@ -826,7 +730,6 @@ if (students.length > 500) {
     <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
       <h3 className="text-lg font-semibold text-white mb-4">📤 Data Sync Upload</h3>
       
-      {/* Status indicators */}
       <div className="mb-4 text-sm space-y-1">
         <div className={diplomaTypesLoaded ? 'text-emerald-400' : 'text-amber-400'}>
           {diplomaTypesLoaded ? '✓' : '⏳'} {diplomaTypes.length} diploma types {diplomaTypesLoaded ? 'loaded' : 'loading...'}
@@ -836,7 +739,6 @@ if (students.length > 500) {
         </div>
       </div>
 
-      {/* Template download link */}
       <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
         <p className="text-slate-300 text-sm">
           📋 Use the <strong>ScholarPath Graduation Progress Engage Import Template</strong> with two sheets:
@@ -847,7 +749,6 @@ if (students.length > 500) {
         </ul>
       </div>
       
-      {/* Dropzone */}
       {uploadState.status === 'idle' && (
         <div
           {...getRootProps()}
@@ -870,7 +771,6 @@ if (students.length > 500) {
         </div>
       )}
 
-      {/* File selected */}
       {uploadState.file && uploadState.status === 'idle' && (
         <div className="mt-4">
           <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
@@ -898,7 +798,6 @@ if (students.length > 500) {
         </div>
       )}
 
-      {/* Uploading */}
       {uploadState.status === 'uploading' && (
         <div className="mt-4 text-center py-8">
           <div className="animate-spin text-4xl mb-3">⚙️</div>
@@ -906,7 +805,6 @@ if (students.length > 500) {
         </div>
       )}
 
-      {/* Success */}
       {uploadState.status === 'success' && uploadState.result && (
         <div className="mt-6 p-4 bg-emerald-900/30 border border-emerald-700 rounded-xl">
           <div className="flex items-start gap-3">
@@ -915,6 +813,9 @@ if (students.length > 500) {
               <h4 className="text-emerald-400 font-semibold">Import Complete!</h4>
               <div className="text-slate-300 text-sm mt-2 space-y-1">
                 <p>✓ {uploadState.result.studentsProcessed} students processed</p>
+                {uploadState.result.studentsArchived > 0 && (
+                  <p>📦 {uploadState.result.studentsArchived} students archived (withdrew)</p>
+                )}
                 <p>✓ {uploadState.result.coursesProcessed} course records processed</p>
                 {(uploadState.result.coursesInserted > 0 ||
                   uploadState.result.coursesUpdated > 0 ||
@@ -949,7 +850,6 @@ if (students.length > 500) {
         </div>
       )}
 
-      {/* Error */}
       {uploadState.status === 'error' && uploadState.result && (
         <div className="mt-6 p-4 bg-red-900/30 border border-red-700 rounded-xl">
           <div className="flex items-start gap-3">
@@ -961,7 +861,6 @@ if (students.length > 500) {
                   The file had {uploadState.result.studentRowsInFile} student row(s) and{' '}
                   {uploadState.result.courseRowsInFile} course row(s), but none were processed.
                   This usually means a column header doesn't match the expected names
-                  (Student ID, Class, Credit_Ammount/Credit_Amount, Credit_Type, Term, Year, Final_Grade)
                   or that no rows had a recognized credit type code.
                 </p>
               )}
