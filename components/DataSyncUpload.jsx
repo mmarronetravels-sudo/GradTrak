@@ -292,10 +292,17 @@ export default function DataSyncUpload({ schoolId }) {
           email,
           password: 'GradTrack2026!',
         });
-        if (authErr && !authErr.message.toLowerCase().includes('already registered')) {
-          errors.push(`Auth signup ${email}: ${authErr.message}`);
-          continue;
-        }
+        if (authErr) {
+  const msg = authErr.message.toLowerCase();
+  if (msg.includes('already registered')) {
+    // fine — will look up existing profile below
+  } else if (msg.includes('signups not allowed') || msg.includes('not allowed')) {
+    // signups disabled — skip auth creation but still upsert profile
+  } else {
+    errors.push(`Auth signup ${email}: ${authErr.message}`);
+    continue;
+  }
+}
         newUserId = authData?.user?.id || null;
 
         // Edge case: auth account already existed (e.g. cross-school move)
