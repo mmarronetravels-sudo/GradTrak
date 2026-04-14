@@ -391,7 +391,7 @@ if (studentProfileId && counselorId) {
 
   if (!existingAssignment || existingAssignment.counselor_id !== counselorId) {
     // Insert new assignment
-    await supabase
+    const { error: assignError } = await supabase
       .from('counselor_assignments')
       .insert({
         student_id: studentProfileId,
@@ -401,15 +401,11 @@ if (studentProfileId && counselorId) {
         assigned_by: null,
         assigned_at: new Date().toISOString()
       });
+    if (assignError && !assignError.message.includes('duplicate')) {
+      errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
+    }
   }
 }
-
-          if (assignError && !assignError.message.includes('duplicate')) {
-            errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
-          }
-        }
-      }
-    }
 
     return { count, errors, studentIdMap };
   };
