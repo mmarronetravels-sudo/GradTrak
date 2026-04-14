@@ -258,7 +258,8 @@ export default function DataSyncUpload({ schoolId }) {
   .select('id')
   .ilike('email', email)
   .eq('school_id', schoolId)
-  .single();
+  .eq('is_active', true)
+  .maybeSingle();
 
       let studentProfileId = existing?.id;
 
