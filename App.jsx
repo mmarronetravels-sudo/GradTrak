@@ -1241,13 +1241,29 @@ function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
     if (logData) setAuditLogs(logData);
     if (delData) setDeletionRequests(delData);
     
-    // Fetch subscription status
+    // Fetch subscription status, then override current_students with an
+    // accurate count of active-only students. The school_subscription_status
+    // view may include archived/withdrawn students in its count.
     const { data: subData } = await supabase
       .from('school_subscription_status')
       .select('*')
       .eq('id', profile.school_id)
       .single();
-    if (subData) setSubscription(subData);
+    if (subData) {
+      const { count: activeStudentCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('school_id', profile.school_id)
+        .eq('role', 'student')
+        .eq('is_active', true);
+      setSubscription({
+        ...subData,
+        current_students: activeStudentCount ?? subData.current_students,
+        usage_percentage: subData.max_students
+          ? Math.round(((activeStudentCount ?? subData.current_students) / subData.max_students) * 100)
+          : 0,
+      });
+    }
     
     // Fetch counselor caseloads
     const { data: caseloadData } = await supabase
