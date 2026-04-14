@@ -2538,244 +2538,212 @@ async function handleSavePreferredName() {
   async function fetchData() {
     setLoading(true);
 
-    // Fire and forget — audit logging shouldn't block the UI.
-    logAudit('view_counselor_dashboard', 'profiles', null);
+    // ── Direct-fetch setup ──
+    // Bypass the Supabase JS client which freezes when Chrome throttles
+    // background tabs, causing 20+ second reloads on tab return. Direct
+    // fetch() calls against the PostgREST API are immune because they
+    // don't rely on Supabase's internal session/timer state.
+    // See AdminStudentManager.jsx and StudentNotesLog.jsx for the same
+    // pattern already established in the codebase.
+    let token = null;
+    try {
+      const raw = localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token');
+      token = raw ? JSON.parse(raw)?.access_token : null;
+    } catch (e) { token = null; }
 
-    // Run the independent reference-data queries in parallel instead of
-    // sequentially. These don't depend on each other and were previously
-    // adding ~2-3s of dead time at the start of every load.
-    const [
-      { data: catData },
-      { data: diplomaReqData },
-      { data: pathData },
-      { data: cpData },
-    ] = await Promise.all([
-      supabase
-        .from('credit_categories')
-        .select('*')
-        .eq('school_id', profile.school_id)
-        .order('display_order'),
-      // TODO: diploma_requirements fetch is missing a school_id filter —
-      // cross-tenant concern flagged for a separate security commit.
-      supabase
-        .from('diploma_requirements')
-        .select('*'),
-      supabase
-        .from('cte_pathways')
-        .select('*')
-        .eq('school_id', profile.school_id)
-        .order('display_order'),
-      supabase
-        .from('course_pathways')
-        .select('*'),
-    ]);
-
-// Get students - viewers and admins see all, superuser counselors depend on toggle, regular counselors see assigned only
-let assignedStudentIds = [];
-
-if (profile.role === 'viewer' || profile.role === 'admin') {
-  // Viewers and admins always see all students in their school
-  const { data: allStudentData } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('school_id', profile.school_id)
-    .eq('role', 'student');
-  assignedStudentIds = allStudentData?.map(s => s.id) || [];
-} else if (profile.is_superuser && viewAllStudents) {
-  // Superuser counselor in "All Students" mode
-  const { data: allStudentData } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('school_id', profile.school_id)
-    .eq('role', 'student');
-  assignedStudentIds = allStudentData?.map(s => s.id) || [];
-} else {
-  // Regular counselors (or superuser counselors in "My Students" mode) see assigned only
-  const assignmentType = profile.role === 'case_manager' ? 'case_manager' : 'counselor';
-  const { data: assignmentData } = await supabase
-    .from('counselor_assignments')
-    .select('student_id')
-    .eq('counselor_id', profile.id)
-    .eq('assignment_type', assignmentType);
-  assignedStudentIds = assignmentData?.map(a => a.student_id) || [];
-}
-
-// Fetch all students for Link Parent modal
-const { data: allStudentData } = await supabase
-  .from('profiles')
-  .select('id, full_name, email, grade, graduation_year, has_iep, has_504, is_ell, is_ged')
-  .eq('school_id', profile.school_id)
-  .eq('role', 'student')
-  .order('full_name');
-if (allStudentData) setAllStudents(allStudentData);
-
-// If no students, show empty list
-if (assignedStudentIds.length === 0) {
-  setStudents([]);
-  if (catData) setCategories(catData);
-  if (pathData) setPathways(pathData);
-  setLoading(false);
-  return;
-}    
-    
-// If no students, show empty list
-if (assignedStudentIds.length === 0) {
-  setStudents([]);
-  if (catData) setCategories(catData);
-  if (diplomaReqData) setDiplomaRequirements(diplomaReqData);
-  if (pathData) setPathways(pathData);
-  setLoading(false);
-  return;
-}
-    const handleArchiveStudent = async ({ studentId, isActive, withdrawalDate, withdrawalReason }) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_active: isActive,
-        withdrawal_date: withdrawalDate,
-        withdrawal_reason: withdrawalReason
-      })
-      .eq('id', studentId);
-
-    if (error) {
-      console.error('Archive error:', error);
-      throw error;
+    if (!token) {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.replace(window.location.origin);
+      return;
     }
 
-    setStudents(prev => prev.map(s => 
-      s.id === studentId 
-        ? { ...s, is_active: isActive, withdrawal_date: withdrawalDate, withdrawal_reason: withdrawalReason }
-        : s
-    ));
+    const SUPA_URL = supabaseUrl;
+    const SUPA_KEY = supabaseAnonKey;
+    const hdrs = {
+      'Authorization': `Bearer ${token}`,
+      'apikey': SUPA_KEY,
+      'Content-Type': 'application/json',
+    };
 
-    if (selectedStudent?.id === studentId) {
-      setSelectedStudent(prev => ({ 
-        ...prev, 
-        is_active: isActive, 
-        withdrawal_date: withdrawalDate, 
-        withdrawal_reason: withdrawalReason 
-      }));
-    }
-
-    setShowArchiveModal(false);
-    setArchiveTarget(null);
-  };
-
-   // Fetch student profiles — superusers/viewers get all, counselors get assigned only
-    let studentQuery = supabase
-      .from('profiles')
-      .select(`
-        *,
-        diploma_types (
-          id,
-          code,
-          name
-        )
-      `);
-    
-    if (profile.is_superuser || profile.role === 'viewer' || profile.role === 'admin') {
-      // Fetch all students directly — no .in() needed, avoids URL length limit
-      studentQuery = studentQuery
-        .eq('school_id', profile.school_id)
-        .eq('role', 'student');
-    } else {
-      // Counselors/case managers — fetch only assigned students
-      studentQuery = studentQuery.in('id', assignedStudentIds);
-    }
-
-    const { data: studentData } = await studentQuery;
-
-if (studentData) {
-  // Fetch courses in batches of 50 to avoid URL length limits
-  const studentIds = studentData.map(s => s.id);
-  const batchSize = 20;
-  let allCourses = [];
-  // Build the list of batches first, then run them in parallel groups.
-  // Previously these ran sequentially — for a school with ~1500 students,
-  // that was ~77 round-trips in series, producing a 20-30s initial load.
-  // Running 10 in parallel drops the wall-clock to ~3-4s.
-  const allBatches = [];
-  for (let i = 0; i < studentIds.length; i += batchSize) {
-    allBatches.push(studentIds.slice(i, i + batchSize));
-  }
-  const FETCH_PARALLEL = 10;
-  for (let i = 0; i < allBatches.length; i += FETCH_PARALLEL) {
-    const chunk = allBatches.slice(i, i + FETCH_PARALLEL);
-    const results = await Promise.all(
-      chunk.map(batch =>
-        supabase.from('courses').select('*').in('student_id', batch).limit(5000)
-      )
-    );
-    for (const { data: courseData } of results) {
-      if (courseData) allCourses = allCourses.concat(courseData);
-    }
-  }
-  const courseData = allCourses;
-  console.log('Total courses fetched:', courseData.length, 'for', studentIds.length, 'students');
-
-  const studentsWithCourses = studentData.map(student => {
-        const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
-        const studentDiplomaReqs = student.diploma_type_id 
-  ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
-  : null;
-const stats = calculateStudentStats(studentCourses, catData || [], studentDiplomaReqs);
-        const alerts = generateAlerts(student, stats);
-        const studentCoursePathways = cpData?.filter(cp => studentCourses.some(c => c.id === cp.course_id)) || [];
-        const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
-        return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
-      });
-// Attach counselor info to each student for filtering (batched to avoid URL
-      // length limit). Same parallelization as the course fetch above — previously
-      // these ran in serial, contributing ~7s to a ~1500-student initial load.
-      const counselorMap = {};
-      const assignBatches = [];
-      for (let i = 0; i < studentIds.length; i += batchSize) {
-        assignBatches.push(studentIds.slice(i, i + batchSize));
+    // Helper: GET from PostgREST, parse JSON. Redirects to login on 401.
+    const doGet = async (path) => {
+      const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: hdrs });
+      if (res.status === 401) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace(window.location.origin);
+        return null;
       }
-      for (let i = 0; i < assignBatches.length; i += FETCH_PARALLEL) {
-        const chunk = assignBatches.slice(i, i + FETCH_PARALLEL);
-        const results = await Promise.all(
-          chunk.map(batch =>
-            supabase
-              .from('counselor_assignments')
-              .select('student_id, counselor_id, counselor:profiles!counselor_assignments_counselor_id_fkey(id, full_name)')
-              .in('student_id', batch)
-              .eq('assignment_type', 'counselor')
+      if (!res.ok) throw new Error(`Fetch ${path.split('?')[0]} failed: ${res.status}`);
+      return res.json();
+    };
+
+    // Helper: build PostgREST `in.(...)` filter from an array of UUIDs.
+    const inList = (ids) => `in.(${ids.map(id => `"${id}"`).join(',')})`;
+
+    try {
+      // Fire and forget — audit logging shouldn't block the UI.
+      logAudit('view_counselor_dashboard', 'profiles', null);
+
+      // ── Phase 1: Independent reference-data queries in parallel ──
+      const [catData, diplomaReqData, pathData, cpData] = await Promise.all([
+        doGet(`credit_categories?select=*&school_id=eq.${profile.school_id}&order=display_order`),
+        // TODO: diploma_requirements fetch is missing a school_id filter —
+        // cross-tenant concern flagged for a separate security commit.
+        doGet(`diploma_requirements?select=*`),
+        doGet(`cte_pathways?select=*&school_id=eq.${profile.school_id}&order=display_order`),
+        doGet(`course_pathways?select=*`),
+      ]);
+
+      // ── Phase 2: Determine which students this user can see ──
+      let assignedStudentIds = [];
+
+      if (profile.role === 'viewer' || profile.role === 'admin') {
+        const allIds = await doGet(
+          `profiles?select=id&school_id=eq.${profile.school_id}&role=eq.student`
+        );
+        assignedStudentIds = allIds?.map(s => s.id) || [];
+      } else if (profile.is_superuser && viewAllStudents) {
+        const allIds = await doGet(
+          `profiles?select=id&school_id=eq.${profile.school_id}&role=eq.student`
+        );
+        assignedStudentIds = allIds?.map(s => s.id) || [];
+      } else {
+        const assignmentType = profile.role === 'case_manager' ? 'case_manager' : 'counselor';
+        const assignments = await doGet(
+          `counselor_assignments?select=student_id&counselor_id=eq.${profile.id}&assignment_type=eq.${assignmentType}`
+        );
+        assignedStudentIds = assignments?.map(a => a.student_id) || [];
+      }
+
+      // Fetch all students for Link Parent modal
+      const allStudentData = await doGet(
+        `profiles?select=id,full_name,email,grade,graduation_year,has_iep,has_504,is_ell,is_ged&school_id=eq.${profile.school_id}&role=eq.student&order=full_name`
+      );
+      if (allStudentData) setAllStudents(allStudentData);
+
+      // If no students, show empty list and bail early
+      if (assignedStudentIds.length === 0) {
+        setStudents([]);
+        if (catData) setCategories(catData);
+        if (diplomaReqData) setDiplomaRequirements(diplomaReqData);
+        if (pathData) setPathways(pathData);
+        setLoading(false);
+        return;
+      }
+
+      // ── Phase 3: Fetch student profiles (with diploma_types join) ──
+      let studentData;
+      if (profile.is_superuser || profile.role === 'viewer' || profile.role === 'admin') {
+        studentData = await doGet(
+          `profiles?select=*,diploma_types(id,code,name)&school_id=eq.${profile.school_id}&role=eq.student`
+        );
+      } else {
+        // For counselors/case managers, batch the IN filter to stay under URL length limits.
+        const idBatchSize = 50;
+        const idBatches = [];
+        for (let i = 0; i < assignedStudentIds.length; i += idBatchSize) {
+          idBatches.push(assignedStudentIds.slice(i, i + idBatchSize));
+        }
+        const profileResults = await Promise.all(
+          idBatches.map(batch =>
+            doGet(`profiles?select=*,diploma_types(id,code,name)&id=${inList(batch)}`)
           )
         );
-        for (const { data: assignBatch } of results) {
-          if (assignBatch) {
-            assignBatch.forEach(a => {
-              if (a.counselor) {
-                counselorMap[a.student_id] = {
-                  counselor_id: a.counselor.id,
-                  counselor_name: a.counselor.full_name,
-                };
-              }
-            });
-          }
-        }
+        studentData = profileResults.flat().filter(Boolean);
       }
 
-      studentsWithCourses.forEach(s => {
-        s.counselor_id = counselorMap[s.id]?.counselor_id || null;
-        s.counselor_name = counselorMap[s.id]?.counselor_name || null;
-      });
+      if (studentData) {
+        const studentIds = studentData.map(s => s.id);
+        const batchSize = 20;
+        const FETCH_PARALLEL = 10;
 
-      setStudents(studentsWithCourses);
-      if (cpData) setCoursePathways(cpData);
+        // ── Phase 4: Fetch courses in parallel batches ──
+        let allCourses = [];
+        const courseBatches = [];
+        for (let i = 0; i < studentIds.length; i += batchSize) {
+          courseBatches.push(studentIds.slice(i, i + batchSize));
+        }
+        for (let i = 0; i < courseBatches.length; i += FETCH_PARALLEL) {
+          const chunk = courseBatches.slice(i, i + FETCH_PARALLEL);
+          const results = await Promise.all(
+            chunk.map(batch =>
+              doGet(`courses?select=*&student_id=${inList(batch)}&limit=5000`)
+            )
+          );
+          for (const data of results) {
+            if (data) allCourses = allCourses.concat(data);
+          }
+        }
+        const courseData = allCourses;
+        console.log('Total courses fetched:', courseData.length, 'for', studentIds.length, 'students');
+
+        // ── Build student objects with courses, stats, alerts, pathways ──
+        const studentsWithCourses = studentData.map(student => {
+          const studentCourses = courseData?.filter(c => c.student_id === student.id) || [];
+          const studentDiplomaReqs = student.diploma_type_id
+            ? (diplomaReqData || []).filter(r => r.diploma_type_id === student.diploma_type_id)
+            : null;
+          const stats = calculateStudentStats(studentCourses, catData || [], studentDiplomaReqs);
+          const alerts = generateAlerts(student, stats);
+          const studentCoursePathways = cpData?.filter(cp => studentCourses.some(c => c.id === cp.course_id)) || [];
+          const pathwayProgress = calculatePathwayProgress(studentCourses, pathData || [], studentCoursePathways);
+          return { ...student, courses: studentCourses, stats, alerts, pathwayProgress, coursePathways: studentCoursePathways, displayName: getDisplayName(student) };
+        });
+
+        // ── Phase 5: Fetch counselor assignments in parallel batches ──
+        const counselorMap = {};
+        const assignBatches = [];
+        for (let i = 0; i < studentIds.length; i += batchSize) {
+          assignBatches.push(studentIds.slice(i, i + batchSize));
+        }
+        for (let i = 0; i < assignBatches.length; i += FETCH_PARALLEL) {
+          const chunk = assignBatches.slice(i, i + FETCH_PARALLEL);
+          const results = await Promise.all(
+            chunk.map(batch =>
+              doGet(
+                `counselor_assignments?select=student_id,counselor_id,counselor:profiles!counselor_assignments_counselor_id_fkey(id,full_name)&student_id=${inList(batch)}&assignment_type=eq.counselor`
+              )
+            )
+          );
+          for (const data of results) {
+            if (data) {
+              data.forEach(a => {
+                if (a.counselor) {
+                  counselorMap[a.student_id] = {
+                    counselor_id: a.counselor.id,
+                    counselor_name: a.counselor.full_name,
+                  };
+                }
+              });
+            }
+          }
+        }
+
+        studentsWithCourses.forEach(s => {
+          s.counselor_id = counselorMap[s.id]?.counselor_id || null;
+          s.counselor_name = counselorMap[s.id]?.counselor_name || null;
+        });
+
+        setStudents(studentsWithCourses);
+        if (cpData) setCoursePathways(cpData);
+      }
+
+      // Fetch parents
+      const parentData = await doGet(
+        `profiles?select=*&school_id=eq.${profile.school_id}&role=eq.parent`
+      );
+
+      if (catData) setCategories(catData);
+      if (pathData) setPathways(pathData);
+      if (parentData) setParents(parentData);
+      setLoading(false);
+    } catch (err) {
+      console.error('fetchData error:', err);
+      setLoading(false);
+      alert('Failed to load student data. Please refresh and try again.');
     }
-    // Fetch parents
-    const { data: parentData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('school_id', profile.school_id)
-      .eq('role', 'parent');
-
-    if (catData) setCategories(catData);
-    if (pathData) setPathways(pathData);
-    if (parentData) setParents(parentData);
-    setLoading(false);
   }
 
   // ============================================
