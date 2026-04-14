@@ -372,25 +372,37 @@ export default function DataSyncUpload({ schoolId }) {
         studentIdMap[studentIdLocal] = studentProfileId;
       }
 
-      // Assign counselor if found
-      if (studentProfileId && counselorId) {
-        const { data: existingAssignment } = await supabase
-          .from('counselor_assignments')
-          .select('id')
-          .eq('student_id', studentProfileId)
-          .eq('counselor_id', counselorId)
-          .single();
+     // Assign counselor if found — delete old assignment first, then insert new one
+if (studentProfileId && counselorId) {
+  const { data: existingAssignment } = await supabase
+    .from('counselor_assignments')
+    .select('id, counselor_id')
+    .eq('student_id', studentProfileId)
+    .eq('assignment_type', 'counselor')
+    .maybeSingle();
 
-        if (!existingAssignment) {
-          const { error: assignError } = await supabase
-            .from('counselor_assignments')
-            .insert({
-              student_id: studentProfileId,
-              counselor_id: counselorId,
-              school_id: schoolId,
-              assigned_by: user?.id || null,
-              assigned_at: new Date().toISOString()
-            });
+  if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
+    // Student changed advisors — delete old assignment
+    await supabase
+      .from('counselor_assignments')
+      .delete()
+      .eq('id', existingAssignment.id);
+  }
+
+  if (!existingAssignment || existingAssignment.counselor_id !== counselorId) {
+    // Insert new assignment
+    await supabase
+      .from('counselor_assignments')
+      .insert({
+        student_id: studentProfileId,
+        counselor_id: counselorId,
+        school_id: schoolId,
+        assignment_type: 'counselor',
+        assigned_by: null,
+        assigned_at: new Date().toISOString()
+      });
+  }
+}
 
           if (assignError && !assignError.message.includes('duplicate')) {
             errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
@@ -746,11 +758,49 @@ export default function DataSyncUpload({ schoolId }) {
         (courseResult.skipped || 0) === 0;
       const isSilentNoOp = hadInputRows && processedNothing;
 
+      // Archive students not in the import file (they have withdrawn)
+let archivedCount = 0;
+if (students.length > 500) {
+  // Only run archive logic if this looks like a full student export (not partial)
+  const importedEngageIds = new Set(
+    students.map(s => s.student_id?.toString().trim()).filter(Boolean)
+  );
+  const importedEmails = new Set(
+    students.map(s => s.student_email?.trim().toLowerCase()).filter(Boolean)
+  );
+
+  const { data: activeStudents } = await supabase
+    .from('profiles')
+    .select('id, email, engage_id, full_name')
+    .eq('school_id', schoolId)
+    .eq('role', 'student')
+    .eq('is_active', true);
+
+  const toArchive = (activeStudents || []).filter(s => {
+    const inByEngageId = s.engage_id && importedEngageIds.has(s.engage_id.toString().trim());
+    const inByEmail = s.email && importedEmails.has(s.email.toLowerCase());
+    return !inByEngageId && !inByEmail;
+  });
+
+  for (const s of toArchive) {
+    await supabase
+      .from('profiles')
+      .update({
+        is_active: false,
+        withdrawal_date: new Date().toISOString().split('T')[0],
+      })
+      .eq('id', s.id);
+    archivedCount++;
+    allErrors.push(`Archived (withdrew): ${s.full_name} (${s.email})`);
+  }
+}
+      
       setUploadState(prev => ({
         ...prev,
         status: (allErrors.length > 0 && processedNothing) || isSilentNoOp ? 'error' : 'success',
         result: {
           studentsProcessed: studentResult.count,
+          studentsArchived: archivedCount,
           coursesProcessed: courseResult.count,
           coursesInserted: courseResult.inserted || 0,
           coursesUpdated: courseResult.updated || 0,
