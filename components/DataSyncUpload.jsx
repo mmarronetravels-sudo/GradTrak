@@ -232,7 +232,7 @@ export default function DataSyncUpload({ schoolId }) {
       }
       
       // Look up advisor/counselor (can be email or name)
-      const advisorField = (s.advisor || s.counselor_email || '')?.trim().toLowerCase();
+      const advisorField = (s.advisor_name || s.advisor || s.counselor_email || '')?.trim().toLowerCase();
       let counselorId = counselorEmailMap[advisorField] || counselorNameMap[advisorField] || null;
 
       // Skip rows without required fields
@@ -768,7 +768,7 @@ export default function DataSyncUpload({ schoolId }) {
           📋 Use the <strong>ScholarPath Graduation Progress Engage Import Template</strong> with two sheets:
         </p>
         <ul className="text-slate-400 text-xs mt-1 ml-4 list-disc">
-          <li><strong>Students</strong>: Student_ID, Last_Name, First_Name, Student Email, Grade, Advisor</li>
+          <li><strong>Students</strong>: Student_ID, Last_Name, First_Name, Student Email, Grade, Graduation_Year, Advisor_ID, Advisor_Name, Subprogram</li>
           <li><strong>Courses</strong>: Student ID, Class, Credit Amount, Credit Type, Term, Year, Final Grade</li>
         </ul>
       </div>
