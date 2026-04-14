@@ -49,12 +49,13 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
       if (schoolError) throw schoolError;
 
-      // Get student count
+      // Get active student count (excludes archived/withdrawn students)
       const { count: studentCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('school_id', schoolId)
-        .eq('role', 'student');
+        .eq('role', 'student')
+        .eq('is_active', true);
 
       setSubscription({
         ...schoolData,
@@ -80,7 +81,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             .from('counselor_assignments')
             .select(`
               student_id,
-              profiles!counselor_assignments_student_id_fkey (grade)
+              profiles!counselor_assignments_student_id_fkey (grade, is_active)
             `)
             .eq('counselor_id', counselor.id);
 
@@ -89,7 +90,8 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
           if (assignments) {
             assignments.forEach(a => {
-              if (a.profiles?.grade) {
+              // Only count active students — archived/withdrawn should not inflate caseloads
+              if (a.profiles?.grade && a.profiles?.is_active !== false) {
                 gradeCounts[a.profiles.grade] = (gradeCounts[a.profiles.grade] || 0) + 1;
                 total++;
               }
@@ -106,12 +108,13 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
       setCounselors(counselorsWithCounts);
 
-      // Fetch unassigned students
+      // Fetch unassigned students (active only — archived students shouldn't appear)
       const { data: allStudentData } = await supabase
         .from('profiles')
         .select('id, full_name, email, grade, graduation_year')
         .eq('school_id', schoolId)
         .eq('role', 'student')
+        .eq('is_active', true)
         .order('grade')
         .order('full_name');
 
