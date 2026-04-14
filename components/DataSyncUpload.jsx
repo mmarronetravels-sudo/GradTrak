@@ -320,9 +320,29 @@ export default function DataSyncUpload({ schoolId }) {
         }
 
         if (!newUserId) {
-          errors.push(`Insert ${email}: could not create or locate auth user`);
-          continue;
-        }
+  // No auth account and signups disabled — insert profile directly with a generated ID
+  const { data: newProfile, error: insertErr } = await supabase
+    .from('profiles')
+    .insert({
+      school_id: schoolId,
+      email,
+      full_name: fullName,
+      grade,
+      graduation_year: graduationYear,
+      role: 'student',
+      diploma_type_id: diplomaTypeId,
+      student_id_local: studentIdLocal,
+      engage_id: studentIdLocal,
+      is_active: true,
+    })
+    .select('id')
+    .single();
+  if (insertErr || !newProfile) {
+    errors.push(`Insert ${email}: could not create profile`);
+    continue;
+  }
+  newUserId = newProfile.id;
+}
 
         const { error } = await supabase
           .from('profiles')
