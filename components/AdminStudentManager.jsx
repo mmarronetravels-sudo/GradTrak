@@ -6,7 +6,12 @@ const CURRENT_SCHOOL_YEAR = new Date().getMonth() >= 7 ? new Date().getFullYear(
 function getGradeLevel(graduationYear) {
   if (!graduationYear) return null;
   const grade = 12 - (graduationYear - (CURRENT_SCHOOL_YEAR + 1));
-  return grade >= 1 && grade <= 12 ? grade : null;
+  if (grade < 1) return null;
+  // Cap at 12 for "super seniors" — students past their original
+  // graduation year who are still actively enrolled. Common for
+  // asynch virtual schools where students complete courses on
+  // their own timeline.
+  return Math.min(grade, 12);
 }
 
 function getGradYearFromGrade(grade) {
