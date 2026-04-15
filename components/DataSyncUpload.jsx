@@ -349,14 +349,17 @@ export default function DataSyncUpload({ schoolId }) {
         studentIdMap[studentIdLocal] = studentProfileId;
       }
 
-      // Assign counselor — update if changed, insert if new
+      // Assign counselor — update if changed, insert if new.
+      // Using .limit(1) instead of .maybeSingle() so pre-existing
+      // duplicate rows don't cause an error that skips the cleanup.
       if (studentProfileId && counselorId) {
-        const { data: existingAssignment } = await supabase
+        const { data: existingRows } = await supabase
           .from('counselor_assignments')
           .select('id, counselor_id')
           .eq('student_id', studentProfileId)
           .eq('assignment_type', 'counselor')
-          .maybeSingle();
+          .limit(1);
+        const existingAssignment = existingRows?.[0] || null;
 
         if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
           // Advisor changed — delete old assignment
