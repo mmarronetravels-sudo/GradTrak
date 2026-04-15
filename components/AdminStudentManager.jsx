@@ -121,11 +121,10 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const filtered = students.filter(s => {
-    const grade = getGradeLevel(s.graduation_year);
     const matchesSearch = !search || s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       s.email?.toLowerCase().includes(search.toLowerCase()) ||
       s.student_id_local?.includes(search);
-    const matchesGrade = gradeFilter === 'all' || String(grade) === gradeFilter;
+    const matchesGrade = gradeFilter === 'all' || String(s.grade) === gradeFilter;
     const matchesCounselor = counselorFilter === 'all' || s.counselor_id === counselorFilter;
     return matchesSearch && matchesGrade && matchesCounselor;
   });
@@ -291,7 +290,7 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
     setSaving(false);
   }
 
-  const grades = [...new Set(students.map(s => getGradeLevel(s.graduation_year)).filter(Boolean))].sort((a, b) => a - b);
+  const grades = [...new Set(students.map(s => s.grade).filter(Boolean))].sort((a, b) => a - b);
 
   return (
     <div className="space-y-4">
@@ -367,7 +366,6 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
                   </td>
                 </tr>
               ) : filtered.map(s => {
-                const grade = getGradeLevel(s.graduation_year);
                 const counselor = counselors.find(c => c.id === s.counselor_id);
                 return (
                   <tr key={s.id} className="bg-slate-900 hover:bg-slate-800/60 transition-colors">
@@ -376,7 +374,7 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
                       <div className="text-slate-500 text-xs">{s.email}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-400">{s.student_id_local || '—'}</td>
-                    <td className="px-4 py-3 text-slate-300">{grade ? `${grade}` : '—'}</td>
+                    <td className="px-4 py-3 text-slate-300">{s.grade || '—'}</td>
                     <td className="px-4 py-3 text-slate-300">{counselor?.full_name || <span className="text-slate-600">Unassigned</span>}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
