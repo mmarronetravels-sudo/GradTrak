@@ -86,14 +86,15 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
       );
       const sData = sRes.ok ? await sRes.json() : [];
 
-      // Fetch counselor assignments
+      // Fetch counselor AND case_manager assignments so both appear in the
+      // filter dropdown and students show under their assigned advisor.
       const studentIds = sData.map(s => s.id);
       const counselorMap = {};
       for (let i = 0; i < studentIds.length; i += 50) {
         const batch = studentIds.slice(i, i + 50);
         const ids = batch.map(id => `"${id}"`).join(',');
         const cRes = await directFetch(
-          `counselor_assignments?student_id=in.(${ids})&school_id=eq.${schoolId}&assignment_type=eq.counselor&select=student_id,counselor_id`
+          `counselor_assignments?student_id=in.(${ids})&school_id=eq.${schoolId}&select=student_id,counselor_id`
         );
         if (cRes.ok) {
           const cData = await cRes.json();
