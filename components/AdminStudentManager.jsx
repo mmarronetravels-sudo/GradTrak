@@ -86,22 +86,33 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
       );
       const sData = sRes.ok ? await sRes.json() : [];
 
-      // Fetch counselor AND case_manager assignments so both appear in the
-      // filter dropdown and students show under their assigned advisor.
+      // Fetch ALL assignments (counselor + case_manager) so students can be
+      // filtered by either. A student can have both a counselor and a case
+      // manager — store them separately so filtering by either works.
       const studentIds = sData.map(s => s.id);
       const counselorMap = {};
+      const caseManagerMap = {};
       for (let i = 0; i < studentIds.length; i += 50) {
         const batch = studentIds.slice(i, i + 50);
         const ids = batch.map(id => `"${id}"`).join(',');
         const cRes = await directFetch(
-          `counselor_assignments?student_id=in.(${ids})&school_id=eq.${schoolId}&select=student_id,counselor_id`
+          `counselor_assignments?student_id=in.(${ids})&school_id=eq.${schoolId}&select=student_id,counselor_id,assignment_type`
         );
         if (cRes.ok) {
           const cData = await cRes.json();
-          cData.forEach(a => { counselorMap[a.student_id] = a.counselor_id; });
+          cData.forEach(a => {
+            if (a.assignment_type === 'case_manager') {
+              caseManagerMap[a.student_id] = a.counselor_id;
+            } else {
+              counselorMap[a.student_id] = a.counselor_id;
+            }
+          });
         }
       }
-      sData.forEach(s => { s.counselor_id = counselorMap[s.id] || null; });
+      sData.forEach(s => {
+        s.counselor_id = counselorMap[s.id] || null;
+        s.case_manager_id = caseManagerMap[s.id] || null;
+      });
       setStudents(sData);
 
       // Fetch counselors
@@ -126,7 +137,7 @@ export default function AdminStudentManager({ schoolId, profile, onViewStudent }
       s.email?.toLowerCase().includes(search.toLowerCase()) ||
       s.student_id_local?.includes(search);
     const matchesGrade = gradeFilter === 'all' || String(s.grade) === gradeFilter;
-    const matchesCounselor = counselorFilter === 'all' || s.counselor_id === counselorFilter;
+    const matchesCounselor = counselorFilter === 'all' || s.counselor_id === counselorFilter || s.case_manager_id === counselorFilter;
     return matchesSearch && matchesGrade && matchesCounselor;
   });
 
