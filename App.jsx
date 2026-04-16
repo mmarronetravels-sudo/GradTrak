@@ -1722,6 +1722,18 @@ if (studentData) {
     schoolId={profile.school_id}
   />
 )}
+  {activeTab === 'at-risk' && (
+  <AtRiskReport
+    schoolId={profile.school_id}
+    onSelectStudent={(student) => onSwitchToCounselor(student.id)}
+  />
+)}
+  {activeTab === 'cte-pathways' && (
+  <CTEPathwayReport
+    schoolId={profile.school_id}
+    onSelectStudent={(student) => onSwitchToCounselor(student.id)}
+  />
+)}
       </main>
       {/* Category Modal */}
       {showCategoryModal && (
