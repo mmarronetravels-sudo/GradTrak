@@ -1190,7 +1190,9 @@ function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
   const [courseMappings, setCourseMappings] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
   const [subscription, setSubscription] = useState(null);
-  const [caseloads, setCaseloads] = useState([]);  
+  const [caseloads, setCaseloads] = useState([]);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState('all');
   const displayName = getDisplayName(profile);
   const [currentCoursesExpanded, setCurrentCoursesExpanded] = useState(true);
   const [counselors, setCounselors] = useState([]);
@@ -1222,9 +1224,9 @@ function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
 
     const { data: logData } = await supabase
       .from('audit_logs')
-      .select('*')
+      .select('*, profiles(full_name)')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(200);
 
     const { data: delData } = await supabase
       .from('deletion_requests')
@@ -1733,6 +1735,84 @@ if (studentData) {
     schoolId={profile.school_id}
     onSelectStudent={(student) => onSwitchToCounselor(student.id)}
   />
+)}
+  {activeTab === 'audit' && (
+  <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+    <div className="flex items-center justify-between mb-6">
+      <h2 className="text-xl font-bold text-white">Audit Log</h2>
+      <span className="text-slate-500 text-sm">{auditLogs.length} entries</span>
+    </div>
+    <div className="flex gap-3 mb-4">
+      <input
+        type="text"
+        placeholder="Search by user, action, or details..."
+        value={auditSearch}
+        onChange={(e) => setAuditSearch(e.target.value)}
+        className="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+      />
+      <select
+        value={auditActionFilter}
+        onChange={(e) => setAuditActionFilter(e.target.value)}
+        className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500"
+      >
+        <option value="all">All Actions</option>
+        {[...new Set(auditLogs.map(l => l.action))].sort().map(a => (
+          <option key={a} value={a}>{a}</option>
+        ))}
+      </select>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-700">
+            <th className="text-left py-3 px-3 text-slate-400 font-medium">Timestamp</th>
+            <th className="text-left py-3 px-3 text-slate-400 font-medium">User</th>
+            <th className="text-left py-3 px-3 text-slate-400 font-medium">Action</th>
+            <th className="text-left py-3 px-3 text-slate-400 font-medium">Table</th>
+            <th className="text-left py-3 px-3 text-slate-400 font-medium">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {auditLogs
+            .filter(log => {
+              if (auditActionFilter !== 'all' && log.action !== auditActionFilter) return false;
+              if (auditSearch) {
+                const s = auditSearch.toLowerCase();
+                const userName = log.profiles?.full_name || '';
+                const details = log.details ? JSON.stringify(log.details) : '';
+                return userName.toLowerCase().includes(s) ||
+                  log.action?.toLowerCase().includes(s) ||
+                  log.table_name?.toLowerCase().includes(s) ||
+                  details.toLowerCase().includes(s);
+              }
+              return true;
+            })
+            .map(log => (
+            <tr key={log.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+              <td className="py-3 px-3 text-slate-300 whitespace-nowrap">
+                {new Date(log.created_at).toLocaleString()}
+              </td>
+              <td className="py-3 px-3 text-slate-300">
+                {log.profiles?.full_name || <span className="text-slate-500 italic">Unknown</span>}
+              </td>
+              <td className="py-3 px-3">
+                <span className="px-2 py-1 rounded-md text-xs font-medium bg-slate-800 text-indigo-400">
+                  {log.action}
+                </span>
+              </td>
+              <td className="py-3 px-3 text-slate-400">{log.table_name}</td>
+              <td className="py-3 px-3 text-slate-500 text-xs max-w-xs truncate">
+                {log.details ? JSON.stringify(log.details) : '—'}
+              </td>
+            </tr>
+          ))}
+          {auditLogs.length === 0 && (
+            <tr><td colSpan={5} className="py-8 text-center text-slate-500">No audit logs found</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
 )}
       </main>
       {/* Category Modal */}
