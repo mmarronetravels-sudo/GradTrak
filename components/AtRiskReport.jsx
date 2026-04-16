@@ -34,7 +34,8 @@ export default function AtRiskReport({ schoolId, counselorId = null, onSelectStu
     )
   `)
   .eq('school_id', schoolId)
-  .eq('role', 'student');
+  .eq('role', 'student')
+  .eq('is_active', true);
         
         if (counselorId) {
           const { data: assignments } = await supabase
