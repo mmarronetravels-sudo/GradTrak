@@ -478,7 +478,14 @@ export default function DataSyncUpload({ schoolId }) {
       else if (term) termFormatted = `${term} ${currentYearSuffix}`;
       else termFormatted = '';
 
-      const status = finalGrade ? 'completed' : 'in_progress';
+      // A course is only "completed" if it has a grade that represents a final result.
+      // "IP" (In Progress) and "I" (Incomplete) are placeholder grades for unfinished work
+      // and must stay as in_progress even though the cell is non-empty.
+      const inProgressGrades = ['IP', 'I'];
+      const gradeUpper = (finalGrade || '').toUpperCase();
+      const status = finalGrade && !inProgressGrades.includes(gradeUpper)
+        ? 'completed'
+        : 'in_progress';
 
       parsed.push({
         studentProfileId,
