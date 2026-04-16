@@ -1222,22 +1222,25 @@ function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-    let logData = null;
-    const { data: logWithProfiles, error: logErr } = await supabase
+    const { data: logPlain } = await supabase
       .from('audit_logs')
-      .select('*, profiles(full_name)')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
-    if (logErr) {
-      const { data: logPlain } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      logData = logPlain;
-    } else {
-      logData = logWithProfiles;
+    const logUserIds = [...new Set((logPlain || []).map(l => l.user_id).filter(Boolean))];
+    const profileMap = {};
+    for (let i = 0; i < logUserIds.length; i += 50) {
+      const batch = logUserIds.slice(i, i + 50);
+      const { data: pBatch } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', batch);
+      (pBatch || []).forEach(p => { profileMap[p.id] = p.full_name; });
     }
+    const logData = (logPlain || []).map(l => ({
+      ...l,
+      profiles: { full_name: profileMap[l.user_id] || null }
+    }));
 
     const { data: delData } = await supabase
       .from('deletion_requests')
