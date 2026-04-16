@@ -1828,6 +1828,132 @@ if (studentData) {
     </div>
   </div>
 )}
+  {activeTab === 'privacy' && (
+  <div className="space-y-6">
+    {/* FERPA Compliance Statement */}
+    <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+      <h2 className="text-xl font-bold text-white mb-4">FERPA Compliance</h2>
+      <div className="bg-indigo-500/10 rounded-xl p-5 border border-indigo-500/20 mb-4">
+        <p className="text-slate-300 text-sm leading-relaxed">
+          ScholarPath Systems operates as a "school official" under FERPA, meaning:
+        </p>
+        <ul className="text-slate-400 text-sm mt-3 space-y-2">
+          <li className="flex gap-2"><span className="text-indigo-400">•</span> We perform institutional services that schools would otherwise perform themselves</li>
+          <li className="flex gap-2"><span className="text-indigo-400">•</span> We are under the direct control of the school regarding data use</li>
+          <li className="flex gap-2"><span className="text-indigo-400">•</span> We use education records only for authorized purposes specified in our agreements</li>
+          <li className="flex gap-2"><span className="text-indigo-400">•</span> We comply with FERPA's restrictions on re-disclosure of student information</li>
+        </ul>
+        <p className="text-slate-400 text-sm mt-4">
+          Our Data Processing Agreement with each school establishes the specific terms of our school official relationship and data handling obligations.
+        </p>
+      </div>
+      <a
+        href="https://scholarpathsystems.org/privacy"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm font-medium transition-colors"
+      >
+        View Full Privacy Policy →
+      </a>
+    </div>
+
+    {/* Data Deletion Requests */}
+    <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-white">Data Deletion Requests</h2>
+        <span className="text-slate-500 text-sm">{deletionRequests.length} requests</span>
+      </div>
+      {deletionRequests.length === 0 ? (
+        <p className="text-slate-500 text-sm py-4">No deletion requests have been submitted.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700">
+                <th className="text-left py-3 px-3 text-slate-400 font-medium">Requested By</th>
+                <th className="text-left py-3 px-3 text-slate-400 font-medium">Date</th>
+                <th className="text-left py-3 px-3 text-slate-400 font-medium">Reason</th>
+                <th className="text-left py-3 px-3 text-slate-400 font-medium">Status</th>
+                <th className="text-left py-3 px-3 text-slate-400 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deletionRequests.map(req => (
+                <tr key={req.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                  <td className="py-3 px-3 text-slate-300">
+                    {req.requested_by_profile?.full_name || 'Unknown'}
+                    {req.requested_by_profile?.email && (
+                      <span className="block text-xs text-slate-500">{req.requested_by_profile.email}</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="py-3 px-3 text-slate-400 max-w-xs truncate">{req.reason || '—'}</td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                      req.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                      req.status === 'denied' ? 'bg-red-500/20 text-red-400' :
+                      'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {req.status || 'pending'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3">
+                    {(!req.status || req.status === 'pending') && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDeletionRequest(req.id, 'approve')}
+                          className="px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleDeletionRequest(req.id, 'deny')}
+                          className="px-3 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    )}
+                    {req.status && req.status !== 'pending' && (
+                      <span className="text-slate-500 text-xs">
+                        {req.reviewed_at ? new Date(req.reviewed_at).toLocaleDateString() : ''}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+
+    {/* Data Access Summary */}
+    <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+      <h2 className="text-xl font-bold text-white mb-4">Data Access by Role</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <h3 className="text-white font-semibold mb-2">Administrators</h3>
+          <p className="text-slate-400 text-sm">Full access to all student records, staff assignments, audit logs, and system configuration within their school.</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <h3 className="text-white font-semibold mb-2">Counselors & Case Managers</h3>
+          <p className="text-slate-400 text-sm">Access to assigned students' records, progress data, notes, and contact history.</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <h3 className="text-white font-semibold mb-2">Students</h3>
+          <p className="text-slate-400 text-sm">View their own course records, credit progress, and graduation status. Can request data deletion.</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <h3 className="text-white font-semibold mb-2">Linked Parents</h3>
+          <p className="text-slate-400 text-sm">Read-only access to their linked student's progress and course information.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       </main>
       {/* Category Modal */}
       {showCategoryModal && (
