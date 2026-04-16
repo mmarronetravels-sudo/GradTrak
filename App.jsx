@@ -1222,11 +1222,22 @@ function AdminDashboard({ user, profile, onLogout, onSwitchToCounselor }) {
       .eq('school_id', profile.school_id)
       .order('display_order');
 
-    const { data: logData } = await supabase
+    let logData = null;
+    const { data: logWithProfiles, error: logErr } = await supabase
       .from('audit_logs')
       .select('*, profiles(full_name)')
       .order('created_at', { ascending: false })
       .limit(200);
+    if (logErr) {
+      const { data: logPlain } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      logData = logPlain;
+    } else {
+      logData = logWithProfiles;
+    }
 
     const { data: delData } = await supabase
       .from('deletion_requests')
