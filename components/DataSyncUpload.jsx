@@ -585,14 +585,18 @@ export default function DataSyncUpload({ schoolId }) {
           continue;
         }
 
-        toUpdate.push({
+        const updateObj = {
           id: existing.id,
           credits: row.creditAmount,
           category_id: row.categoryId,
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
-        });
+        };
+        if (row.status === 'completed' && existing.status !== 'completed') {
+          updateObj.completed_at = new Date().toISOString();
+        }
+        toUpdate.push(updateObj);
       } else {
         toInsert.push({
           student_id: row.studentProfileId,
@@ -602,6 +606,7 @@ export default function DataSyncUpload({ schoolId }) {
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
+          completed_at: row.status === 'completed' ? new Date().toISOString() : null,
         });
       }
     }

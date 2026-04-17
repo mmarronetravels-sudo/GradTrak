@@ -12,6 +12,7 @@ import MTSSInterventionReport from './components/MTSSInterventionReport';
 import AcademicContractForm from './components/AcademicContractForm';
 import AttendanceContactExport from './components/AttendanceContactExport';
 import AdminStudentManager from './components/AdminStudentManager';
+import CreditProgressTimeline from './components/CreditProgressTimeline';
 const APP_VERSION = '2.14.0';
 
 
@@ -2420,7 +2421,13 @@ const getPathwaysForCourse = (course) => {
               </div>
             </div>
 
-            <YearlyProgressChart yearlyProgress={yearlyProgress} />            <div>
+            <YearlyProgressChart yearlyProgress={yearlyProgress} />
+            <CreditProgressTimeline
+              courses={courses}
+              totalRequired={stats.totalRequired}
+              graduationYear={profile.graduation_year}
+            />
+            <div>
               <h3 className="text-lg font-semibold text-white mb-4">Credit Categories</h3>
               <div className="grid grid-cols-2 gap-3">
                 {(stats?.categories || categories).map(cat =>
@@ -3530,6 +3537,13 @@ const summaryStats = {
               </div>
             </div>
           </div>
+
+          {/* Credit Progress Timeline */}
+          <CreditProgressTimeline
+            courses={courses}
+            totalRequired={student.stats.totalRequired}
+            graduationYear={student.graduation_year}
+          />
 
           {/* Credit Categories */}
           <div>
