@@ -2859,7 +2859,7 @@ async function handleSavePreferredName() {
           `profiles?select=id&school_id=eq.${profile.school_id}&role=eq.student`
         );
         assignedStudentIds = allIds?.map(s => s.id) || [];
-      } else if (profile.is_superuser && viewAllStudents) {
+      } else if (viewAllStudents) {
         const allIds = await doGet(
           `profiles?select=id&school_id=eq.${profile.school_id}&role=eq.student`
         );
@@ -2890,7 +2890,7 @@ async function handleSavePreferredName() {
 
       // ── Phase 3: Fetch student profiles (with diploma_types join) ──
       let studentData;
-      if (profile.is_superuser || profile.role === 'viewer' || profile.role === 'admin') {
+      if (profile.is_superuser || profile.role === 'viewer' || profile.role === 'admin' || viewAllStudents) {
         studentData = await doGet(
           `profiles?select=*,diploma_types(id,code,name)&school_id=eq.${profile.school_id}&role=eq.student`
         );
@@ -4164,7 +4164,7 @@ const summaryStats = {
 </div>
                 
 {/* My Students / All Students toggle — superuser counselors only */}
-{profile?.is_superuser && profile?.role !== 'viewer' && (
+{(profile?.role === 'counselor' || profile?.role === 'case_manager') && (
   <div className="flex items-center gap-3 mt-3">
     <div className="inline-flex rounded-xl overflow-hidden border border-slate-700">
       <button
@@ -4225,7 +4225,7 @@ const summaryStats = {
       <option key={term} value={term}>{term}</option>
     ))}
   </select>
-  {(profile.role === 'viewer' || (profile.is_superuser && viewAllStudents)) && (
+  {(profile.role === 'viewer' || viewAllStudents) && (
     <select
       value={counselorFilter}
       onChange={(e) => setCounselorFilter(e.target.value)}
