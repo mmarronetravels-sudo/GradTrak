@@ -3540,7 +3540,7 @@ const summaryStats = {
 
           {/* Credit Progress Timeline */}
           <CreditProgressTimeline
-            courses={courses}
+            courses={student.courses || []}
             totalRequired={student.stats.totalRequired}
             graduationYear={student.graduation_year}
           />
