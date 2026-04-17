@@ -935,12 +935,13 @@ const generateMTSSReport = (notes, studentName, studentGrade, counselorName) => 
 // ============================================================
 // Main StudentNotesLog Component
 // ============================================================
-const StudentNotesLog = ({ 
-  studentId, 
-  counselorId, 
+const StudentNotesLog = ({
+  studentId,
+  counselorId,
+  schoolId,
   studentName = 'Student',
   studentGrade = null,
-  counselorName = null 
+  counselorName = null
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -1109,6 +1110,7 @@ const StudentNotesLog = ({
           body: JSON.stringify({
             student_id: studentId,
             counselor_id: counselorId,
+            school_id: schoolId,
             note: noteData.content,
             note_type: noteData.note_type,
             follow_up_date: noteData.follow_up_date,

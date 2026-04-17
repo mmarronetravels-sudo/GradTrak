@@ -3221,6 +3221,7 @@ advisingNotes.slice(0, 5)
         const { error } = await supabase.from('student_notes').insert([{
           student_id: student.id,
           counselor_id: profile.id,
+          school_id: profile.school_id,
           note_type: 'advising_plan',
           note: noteText.trim(),
           status: 'completed',
@@ -3654,10 +3655,11 @@ const summaryStats = {
 </div>
             
 {/* Student Notes Log */}
-  <StudentNotesLog 
-  key={`${student.id}-${notesRefreshKey}`}          
+  <StudentNotesLog
+  key={`${student.id}-${notesRefreshKey}`}
   studentId={student.id}
   counselorId={profile.id}
+  schoolId={profile.school_id}
   studentName={student.displayName}
   studentGrade={student.grade_level}
   counselorName={profile.full_name}

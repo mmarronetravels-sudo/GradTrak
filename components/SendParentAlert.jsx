@@ -294,6 +294,7 @@ export default function SendParentAlert({
             body: JSON.stringify({
               student_id: student.id,
               counselor_id: counselorProfile.id,
+              school_id: counselorProfile.school_id,
               note: `Parent alert email sent to ${parentEmail.trim()} — Student behind in coursework.`,
               note_type: 'parent_contact',
               status: 'completed',
