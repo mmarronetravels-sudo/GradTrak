@@ -1,12 +1,38 @@
 import React, { useMemo } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 
-function getSchoolYearStart(graduationYear) {
-  return new Date(graduationYear - 4, 7, 1); // Aug 1 of freshman year
-}
+function termToDate(term) {
+  if (!term) return null;
+  const parts = term.trim().split(' ');
+  if (parts.length < 2) return null;
 
-function getSchoolYearEnd(graduationYear) {
-  return new Date(graduationYear, 5, 30); // Jun 30 of senior year
+  const trimester = parts[0].toUpperCase();
+  const yearPart = parts[1];
+
+  let year;
+  if (yearPart.includes('/')) {
+    const [startYr, endYr] = yearPart.split('/');
+    const s = parseInt(startYr);
+    const e = parseInt(endYr);
+    year = s < 100 ? 2000 + s : s;
+    const endYear = e < 100 ? 2000 + e : e;
+    if (trimester === 'T1' || trimester === 'S1') year = year;
+    else year = endYear;
+  } else {
+    year = parseInt(yearPart);
+    if (year < 100) year += 2000;
+  }
+
+  // Map trimester/semester to approximate completion month
+  switch (trimester) {
+    case 'T1': return new Date(year, 10, 1);  // Nov
+    case 'T2': return new Date(year, 1, 1);   // Feb
+    case 'T3': return new Date(year, 5, 1);   // Jun
+    case 'SU': return new Date(year, 6, 1);   // Jul
+    case 'S1': return new Date(year, 0, 1);   // Jan
+    case 'S2': return new Date(year, 5, 1);   // Jun
+    default:   return new Date(year, 5, 1);   // Default to Jun
+  }
 }
 
 function formatMonth(dateStr) {
@@ -18,75 +44,62 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
   const chartData = useMemo(() => {
     if (!courses || courses.length === 0 || !totalRequired) return [];
 
+    const gradYear = parseInt(graduationYear) || new Date().getFullYear() + 1;
+    const startDate = new Date(gradYear - 4, 7, 1);  // Aug 1 of freshman year
+    const endDate = new Date(gradYear, 5, 30);        // Jun 30 of senior year
+    const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                        (endDate.getMonth() - startDate.getMonth());
+
     const completed = courses
-      .filter(c => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP' && c.completed_at)
-      .map(c => ({
-        date: new Date(c.completed_at),
-        credits: Number(c.credits) || 0,
-      }))
+      .filter(c => c.status === 'completed' && c.grade !== 'F' && c.grade !== 'NP')
+      .map(c => {
+        const date = termToDate(c.term);
+        return date ? { date, credits: Number(c.credits) || 0 } : null;
+      })
+      .filter(Boolean)
       .sort((a, b) => a.date - b.date);
 
     if (completed.length === 0) return [];
 
-    const startDate = getSchoolYearStart(parseInt(graduationYear) || new Date().getFullYear() + 1);
-    const endDate = getSchoolYearEnd(parseInt(graduationYear) || new Date().getFullYear() + 1);
-    const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
-
+    // Build monthly buckets across the full 4-year span
     const monthBuckets = {};
-    let cumulative = 0;
-
-    // Add credits from courses completed BEFORE the timeline starts
-    completed.forEach(c => {
-      if (c.date < startDate) {
-        cumulative += c.credits;
-      }
-    });
-
-    // Build monthly data points
     for (let i = 0; i <= totalMonths; i++) {
       const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const pace = totalRequired * (i / totalMonths);
-      monthBuckets[key] = { month: key, earned: cumulative, pace: Math.round(pace * 100) / 100 };
+      monthBuckets[key] = { month: key, earned: 0, pace: Math.round(pace * 100) / 100 };
     }
 
-    // Accumulate credits into their completion months
+    // Place credits into their term-derived month
     completed.forEach(c => {
-      if (c.date < startDate) return;
       const key = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
-      if (!monthBuckets[key]) return;
-      cumulative += c.credits;
-      // Update this month and all future months
-      const keys = Object.keys(monthBuckets).sort();
-      const idx = keys.indexOf(key);
-      for (let j = idx; j < keys.length; j++) {
-        monthBuckets[keys[j]].earned = Math.round(
-          (j === idx ? cumulative : monthBuckets[keys[j]].earned + c.credits) * 1000
-        ) / 1000;
+      if (monthBuckets[key]) {
+        monthBuckets[key].earned += c.credits;
       }
     });
 
-    // Simpler approach: just re-walk and compute cumulative
+    // Convert to cumulative
     const keys = Object.keys(monthBuckets).sort();
     let runningTotal = 0;
 
-    // Count pre-start credits
+    // Credits earned before the timeline starts
     completed.forEach(c => {
-      if (c.date < startDate) runningTotal += c.credits;
+      const key = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
+      if (key < keys[0]) runningTotal += c.credits;
     });
 
     keys.forEach(key => {
-      const monthCredits = completed
-        .filter(c => {
-          const ck = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
-          return ck === key && c.date >= startDate;
-        })
-        .reduce((sum, c) => sum + c.credits, 0);
-      runningTotal += monthCredits;
+      runningTotal += monthBuckets[key].earned;
       monthBuckets[key].earned = Math.round(runningTotal * 1000) / 1000;
     });
 
-    return keys.map(k => monthBuckets[k]);
+    // Only show months up to current month (don't project future earned)
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    return keys
+      .filter(k => k <= currentKey || monthBuckets[k].pace > 0)
+      .map(k => monthBuckets[k]);
   }, [courses, totalRequired, graduationYear]);
 
   if (chartData.length === 0) {
@@ -96,12 +109,11 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
           <span className="text-2xl">📊</span>
           <h2 className="text-lg font-bold text-white">Credit Progress Timeline</h2>
         </div>
-        <p className="text-slate-500 text-sm">No completed courses with dates to chart yet.</p>
+        <p className="text-slate-500 text-sm">No completed courses to chart yet.</p>
       </div>
     );
   }
 
-  const latest = chartData[chartData.length - 1];
   const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const currentData = chartData.find(d => d.month === currentMonth);
   const isAhead = currentData && currentData.earned >= currentData.pace;
@@ -174,7 +186,7 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               label={{ value: `${totalRequired} required`, position: 'right', fill: '#64748b', fontSize: 10 }}
             />
             <Area
-              type="monotone"
+              type="stepAfter"
               dataKey="pace"
               stroke="#475569"
               strokeDasharray="6 3"
@@ -183,7 +195,7 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               name="Expected Pace"
             />
             <Area
-              type="monotone"
+              type="stepAfter"
               dataKey="earned"
               stroke="#818cf8"
               strokeWidth={2}
