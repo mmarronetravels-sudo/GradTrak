@@ -204,19 +204,23 @@ export default function DataSyncUpload({ schoolId }) {
       const grade = parseInt(s.grade, 10);
       
       let graduationYear = parseInt(s.graduation_year, 10);
-      // Guard against 2-digit graduation years (e.g. "28" instead of "2028")
-      // that some Engage exports produce. Without this, getGradeLevel() in
-      // AdminStudentManager computes absurd grade values and returns null.
-      if (!isNaN(graduationYear) && graduationYear < 100) {
-        graduationYear += 2000;
-      }
       if (isNaN(graduationYear) && !isNaN(grade)) {
         graduationYear = calculateGraduationYear(grade);
       }
       
       // Look up advisor/counselor — accept Advisor_Name or Advisor column
-      const advisorField = (s.advisor_name || s.advisor || s.counselor_email || '')?.trim().toLowerCase();
+      const advisorRaw = (s.advisor_name || s.advisor || s.counselor_email || '')?.trim();
+      const advisorField = advisorRaw.toLowerCase();
       let counselorId = counselorEmailMap[advisorField] || counselorNameMap[advisorField] || null;
+
+      // Log when an advisor was provided but doesn't match any GradTrack profile.
+      // This previously failed silently and caused students to stay assigned to
+      // their old counselor (or no counselor) on import. (Apr 30, 2026)
+      if (advisorRaw && !counselorId) {
+        errors.push(
+          `Advisor not found in GradTrack: "${advisorRaw}" — Student ${studentIdLocal || '(no ID)'} (${fullName || email || 'unknown'}). Add this counselor's profile or fix the Advisor_Name in Engage.`
+        );
+      }
 
       if (!email || !fullName || fullName === ' ') {
         if (studentIdLocal) {
@@ -350,27 +354,35 @@ export default function DataSyncUpload({ schoolId }) {
       }
 
       // Assign counselor — update if changed, insert if new.
-      // Using .limit(1) instead of .maybeSingle() so pre-existing
-      // duplicate rows don't cause an error that skips the cleanup.
+      // NOTE (Apr 30, 2026): Switched from `.maybeSingle()` to `.select()`
+      // because the unique constraint on (student_id, assignment_type) was
+      // dropped Feb 11, 2026 to allow multi-counselor assignments. With the
+      // constraint gone, .maybeSingle() returns null whenever 2+ rows exist
+      // and the old code would silently insert *another* duplicate instead of
+      // updating, causing assignment counts to drift over time.
       if (studentProfileId && counselorId) {
-        const { data: existingRows } = await supabase
+        const { data: existingAssignments } = await supabase
           .from('counselor_assignments')
           .select('id, counselor_id')
           .eq('student_id', studentProfileId)
-          .eq('assignment_type', 'counselor')
-          .limit(1);
-        const existingAssignment = existingRows?.[0] || null;
+          .eq('assignment_type', 'counselor');
 
-        if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
-          // Advisor changed — delete old assignment
+        const existing = existingAssignments || [];
+        const correctRow = existing.find(r => r.counselor_id === counselorId);
+        const staleRows = existing.filter(r => r.counselor_id !== counselorId);
+
+        // Delete every row that points at a counselor other than the one
+        // Engage now says owns this student. There may be more than one.
+        if (staleRows.length > 0) {
+          const staleIds = staleRows.map(r => r.id);
           await supabase
             .from('counselor_assignments')
             .delete()
-            .eq('id', existingAssignment.id);
+            .in('id', staleIds);
         }
 
-        if (!existingAssignment || existingAssignment.counselor_id !== counselorId) {
-          // Insert new assignment
+        // Insert if and only if the correct counselor isn't already on file.
+        if (!correctRow) {
           const { error: assignError } = await supabase
             .from('counselor_assignments')
             .insert({
@@ -384,6 +396,15 @@ export default function DataSyncUpload({ schoolId }) {
             errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
           }
         }
+      } else if (studentProfileId && advisorRaw && !counselorId) {
+        // Engage named an advisor we couldn't match. Clear any stale
+        // assignment so the student isn't falsely attributed to a counselor
+        // they're no longer assigned to in Engage. (Apr 30, 2026)
+        await supabase
+          .from('counselor_assignments')
+          .delete()
+          .eq('student_id', studentProfileId)
+          .eq('assignment_type', 'counselor');
       }
     }
 
@@ -478,14 +499,7 @@ export default function DataSyncUpload({ schoolId }) {
       else if (term) termFormatted = `${term} ${currentYearSuffix}`;
       else termFormatted = '';
 
-      // A course is only "completed" if it has a grade that represents a final result.
-      // "IP" (In Progress) and "I" (Incomplete) are placeholder grades for unfinished work
-      // and must stay as in_progress even though the cell is non-empty.
-      const inProgressGrades = ['IP', 'I'];
-      const gradeUpper = (finalGrade || '').toUpperCase();
-      const status = finalGrade && !inProgressGrades.includes(gradeUpper)
-        ? 'completed'
-        : 'in_progress';
+      const status = finalGrade ? 'completed' : 'in_progress';
 
       parsed.push({
         studentProfileId,
@@ -585,18 +599,14 @@ export default function DataSyncUpload({ schoolId }) {
           continue;
         }
 
-        const updateObj = {
+        toUpdate.push({
           id: existing.id,
           credits: row.creditAmount,
           category_id: row.categoryId,
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
-        };
-        if (row.status === 'completed' && existing.status !== 'completed') {
-          updateObj.completed_at = new Date().toISOString();
-        }
-        toUpdate.push(updateObj);
+        });
       } else {
         toInsert.push({
           student_id: row.studentProfileId,
@@ -606,7 +616,6 @@ export default function DataSyncUpload({ schoolId }) {
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
-          completed_at: row.status === 'completed' ? new Date().toISOString() : null,
         });
       }
     }
