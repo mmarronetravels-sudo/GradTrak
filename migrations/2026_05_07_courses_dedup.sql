@@ -1,0 +1,205 @@
+-- ============================================================
+-- Migration: Courses table deduplication — Steps A and A.5
+-- Date: May 7, 2026
+-- ============================================================
+-- Context:
+--   Diagnostic queries on May 7 surfaced two distinct populations
+--   of duplicate rows in the `courses` table, both attributable to
+--   `DataSyncUpload.jsx` running INSERT-only paths during repeated
+--   imports between Jan 28 and Apr 20, 2026.
+--
+--     1. Exact duplicates (Step A): 1,303 rows where every column
+--        except `id` and `created_at` matched another row for the
+--        same (student_id, name, term). Worst case: Aleena Hill's
+--        English 9A S1 24/25 row repeated 4 times. 65 students
+--        affected.
+--
+--     2. Empty-term variants (Step A.5): 1,578 rows where `term`
+--        was empty/blank, paired with one or more real-term siblings
+--        for the same (student_id, name). 430 students affected.
+--        Caused by the importer falling through to `termFormatted = ''`
+--        when the source row had no term value (verified by inspecting
+--        the May import file, which contained 2 such rows for "American
+--        Government" and "US Government" with valid grades but no term).
+--        These 1,578 rows accumulated across all imports since Jan 28.
+--
+-- What this migration does:
+--   Documents the SQL applied via Supabase SQL Editor on May 7, 2026.
+--   This file is a reference / audit-trail document — the destructive
+--   operations have already been applied to production. Re-running this
+--   file as-is would either no-op (the rows are already gone) or fail
+--   harmlessly.
+--
+--   Backups of all deleted rows are preserved in:
+--     - backups.courses_2026_05_07_dupes (1,303 rows from Step A)
+--     - backups.courses_2026_05_07_empty_term_dupes (1,578 rows from Step A.5)
+--
+-- What this migration does NOT do:
+--   - Add the unique constraint preventing recurrence (see
+--     2026_05_07_courses_unique_constraint.sql for that)
+--   - Touch the importer code (see DataSyncUpload.jsx changes from
+--     this same session)
+--   - Modify any non-courses tables
+--
+-- Companion changes shipped same day:
+--   - DataSyncUpload.jsx — rejects term-less rows with logged error
+--     instead of silently inserting empty-term records
+--   - migrations/2026_05_07_courses_unique_constraint.sql — adds
+--     UNIQUE (student_id, name, term) constraint
+-- ============================================================
+
+
+-- ============================================================
+-- STEP A — Exact duplicate deletion
+-- Applied: May 7, 2026 (last session)
+-- ============================================================
+
+-- ----------------------------------------------------------
+-- 1. Backup table for Step A duplicates
+-- ----------------------------------------------------------
+-- CREATE SCHEMA IF NOT EXISTS backups;
+--
+-- CREATE TABLE backups.courses_2026_05_07_dupes AS
+-- SELECT *
+-- FROM courses
+-- WHERE id IN (
+--   SELECT id FROM (
+--     SELECT id, ROW_NUMBER() OVER (
+--       PARTITION BY student_id, name, LOWER(TRIM(term))
+--       ORDER BY created_at
+--     ) AS rn
+--     FROM courses
+--     WHERE term IS NOT NULL AND TRIM(term) <> ''
+--   ) ranked
+--   WHERE rn > 1
+-- );
+-- -- Verified: 1,303 rows backed up.
+
+-- ----------------------------------------------------------
+-- 2. Step A delete (wrapped in transaction, committed after verification)
+-- ----------------------------------------------------------
+-- BEGIN;
+--
+-- WITH ranked AS (
+--   SELECT id, ROW_NUMBER() OVER (
+--     PARTITION BY student_id, name, LOWER(TRIM(term))
+--     ORDER BY created_at
+--   ) AS rn
+--   FROM courses
+--   WHERE term IS NOT NULL AND TRIM(term) <> ''
+-- )
+-- DELETE FROM courses
+-- WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+--
+-- -- Verification: expected_deleted = 1303, still_present_should_be_zero = 0
+-- COMMIT;
+
+
+-- ============================================================
+-- STEP A.5 — Empty-term row deletion
+-- Applied: May 7, 2026 (this session)
+-- ============================================================
+
+-- ----------------------------------------------------------
+-- 1. Backup table for Step A.5 empty-term rows
+-- ----------------------------------------------------------
+-- CREATE TABLE backups.courses_2026_05_07_empty_term_dupes AS
+-- SELECT *
+-- FROM courses c1
+-- WHERE (c1.term IS NULL OR TRIM(c1.term) = '')
+--   AND EXISTS (
+--     SELECT 1 FROM courses c2
+--     WHERE c2.student_id = c1.student_id
+--       AND c2.name = c1.name
+--       AND c2.id != c1.id
+--       AND c2.term IS NOT NULL
+--       AND TRIM(c2.term) <> ''
+--   );
+-- -- Verified: 1,578 rows backed up.
+
+-- ----------------------------------------------------------
+-- 2. Step A.5b — bulk delete of grade-less empty-term rows
+-- Diagnostic queries before this delete confirmed:
+--   - 1,556 empty rows had equal credits to their real-term sibling
+--   - 155 empty rows had MORE credits than sibling, but in every case
+--     the real-term row had grade='I' (Incomplete) with credits=0,
+--     meaning the empty row's credits were projected/expected, not
+--     earned. Real-term row was the accurate transcript record.
+--   - 4 empty rows had less credits than sibling (also safe to delete)
+--   - 2 empty rows carried real grades (handled separately below)
+-- ----------------------------------------------------------
+-- BEGIN;
+--
+-- DELETE FROM courses
+-- WHERE (term IS NULL OR TRIM(term) = '')
+--   AND (grade IS NULL OR TRIM(grade) = '')
+--   AND EXISTS (
+--     SELECT 1 FROM courses c2
+--     WHERE c2.student_id = courses.student_id
+--       AND c2.name = courses.name
+--       AND c2.id != courses.id
+--       AND c2.term IS NOT NULL
+--       AND TRIM(c2.term) <> ''
+--   );
+--
+-- -- Verification: expected_deleted = 1576, still_present_should_be_zero = 0
+-- COMMIT;
+
+-- ----------------------------------------------------------
+-- 3. Step A.5c — manual deletion of 2 grade-bearing rows
+-- Both rows had real grades but their real-term sibling already
+-- carried equal-or-greater credits with the same grade. Empty-term
+-- row was a redundant copy. Safe to delete.
+--   - d33bb2f3 / student 100c8710 / "US Government" / B
+--   - a08bbf47 / student ab2c52e3 / "American Government" / C
+-- ----------------------------------------------------------
+-- BEGIN;
+--
+-- DELETE FROM courses
+-- WHERE id IN (
+--   'd33bb2f3-9d72-4dd6-8d04-39b81200133b',
+--   'a08bbf47-9a59-4448-b326-0a40e053a46b'
+-- );
+--
+-- -- Verification: still_present_should_be_zero = 0
+-- COMMIT;
+
+
+-- ============================================================
+-- Total impact across both steps
+--   Rows deleted: 1,303 (A) + 1,576 (A.5b) + 2 (A.5c) = 2,881
+--   Backups: 1,303 + 1,578 = 2,881 rows preserved
+--   Students affected: 65 (A) + 430 (A.5) = ~430 unique
+--   (A's affected students are a subset of A.5's)
+-- ============================================================
+
+
+-- ============================================================
+-- Rollback (run only if needed)
+-- ============================================================
+-- Restore Step A rows:
+--   INSERT INTO courses
+--   SELECT * FROM backups.courses_2026_05_07_dupes;
+--
+-- Restore Step A.5 rows:
+--   INSERT INTO courses
+--   SELECT * FROM backups.courses_2026_05_07_empty_term_dupes;
+--
+-- Note: Restoring will violate the unique constraint added in
+-- 2026_05_07_courses_unique_constraint.sql. Drop the constraint
+-- first if rollback is needed:
+--   ALTER TABLE courses DROP CONSTRAINT courses_unique_per_student_term;
+-- ============================================================
+
+
+-- ============================================================
+-- Backup retention
+-- ============================================================
+-- Both backup tables can be dropped ~14 days after Step C
+-- (importer fix) is verified in production with no regressions.
+-- Earliest drop date: ~May 21, 2026 (assumes a sync runs between
+-- now and then to confirm the importer fix doesn't error).
+--
+--   DROP TABLE IF EXISTS backups.courses_2026_05_07_dupes;
+--   DROP TABLE IF EXISTS backups.courses_2026_05_07_empty_term_dupes;
+-- ============================================================
