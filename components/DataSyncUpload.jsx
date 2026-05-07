@@ -209,18 +209,8 @@ export default function DataSyncUpload({ schoolId }) {
       }
       
       // Look up advisor/counselor — accept Advisor_Name or Advisor column
-      const advisorRaw = (s.advisor_name || s.advisor || s.counselor_email || '')?.trim();
-      const advisorField = advisorRaw.toLowerCase();
+      const advisorField = (s.advisor_name || s.advisor || s.counselor_email || '')?.trim().toLowerCase();
       let counselorId = counselorEmailMap[advisorField] || counselorNameMap[advisorField] || null;
-
-      // Log when an advisor was provided but doesn't match any GradTrack profile.
-      // This previously failed silently and caused students to stay assigned to
-      // their old counselor (or no counselor) on import. (Apr 30, 2026)
-      if (advisorRaw && !counselorId) {
-        errors.push(
-          `Advisor not found in GradTrack: "${advisorRaw}" — Student ${studentIdLocal || '(no ID)'} (${fullName || email || 'unknown'}). Add this counselor's profile or fix the Advisor_Name in Engage.`
-        );
-      }
 
       if (!email || !fullName || fullName === ' ') {
         if (studentIdLocal) {
@@ -353,36 +343,25 @@ export default function DataSyncUpload({ schoolId }) {
         studentIdMap[studentIdLocal] = studentProfileId;
       }
 
-      // Assign counselor — update if changed, insert if new.
-      // NOTE (Apr 30, 2026): Switched from `.maybeSingle()` to `.select()`
-      // because the unique constraint on (student_id, assignment_type) was
-      // dropped Feb 11, 2026 to allow multi-counselor assignments. With the
-      // constraint gone, .maybeSingle() returns null whenever 2+ rows exist
-      // and the old code would silently insert *another* duplicate instead of
-      // updating, causing assignment counts to drift over time.
+      // Assign counselor — update if changed, insert if new
       if (studentProfileId && counselorId) {
-        const { data: existingAssignments } = await supabase
+        const { data: existingAssignment } = await supabase
           .from('counselor_assignments')
           .select('id, counselor_id')
           .eq('student_id', studentProfileId)
-          .eq('assignment_type', 'counselor');
+          .eq('assignment_type', 'counselor')
+          .maybeSingle();
 
-        const existing = existingAssignments || [];
-        const correctRow = existing.find(r => r.counselor_id === counselorId);
-        const staleRows = existing.filter(r => r.counselor_id !== counselorId);
-
-        // Delete every row that points at a counselor other than the one
-        // Engage now says owns this student. There may be more than one.
-        if (staleRows.length > 0) {
-          const staleIds = staleRows.map(r => r.id);
+        if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
+          // Advisor changed — delete old assignment
           await supabase
             .from('counselor_assignments')
             .delete()
-            .in('id', staleIds);
+            .eq('id', existingAssignment.id);
         }
 
-        // Insert if and only if the correct counselor isn't already on file.
-        if (!correctRow) {
+        if (!existingAssignment || existingAssignment.counselor_id !== counselorId) {
+          // Insert new assignment
           const { error: assignError } = await supabase
             .from('counselor_assignments')
             .insert({
@@ -396,15 +375,6 @@ export default function DataSyncUpload({ schoolId }) {
             errors.push(`Counselor assignment for ${email}: ${assignError.message}`);
           }
         }
-      } else if (studentProfileId && advisorRaw && !counselorId) {
-        // Engage named an advisor we couldn't match. Clear any stale
-        // assignment so the student isn't falsely attributed to a counselor
-        // they're no longer assigned to in Engage. (Apr 30, 2026)
-        await supabase
-          .from('counselor_assignments')
-          .delete()
-          .eq('student_id', studentProfileId)
-          .eq('assignment_type', 'counselor');
       }
     }
 
@@ -497,7 +467,12 @@ export default function DataSyncUpload({ schoolId }) {
       let termFormatted;
       if (term && year) termFormatted = `${term} ${year}`;
       else if (term) termFormatted = `${term} ${currentYearSuffix}`;
-      else termFormatted = '';
+      else {
+        errors.push(
+          `Course "${courseName}" for student ${studentIdLocal}: missing term, row skipped`
+        );
+        continue;
+      }
 
       const status = finalGrade ? 'completed' : 'in_progress';
 
