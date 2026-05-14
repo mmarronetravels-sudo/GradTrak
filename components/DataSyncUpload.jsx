@@ -465,14 +465,9 @@ export default function DataSyncUpload({ schoolId }) {
       if (!hasGrade && !hasCredit) continue;
 
       let termFormatted;
-      if (term && year) termFormatted = `${term} ${year}`;
-      else if (term) termFormatted = `${term} ${currentYearSuffix}`;
-      else {
-        errors.push(
-          `Course "${courseName}" for student ${studentIdLocal}: missing term, row skipped`
-        );
-        continue;
-      }
+if (term && year) termFormatted = `${term} ${year}`;
+else if (term) termFormatted = `${term} ${currentYearSuffix}`;
+else termFormatted = '';
 
       const status = finalGrade ? 'completed' : 'in_progress';
 
