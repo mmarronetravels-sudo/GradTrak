@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 
 function termToDate(term) {
   if (!term) return null;
@@ -53,16 +53,10 @@ function formatMonth(dateStr) {
 }
 
 export default function CreditProgressTimeline({ courses, totalRequired, graduationYear }) {
-  // --- Self-measuring container -------------------------------------------
-  // Recharts' ResponsiveContainer measures its parent. When this card mounts
-  // while its parent is briefly zero-sized (tab not yet visible, layout not
-  // settled), Recharts logs "width(-1) and height(-1)" and draws the chart
-  // degenerately — the line collapses / stacks at one edge. To avoid that we
-  // measure our own width with a ResizeObserver and only render the chart
-  // once we have a real (> 0) width, using fixed pixel dimensions.
+  // Self-measuring container so the chart never renders into a zero-sized box.
   const wrapRef = useRef(null);
   const [chartWidth, setChartWidth] = useState(0);
-  const CHART_HEIGHT = 192; // matches the old h-48 (12rem)
+  const CHART_HEIGHT = 192;
 
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -80,7 +74,13 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
   const chartData = useMemo(() => {
     if (!courses || courses.length === 0 || !totalRequired) return [];
 
-    const gradYear = parseInt(graduationYear, 10) || new Date().getFullYear() + 1;
+    // graduationYear may arrive as a 2-digit value (e.g. 25 for "Class of
+    // 25"). Normalize to a 4-digit year — the same correction termToDate
+    // applies to term years. Without this, new Date(25 - 4, ...) builds
+    // buckets in the year 1921 and every course falls outside the window.
+    let gradYear = parseInt(graduationYear, 10) || (new Date().getFullYear() + 1);
+    if (gradYear < 100) gradYear += 2000;
+
     const startDate = new Date(gradYear - 4, 7, 1);  // Aug 1 of freshman year
     const endDate = new Date(gradYear + 1, 7, 31);   // Aug 31 of year after grad
     const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
@@ -130,13 +130,6 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
       .filter(k => k <= visibleEndKey)
       .map(k => monthBuckets[k]);
   }, [courses, totalRequired, graduationYear]);
-
-  // TEMP DIAGNOSTIC — remove after the timeline is confirmed working.
-  // Prints the exact array handed to the chart so the data can be verified.
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('TIMELINE DEBUG', JSON.stringify(chartData));
-  }, [chartData]);
 
   if (chartData.length === 0) {
     return (
@@ -191,9 +184,6 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
         )}
       </div>
 
-      {/* Self-measured wrapper. The chart renders with explicit pixel
-          dimensions only once a real width is known, so Recharts never
-          measures a zero/negative-sized container. */}
       <div ref={wrapRef} style={{ width: '100%', height: CHART_HEIGHT }}>
         {chartWidth > 0 ? (
           <AreaChart
