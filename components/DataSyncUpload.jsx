@@ -158,10 +158,6 @@ export default function DataSyncUpload({ schoolId }) {
       if (normalized.length > 0) {
         const columns = Object.keys(normalized[0]);
 
-        // TEMP DIAGNOSTIC — remove once the 8th-grade import is working.
-        console.log('PARSE DEBUG: sheet "' + sheetName + '" has', normalized.length,
-                    'rows, columns =', columns);
-
         const isStudentSheet = columns.some(c => 
           c === 'student_email' || c === 'first_name'
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
@@ -176,13 +172,6 @@ export default function DataSyncUpload({ schoolId }) {
           courses = normalized;
         }
       }
-    }
-
-    // TEMP DIAGNOSTIC — remove once the 8th-grade import is working.
-    console.log('PARSE DEBUG: workbook sheet names =', workbook.SheetNames);
-    console.log('PARSE DEBUG: returning', students.length, 'students,', courses.length, 'courses');
-    if (students.length > 0) {
-      console.log('PARSE DEBUG: student[0] keys =', Object.keys(students[0]));
     }
 
     return { students, courses };
@@ -210,13 +199,6 @@ export default function DataSyncUpload({ schoolId }) {
       }
     });
 
-    // TEMP DIAGNOSTIC — remove once the 8th-grade import is working.
-    console.log('SYNC DEBUG: syncStudents received', students.length, 'rows');
-    if (students.length > 0) {
-      console.log('SYNC DEBUG: first row keys =', Object.keys(students[0]));
-      console.log('SYNC DEBUG: first row values =', JSON.stringify(students[0]));
-    }
-
     for (const s of students) {
       const studentIdLocal = s.student_id?.trim();
       const email = (s.student_email || s.email)?.trim().toLowerCase();
@@ -225,8 +207,6 @@ export default function DataSyncUpload({ schoolId }) {
       const fullName = s.full_name?.trim() || `${firstName} ${lastName}`.trim();
       const grade = parseInt(s.grade, 10);
 
-      // TEMP DIAGNOSTIC — logs why each row passes or skips.
-      console.log('SYNC DEBUG row:', { studentIdLocal, email, fullName, gradeRaw: s.grade, grade });
       
       let graduationYear = parseInt(s.graduation_year, 10);
       if (isNaN(graduationYear) && !isNaN(grade)) {
@@ -311,55 +291,40 @@ export default function DataSyncUpload({ schoolId }) {
           studentProfileId = existing.id;
         }
       } else {
-        // New student — try auth signup first, but don't stop if signups are disabled
+        // New student. We deliberately DO NOT call supabase.auth.signUp()
+        // here. Bulk imports of many new students (e.g. a whole 8th-grade
+        // cohort) would otherwise hit Supabase's auth signup rate limit,
+        // causing most rows to fail. Students do not need a login account
+        // at import time — advisors work with the profile records, and
+        // student logins can be provisioned separately later. So we always
+        // create the profile row directly.
+        //
+        // First check whether a profile already exists (an earlier partial
+        // import, or a student who already had an auth account from before
+        // this change). engage_id first, email fallback.
         let newUserId = null;
-        const { data: authData, error: authErr } = await supabase.auth.signUp({
-          email,
-          password: 'GradTrack2026!',
-        });
-
-        if (authErr) {
-          const msg = authErr.message.toLowerCase();
-          if (msg.includes('already registered')) {
-            // Auth account exists — will look up profile below
-          } else if (msg.includes('signups not allowed') || msg.includes('not allowed')) {
-            // Signups disabled — skip auth creation, still upsert profile
-          } else {
-            errors.push(`Auth signup ${email}: ${authErr.message}`);
-            continue;
-          }
-        } else {
-          newUserId = authData?.user?.id || null;
+        let found = null;
+        if (studentIdLocal) {
+          const { data: byEngageId } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('engage_id', studentIdLocal)
+            .order('created_at', { ascending: true })
+            .limit(1);
+          found = byEngageId?.[0] || null;
         }
-
-        // If no auth user ID yet, look up an existing profile.
-        // engage_id first, email fallback — consistent with the primary
-        // match above. limit(1) instead of maybeSingle so a legacy
-        // duplicate can't throw here.
-        if (!newUserId) {
-          let found = null;
-          if (studentIdLocal) {
-            const { data: byEngageId } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('engage_id', studentIdLocal)
-              .order('created_at', { ascending: true })
-              .limit(1);
-            found = byEngageId?.[0] || null;
-          }
-          if (!found) {
-            const { data: byEmail } = await supabase
-              .from('profiles')
-              .select('id')
-              .ilike('email', email)
-              .order('created_at', { ascending: true })
-              .limit(1);
-            found = byEmail?.[0] || null;
-          }
-          newUserId = found?.id || null;
+        if (!found) {
+          const { data: byEmail } = await supabase
+            .from('profiles')
+            .select('id')
+            .ilike('email', email)
+            .order('created_at', { ascending: true })
+            .limit(1);
+          found = byEmail?.[0] || null;
         }
+        newUserId = found?.id || null;
 
-        // If still no ID, insert profile directly (signups disabled case)
+        // No existing profile — insert one. The DB generates the id.
         if (!newUserId) {
           const { data: newProfile, error: insertErr } = await supabase
             .from('profiles')
@@ -378,12 +343,12 @@ export default function DataSyncUpload({ schoolId }) {
             .select('id')
             .single();
           if (insertErr || !newProfile) {
-            errors.push(`Insert ${email}: could not create profile`);
+            errors.push(`Insert ${email}: ${insertErr?.message || 'could not create profile'}`);
             continue;
           }
           newUserId = newProfile.id;
         } else {
-          // Upsert profile with known ID
+          // Existing profile — update it.
           const { error } = await supabase
             .from('profiles')
             .upsert({
