@@ -87,13 +87,17 @@ export default function DataSyncUpload({ schoolId }) {
     return standardDiploma || anyMatchingDiploma || diplomaTypes[0] || null;
   };
 
-  // Calculate graduation year from grade level
+  // Calculate graduation year from grade level.
+  // Accepts grade 8 as well as 9-12: 8th graders are imported as full
+  // students ahead of fall enrollment. The schoolYear + (13 - gradeNum)
+  // formula already yields the correct year for grade 8 (5 years out);
+  // the lower bound just needs to permit it.
   const calculateGraduationYear = (grade) => {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
     const schoolYear = currentMonth >= 7 ? currentYear : currentYear - 1;
     const gradeNum = parseInt(grade, 10);
-    if (isNaN(gradeNum) || gradeNum < 9 || gradeNum > 12) return null;
+    if (isNaN(gradeNum) || gradeNum < 8 || gradeNum > 12) return null;
     return schoolYear + (13 - gradeNum);
   };
 
@@ -219,7 +223,10 @@ export default function DataSyncUpload({ schoolId }) {
         continue;
       }
 
-      if (grade < 9) continue;
+      // Grade floor: 8th graders are imported as full students ahead of
+      // fall enrollment. Rows below grade 8 (elementary / junk data) are
+      // still skipped. NaN grades are also skipped here.
+      if (isNaN(grade) || grade < 8) continue;
 
       const diplomaType = getDefaultDiplomaType(graduationYear);
       const diplomaTypeId = diplomaType?.id || null;
