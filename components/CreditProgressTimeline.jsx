@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 
 function termToDate(term) {
@@ -15,8 +15,6 @@ function termToDate(term) {
     const e = parseInt(endYr, 10);
     const startYear = s < 100 ? 2000 + s : s;
     const endYear = e < 100 ? 2000 + e : e;
-    // T1/S1/Q1/Q2 fall in the first calendar year of the school year;
-    // everything later falls in the second.
     const firstHalf = (trimester === 'T1' || trimester === 'S1' ||
                        trimester === 'Q1' || trimester === 'Q2');
     year = firstHalf ? startYear : endYear;
@@ -29,7 +27,6 @@ function termToDate(term) {
 
   if (isNaN(year)) return null;
 
-  // Map term code to an approximate completion month.
   switch (trimester) {
     case 'T1': return new Date(year, 10, 1);  // Nov
     case 'T2': return new Date(year, 1, 1);   // Feb
@@ -41,7 +38,7 @@ function termToDate(term) {
     case 'Q2': return new Date(year, 0, 1);   // Jan
     case 'Q3': return new Date(year, 2, 1);   // Mar
     case 'Q4': return new Date(year, 5, 1);   // Jun
-    case 'YR': return new Date(year, 5, 1);   // Jun — year-long course completes in spring
+    case 'YR': return new Date(year, 5, 1);   // Jun
     default:   return new Date(year, 5, 1);   // Jun fallback
   }
 }
@@ -56,13 +53,35 @@ function formatMonth(dateStr) {
 }
 
 export default function CreditProgressTimeline({ courses, totalRequired, graduationYear }) {
+  // --- Self-measuring container -------------------------------------------
+  // Recharts' ResponsiveContainer measures its parent. When this card mounts
+  // while its parent is briefly zero-sized (tab not yet visible, layout not
+  // settled), Recharts logs "width(-1) and height(-1)" and draws the chart
+  // degenerately — the line collapses / stacks at one edge. To avoid that we
+  // measure our own width with a ResizeObserver and only render the chart
+  // once we have a real (> 0) width, using fixed pixel dimensions.
+  const wrapRef = useRef(null);
+  const [chartWidth, setChartWidth] = useState(0);
+  const CHART_HEIGHT = 192; // matches the old h-48 (12rem)
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const el = wrapRef.current;
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w > 0) setChartWidth(w);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const chartData = useMemo(() => {
     if (!courses || courses.length === 0 || !totalRequired) return [];
 
     const gradYear = parseInt(graduationYear, 10) || new Date().getFullYear() + 1;
     const startDate = new Date(gradYear - 4, 7, 1);  // Aug 1 of freshman year
-    // Window extends to the summer after graduation so a senior's final
-    // trimester ("T3 25/26" -> ~Jun of gradYear+1) still has a bucket.
     const endDate = new Date(gradYear + 1, 7, 31);   // Aug 31 of year after grad
     const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
                         (endDate.getMonth() - startDate.getMonth());
@@ -78,7 +97,6 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
 
     if (completed.length === 0) return [];
 
-    // Build monthly buckets across the full span.
     const monthBuckets = {};
     for (let i = 0; i <= totalMonths; i++) {
       const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
@@ -91,8 +109,6 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
     const firstKey = keys[0];
     const lastKey = keys[keys.length - 1];
 
-    // Place each course's credits into its term-derived month, clamping
-    // anything outside the window into the nearest bucket.
     completed.forEach(c => {
       let key = monthKey(c.date);
       if (key < firstKey) key = firstKey;
@@ -100,18 +116,12 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
       monthBuckets[key].earned += c.credits;
     });
 
-    // Convert per-month earned into a cumulative running total.
     let runningTotal = 0;
     keys.forEach(key => {
       runningTotal += monthBuckets[key].earned;
       monthBuckets[key].earned = Math.round(runningTotal * 1000) / 1000;
     });
 
-    // Trim the chart range. Rendering the full Aug->Aug+5yr window leaves a
-    // long flat run after the last credit, which visually compresses the
-    // actual climb into the middle. Render only through the LATER of (the
-    // last month with a real credit) or (the current month) — so the line
-    // spans the meaningful range and the pace line still reaches "today".
     const lastActivityKey = monthKey(completed[completed.length - 1].date);
     const currentKey = monthKey(new Date());
     const visibleEndKey = lastActivityKey > currentKey ? lastActivityKey : currentKey;
@@ -120,6 +130,13 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
       .filter(k => k <= visibleEndKey)
       .map(k => monthBuckets[k]);
   }, [courses, totalRequired, graduationYear]);
+
+  // TEMP DIAGNOSTIC — remove after the timeline is confirmed working.
+  // Prints the exact array handed to the chart so the data can be verified.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('TIMELINE DEBUG', JSON.stringify(chartData));
+  }, [chartData]);
 
   if (chartData.length === 0) {
     return (
@@ -174,9 +191,17 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
         )}
       </div>
 
-      <div className="h-48">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+      {/* Self-measured wrapper. The chart renders with explicit pixel
+          dimensions only once a real width is known, so Recharts never
+          measures a zero/negative-sized container. */}
+      <div ref={wrapRef} style={{ width: '100%', height: CHART_HEIGHT }}>
+        {chartWidth > 0 ? (
+          <AreaChart
+            width={chartWidth}
+            height={CHART_HEIGHT}
+            data={chartData}
+            margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+          >
             <defs>
               <linearGradient id="earnedGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
@@ -204,7 +229,6 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               strokeDasharray="4 4"
               label={{ value: `${totalRequired} required`, position: 'right', fill: '#64748b', fontSize: 10 }}
             />
-            {/* Expected pace: linear ramp from 0 to totalRequired. */}
             <Area
               type="linear"
               dataKey="pace"
@@ -214,8 +238,6 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               dot={false}
               name="Expected Pace"
             />
-            {/* Earned: monotone so the cumulative climb reads as a smooth
-                line rather than a flat-then-jump staircase. */}
             <Area
               type="monotone"
               dataKey="earned"
@@ -226,7 +248,9 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               name="Credits Earned"
             />
           </AreaChart>
-        </ResponsiveContainer>
+        ) : (
+          <div className="w-full h-full" />
+        )}
       </div>
 
       <div className="flex items-center justify-center gap-6 mt-3 text-xs text-slate-400">
