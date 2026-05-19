@@ -200,6 +200,7 @@ export default function DataSyncUpload({ schoolId }) {
     });
 
     for (const s of students) {
+      console.log('ROW DEBUG keys:', Object.keys(s), 'values:', JSON.stringify(s));
       const studentIdLocal = s.student_id?.trim();
       const email = (s.student_email || s.email)?.trim().toLowerCase();
       const firstName = s.first_name?.trim();
