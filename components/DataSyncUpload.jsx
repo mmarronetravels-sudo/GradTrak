@@ -224,20 +224,45 @@ export default function DataSyncUpload({ schoolId }) {
       const diplomaType = getDefaultDiplomaType(graduationYear);
       const diplomaTypeId = diplomaType?.id || null;
 
-      // Check if student exists by email — use maybeSingle + is_active filter
-      // to avoid .single() errors when inactive duplicates exist
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .ilike('email', email)
-        .eq('school_id', schoolId)
-        .eq('is_active', true)
-        .maybeSingle();
+      // Find an existing profile. Match on engage_id FIRST — it is the
+      // stable, unique identifier from Engage and is immune to email
+      // casing/address drift. Only fall back to email when there is no
+      // engage_id match (e.g. a profile that predates engage_id capture).
+      //
+      // Do NOT filter on is_active here: an archived student who
+      // reappears in an import must be matched and re-activated, not
+      // duplicated. Order by created_at so that if legacy duplicates
+      // still exist we deterministically pick the oldest (original) row.
+      let existing = null;
+
+      if (studentIdLocal) {
+        const { data: byEngageId } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('engage_id', studentIdLocal)
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        existing = byEngageId?.[0] || null;
+      }
+
+      if (!existing) {
+        const { data: byEmail } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', email)
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        existing = byEmail?.[0] || null;
+      }
 
       let studentProfileId = existing?.id;
 
       if (existing) {
-        // Update existing student
+        // Update existing student. Also set is_active: true so a student
+        // who was previously archived but is back in the roster is
+        // correctly re-activated rather than left archived.
         const { error } = await supabase
           .from('profiles')
           .update({ 
@@ -247,6 +272,7 @@ export default function DataSyncUpload({ schoolId }) {
             diploma_type_id: diplomaTypeId,
             student_id_local: studentIdLocal,
             engage_id: studentIdLocal,
+            is_active: true,
           })
           .eq('id', existing.id);
         
@@ -278,14 +304,31 @@ export default function DataSyncUpload({ schoolId }) {
           newUserId = authData?.user?.id || null;
         }
 
-        // If no auth user ID yet, look up existing profile by email
+        // If no auth user ID yet, look up an existing profile.
+        // engage_id first, email fallback — consistent with the primary
+        // match above. limit(1) instead of maybeSingle so a legacy
+        // duplicate can't throw here.
         if (!newUserId) {
-          const { data: existingByEmail } = await supabase
-            .from('profiles')
-            .select('id')
-            .ilike('email', email)
-            .maybeSingle();
-          newUserId = existingByEmail?.id || null;
+          let found = null;
+          if (studentIdLocal) {
+            const { data: byEngageId } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('engage_id', studentIdLocal)
+              .order('created_at', { ascending: true })
+              .limit(1);
+            found = byEngageId?.[0] || null;
+          }
+          if (!found) {
+            const { data: byEmail } = await supabase
+              .from('profiles')
+              .select('id')
+              .ilike('email', email)
+              .order('created_at', { ascending: true })
+              .limit(1);
+            found = byEmail?.[0] || null;
+          }
+          newUserId = found?.id || null;
         }
 
         // If still no ID, insert profile directly (signups disabled case)
@@ -465,9 +508,9 @@ export default function DataSyncUpload({ schoolId }) {
       if (!hasGrade && !hasCredit) continue;
 
       let termFormatted;
-if (term && year) termFormatted = `${term} ${year}`;
-else if (term) termFormatted = `${term} ${currentYearSuffix}`;
-else termFormatted = '';
+      if (term && year) termFormatted = `${term} ${year}`;
+      else if (term) termFormatted = `${term} ${currentYearSuffix}`;
+      else termFormatted = '';
 
       const status = finalGrade ? 'completed' : 'in_progress';
 
@@ -536,8 +579,40 @@ else termFormatted = '';
       return year * 10 + pos;
     };
 
+    // Tracks rows already queued for insert in THIS import, keyed the same
+    // way as strictIndex. Prevents two identical rows in the same file from
+    // both being inserted (the database strictIndex is built once up front
+    // and never sees rows queued during this loop).
+    const pendingInsertByKey = new Map();
+
     for (const row of parsed) {
       const strictKey = `${row.studentProfileId}|${row.courseName}|${row.termFormatted}`;
+
+      // Intra-file duplicate: a row earlier in this same file already
+      // queued an insert for this exact key. Don't queue a second one.
+      const pendingInsert = pendingInsertByKey.get(strictKey);
+      if (pendingInsert) {
+        const sameData =
+          creditsEqual(pendingInsert.credits, row.creditAmount) &&
+          pendingInsert.category_id === row.categoryId &&
+          (pendingInsert.grade || null) === row.finalGrade &&
+          pendingInsert.status === row.status;
+        if (sameData) {
+          // True duplicate row — nothing to do.
+          skipped++;
+        } else {
+          // Same course, differing data (e.g. corrected grade later in
+          // the file). Last row in the file wins: mutate the queued
+          // insert in place rather than creating a second row.
+          pendingInsert.credits = row.creditAmount;
+          pendingInsert.category_id = row.categoryId;
+          pendingInsert.grade = row.finalGrade;
+          pendingInsert.status = row.status;
+          updated++;
+        }
+        continue;
+      }
+
       let existing = strictIndex.get(strictKey);
       if (!existing && row.finalGrade) {
         const candidate = inProgressIndex.get(
@@ -578,7 +653,7 @@ else termFormatted = '';
           status: row.status,
         });
       } else {
-        toInsert.push({
+        const insertRow = {
           student_id: row.studentProfileId,
           name: row.courseName,
           credits: row.creditAmount,
@@ -586,7 +661,10 @@ else termFormatted = '';
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
-        });
+        };
+        toInsert.push(insertRow);
+        // Register so later identical rows in this file are caught above.
+        pendingInsertByKey.set(strictKey, insertRow);
       }
     }
 
