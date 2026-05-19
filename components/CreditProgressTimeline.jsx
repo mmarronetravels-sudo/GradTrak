@@ -3,25 +3,30 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceL
 
 function termToDate(term) {
   if (!term) return null;
-  const parts = term.trim().split(' ');
-  if (parts.length < 2) return null;
+  const parts = term.trim().split(/\s+/);
 
-  const trimester = parts[0].toUpperCase();
+  const trimester = (parts[0] || '').toUpperCase();
   const yearPart = parts[1];
 
   let year;
-  if (yearPart.includes('/')) {
+  if (yearPart && yearPart.includes('/')) {
     const [startYr, endYr] = yearPart.split('/');
-    const s = parseInt(startYr);
-    const e = parseInt(endYr);
-    year = s < 100 ? 2000 + s : s;
+    const s = parseInt(startYr, 10);
+    const e = parseInt(endYr, 10);
+    const startYear = s < 100 ? 2000 + s : s;
     const endYear = e < 100 ? 2000 + e : e;
-    if (trimester === 'T1' || trimester === 'S1') year = year;
-    else year = endYear;
-  } else {
-    year = parseInt(yearPart);
+    // T1/S1 fall in the first calendar year of the school year;
+    // everything later falls in the second.
+    year = (trimester === 'T1' || trimester === 'S1') ? startYear : endYear;
+  } else if (yearPart) {
+    year = parseInt(yearPart, 10);
     if (year < 100) year += 2000;
+  } else {
+    // Year-only or bare-trimester term strings can't be placed.
+    return null;
   }
+
+  if (isNaN(year)) return null;
 
   // Map trimester/semester to approximate completion month
   switch (trimester) {
@@ -35,6 +40,10 @@ function termToDate(term) {
   }
 }
 
+function monthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function formatMonth(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
@@ -44,9 +53,13 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
   const chartData = useMemo(() => {
     if (!courses || courses.length === 0 || !totalRequired) return [];
 
-    const gradYear = parseInt(graduationYear) || new Date().getFullYear() + 1;
+    const gradYear = parseInt(graduationYear, 10) || new Date().getFullYear() + 1;
     const startDate = new Date(gradYear - 4, 7, 1);  // Aug 1 of freshman year
-    const endDate = new Date(gradYear, 5, 30);        // Jun 30 of senior year
+    // End the window in the summer AFTER graduation. In the current Engage
+    // term format a senior's final trimester ("T3 25/26") resolves to ~Jun
+    // of gradYear+1, so the window must extend past gradYear or those
+    // credits fall off the end of the bucket range and never get counted.
+    const endDate = new Date(gradYear + 1, 7, 31);   // Aug 31 of year after grad
     const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
                         (endDate.getMonth() - startDate.getMonth());
 
@@ -61,41 +74,42 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
 
     if (completed.length === 0) return [];
 
-    // Build monthly buckets across the full 4-year span
+    // Build monthly buckets across the full span
     const monthBuckets = {};
     for (let i = 0; i <= totalMonths; i++) {
       const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const key = monthKey(d);
       const pace = totalRequired * (i / totalMonths);
       monthBuckets[key] = { month: key, earned: 0, pace: Math.round(pace * 100) / 100 };
     }
 
-    // Place credits into their term-derived month
-    completed.forEach(c => {
-      const key = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
-      if (monthBuckets[key]) {
-        monthBuckets[key].earned += c.credits;
-      }
-    });
-
-    // Convert to cumulative
     const keys = Object.keys(monthBuckets).sort();
-    let runningTotal = 0;
+    const firstKey = keys[0];
+    const lastKey = keys[keys.length - 1];
 
-    // Credits earned before the timeline starts
+    // Place each course's credits into its term-derived month. A course
+    // whose date falls outside the window is clamped to the nearest
+    // bucket rather than silently dropped — clamping to lastKey ensures a
+    // senior's most recent trimester still contributes to the running
+    // total even if its derived month is slightly past the window.
     completed.forEach(c => {
-      const key = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
-      if (key < keys[0]) runningTotal += c.credits;
+      let key = monthKey(c.date);
+      if (key < firstKey) key = firstKey;
+      else if (key > lastKey) key = lastKey;
+      monthBuckets[key].earned += c.credits;
     });
 
+    // Convert per-month earned into a cumulative running total.
+    let runningTotal = 0;
     keys.forEach(key => {
       runningTotal += monthBuckets[key].earned;
       monthBuckets[key].earned = Math.round(runningTotal * 1000) / 1000;
     });
 
-    // Only show months up to current month (don't project future earned)
+    // Only show months up to the current month, plus future months that
+    // still carry a pace value (so the expected-pace line extends forward).
     const now = new Date();
-    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentKey = monthKey(now);
 
     return keys
       .filter(k => k <= currentKey || monthBuckets[k].pace > 0)
