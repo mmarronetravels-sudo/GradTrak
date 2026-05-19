@@ -15,20 +15,21 @@ function termToDate(term) {
     const e = parseInt(endYr, 10);
     const startYear = s < 100 ? 2000 + s : s;
     const endYear = e < 100 ? 2000 + e : e;
-    // T1/S1 fall in the first calendar year of the school year;
+    // T1/S1/Q1/Q2 fall in the first calendar year of the school year;
     // everything later falls in the second.
-    year = (trimester === 'T1' || trimester === 'S1') ? startYear : endYear;
+    const firstHalf = (trimester === 'T1' || trimester === 'S1' ||
+                       trimester === 'Q1' || trimester === 'Q2');
+    year = firstHalf ? startYear : endYear;
   } else if (yearPart) {
     year = parseInt(yearPart, 10);
     if (year < 100) year += 2000;
   } else {
-    // Year-only or bare-trimester term strings can't be placed.
     return null;
   }
 
   if (isNaN(year)) return null;
 
-  // Map trimester/semester to approximate completion month
+  // Map term code to an approximate completion month.
   switch (trimester) {
     case 'T1': return new Date(year, 10, 1);  // Nov
     case 'T2': return new Date(year, 1, 1);   // Feb
@@ -36,7 +37,12 @@ function termToDate(term) {
     case 'SU': return new Date(year, 6, 1);   // Jul
     case 'S1': return new Date(year, 0, 1);   // Jan
     case 'S2': return new Date(year, 5, 1);   // Jun
-    default:   return new Date(year, 5, 1);   // Default to Jun
+    case 'Q1': return new Date(year, 9, 1);   // Oct
+    case 'Q2': return new Date(year, 0, 1);   // Jan
+    case 'Q3': return new Date(year, 2, 1);   // Mar
+    case 'Q4': return new Date(year, 5, 1);   // Jun
+    case 'YR': return new Date(year, 5, 1);   // Jun — year-long course completes in spring
+    default:   return new Date(year, 5, 1);   // Jun fallback
   }
 }
 
@@ -55,10 +61,8 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
 
     const gradYear = parseInt(graduationYear, 10) || new Date().getFullYear() + 1;
     const startDate = new Date(gradYear - 4, 7, 1);  // Aug 1 of freshman year
-    // End the window in the summer AFTER graduation. In the current Engage
-    // term format a senior's final trimester ("T3 25/26") resolves to ~Jun
-    // of gradYear+1, so the window must extend past gradYear or those
-    // credits fall off the end of the bucket range and never get counted.
+    // Window extends to the summer after graduation so a senior's final
+    // trimester ("T3 25/26" -> ~Jun of gradYear+1) still has a bucket.
     const endDate = new Date(gradYear + 1, 7, 31);   // Aug 31 of year after grad
     const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
                         (endDate.getMonth() - startDate.getMonth());
@@ -74,7 +78,7 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
 
     if (completed.length === 0) return [];
 
-    // Build monthly buckets across the full span
+    // Build monthly buckets across the full span.
     const monthBuckets = {};
     for (let i = 0; i <= totalMonths; i++) {
       const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
@@ -87,11 +91,8 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
     const firstKey = keys[0];
     const lastKey = keys[keys.length - 1];
 
-    // Place each course's credits into its term-derived month. A course
-    // whose date falls outside the window is clamped to the nearest
-    // bucket rather than silently dropped — clamping to lastKey ensures a
-    // senior's most recent trimester still contributes to the running
-    // total even if its derived month is slightly past the window.
+    // Place each course's credits into its term-derived month, clamping
+    // anything outside the window into the nearest bucket.
     completed.forEach(c => {
       let key = monthKey(c.date);
       if (key < firstKey) key = firstKey;
@@ -106,13 +107,17 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
       monthBuckets[key].earned = Math.round(runningTotal * 1000) / 1000;
     });
 
-    // Only show months up to the current month, plus future months that
-    // still carry a pace value (so the expected-pace line extends forward).
-    const now = new Date();
-    const currentKey = monthKey(now);
+    // Trim the chart range. Rendering the full Aug->Aug+5yr window leaves a
+    // long flat run after the last credit, which visually compresses the
+    // actual climb into the middle. Render only through the LATER of (the
+    // last month with a real credit) or (the current month) — so the line
+    // spans the meaningful range and the pace line still reaches "today".
+    const lastActivityKey = monthKey(completed[completed.length - 1].date);
+    const currentKey = monthKey(new Date());
+    const visibleEndKey = lastActivityKey > currentKey ? lastActivityKey : currentKey;
 
     return keys
-      .filter(k => k <= currentKey || monthBuckets[k].pace > 0)
+      .filter(k => k <= visibleEndKey)
       .map(k => monthBuckets[k]);
   }, [courses, totalRequired, graduationYear]);
 
@@ -199,8 +204,9 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               strokeDasharray="4 4"
               label={{ value: `${totalRequired} required`, position: 'right', fill: '#64748b', fontSize: 10 }}
             />
+            {/* Expected pace: linear ramp from 0 to totalRequired. */}
             <Area
-              type="stepAfter"
+              type="linear"
               dataKey="pace"
               stroke="#475569"
               strokeDasharray="6 3"
@@ -208,8 +214,10 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               dot={false}
               name="Expected Pace"
             />
+            {/* Earned: monotone so the cumulative climb reads as a smooth
+                line rather than a flat-then-jump staircase. */}
             <Area
-              type="stepAfter"
+              type="monotone"
               dataKey="earned"
               stroke="#818cf8"
               strokeWidth={2}
