@@ -157,7 +157,11 @@ export default function DataSyncUpload({ schoolId }) {
 
       if (normalized.length > 0) {
         const columns = Object.keys(normalized[0]);
-        
+
+        // TEMP DIAGNOSTIC — remove once the 8th-grade import is working.
+        console.log('PARSE DEBUG: sheet "' + sheetName + '" has', normalized.length,
+                    'rows, columns =', columns);
+
         const isStudentSheet = columns.some(c => 
           c === 'student_email' || c === 'first_name'
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
@@ -172,6 +176,13 @@ export default function DataSyncUpload({ schoolId }) {
           courses = normalized;
         }
       }
+    }
+
+    // TEMP DIAGNOSTIC — remove once the 8th-grade import is working.
+    console.log('PARSE DEBUG: workbook sheet names =', workbook.SheetNames);
+    console.log('PARSE DEBUG: returning', students.length, 'students,', courses.length, 'courses');
+    if (students.length > 0) {
+      console.log('PARSE DEBUG: student[0] keys =', Object.keys(students[0]));
     }
 
     return { students, courses };
@@ -199,14 +210,23 @@ export default function DataSyncUpload({ schoolId }) {
       }
     });
 
+    // TEMP DIAGNOSTIC — remove once the 8th-grade import is working.
+    console.log('SYNC DEBUG: syncStudents received', students.length, 'rows');
+    if (students.length > 0) {
+      console.log('SYNC DEBUG: first row keys =', Object.keys(students[0]));
+      console.log('SYNC DEBUG: first row values =', JSON.stringify(students[0]));
+    }
+
     for (const s of students) {
-      console.log('ROW DEBUG keys:', Object.keys(s), 'values:', JSON.stringify(s));
       const studentIdLocal = s.student_id?.trim();
       const email = (s.student_email || s.email)?.trim().toLowerCase();
       const firstName = s.first_name?.trim();
       const lastName = s.last_name?.trim();
       const fullName = s.full_name?.trim() || `${firstName} ${lastName}`.trim();
       const grade = parseInt(s.grade, 10);
+
+      // TEMP DIAGNOSTIC — logs why each row passes or skips.
+      console.log('SYNC DEBUG row:', { studentIdLocal, email, fullName, gradeRaw: s.grade, grade });
       
       let graduationYear = parseInt(s.graduation_year, 10);
       if (isNaN(graduationYear) && !isNaN(grade)) {
