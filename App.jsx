@@ -4113,6 +4113,41 @@ const summaryStats = {
 </button>
             </div>
 
+{/* My Students / All Students toggle — counselors and case managers.
+    Shown on the Students and At-Risk tabs so scope can be changed from either. */}
+{(profile?.role === 'counselor' || profile?.role === 'case_manager') &&
+  (mainView === 'students' || mainView === 'at-risk') && (
+  <div className="flex items-center gap-3 mb-4">
+    <div className="inline-flex rounded-xl overflow-hidden border border-slate-700">
+      <button
+        onClick={() => setViewAllStudents(false)}
+        className={`px-4 py-2 text-sm font-medium transition-colors ${
+          !viewAllStudents
+            ? 'bg-indigo-600 text-white'
+            : 'bg-slate-800 text-slate-400 hover:text-white'
+        }`}
+      >
+        👤 My Students
+      </button>
+      <button
+        onClick={() => setViewAllStudents(true)}
+        className={`px-4 py-2 text-sm font-medium transition-colors ${
+          viewAllStudents
+            ? 'bg-indigo-600 text-white'
+            : 'bg-slate-800 text-slate-400 hover:text-white'
+        }`}
+      >
+        👁 All Students
+      </button>
+    </div>
+    {viewAllStudents && (
+      <span className="text-slate-500 text-xs">
+        Viewing all students school-wide
+      </span>
+    )}
+  </div>
+)}
+
             {mainView === 'students' && (
               <>
                             
@@ -4162,39 +4197,6 @@ const summaryStats = {
     </p>
   )}
 </div>
-                
-{/* My Students / All Students toggle — superuser counselors only */}
-{(profile?.role === 'counselor' || profile?.role === 'case_manager') && (
-  <div className="flex items-center gap-3 mt-3">
-    <div className="inline-flex rounded-xl overflow-hidden border border-slate-700">
-      <button
-        onClick={() => setViewAllStudents(false)}
-        className={`px-4 py-2 text-sm font-medium transition-colors ${
-          !viewAllStudents
-            ? 'bg-indigo-600 text-white'
-            : 'bg-slate-800 text-slate-400 hover:text-white'
-        }`}
-      >
-        👤 My Students
-      </button>
-      <button
-        onClick={() => setViewAllStudents(true)}
-        className={`px-4 py-2 text-sm font-medium transition-colors ${
-          viewAllStudents
-            ? 'bg-indigo-600 text-white'
-            : 'bg-slate-800 text-slate-400 hover:text-white'
-        }`}
-      >
-        👁 All Students
-      </button>
-    </div>
-    {viewAllStudents && (
-      <span className="text-slate-500 text-xs">
-        Viewing all {students.length} students
-      </span>
-    )}
-  </div>
-)}
                 
                 {/* Filters */}
 <div className="flex flex-wrap gap-2 mt-3">
@@ -4338,7 +4340,7 @@ const summaryStats = {
             {mainView === 'at-risk' && (
               <AtRiskReport
                 schoolId={profile.school_id}
-                counselorId={profile.id}
+                counselorId={viewAllStudents ? null : profile.id}
                 onSelectStudent={(student) => {
   const fullStudent = students.find(s => s.id === student.id) || student;
   setSelectedStudent(fullStudent);
