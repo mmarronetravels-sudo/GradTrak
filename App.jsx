@@ -4116,7 +4116,7 @@ const summaryStats = {
 {/* My Students / All Students toggle — counselors and case managers.
     Shown on the Students and At-Risk tabs so scope can be changed from either. */}
 {(profile?.role === 'counselor' || profile?.role === 'case_manager') &&
-  (mainView === 'students' || mainView === 'at-risk') && (
+  (mainView === 'students' || mainView === 'at-risk' || mainView === 'cte-pathways') && (
   <div className="flex items-center gap-3 mb-4">
     <div className="inline-flex rounded-xl overflow-hidden border border-slate-700">
       <button
@@ -4350,7 +4350,7 @@ const summaryStats = {
             {mainView === 'cte-pathways' && (
               <CTEPathwayReport
                 schoolId={profile.school_id}
-                counselorId={profile.id}
+                counselorId={viewAllStudents ? null : profile.id}
                 onSelectStudent={(student) => {
   const fullStudent = students.find(s => s.id === student.id) || student;
   setSelectedStudent(fullStudent);
