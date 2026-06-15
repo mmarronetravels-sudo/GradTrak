@@ -4340,7 +4340,7 @@ const summaryStats = {
             {mainView === 'at-risk' && (
               <AtRiskReport
                 schoolId={profile.school_id}
-                counselorId={viewAllStudents ? null : profile.id}
+                counselorId={(viewAllStudents || profile.role === 'viewer' || profile.role === 'admin') ? null : profile.id}
                 onSelectStudent={(student) => {
   const fullStudent = students.find(s => s.id === student.id) || student;
   setSelectedStudent(fullStudent);
@@ -4350,7 +4350,7 @@ const summaryStats = {
             {mainView === 'cte-pathways' && (
               <CTEPathwayReport
                 schoolId={profile.school_id}
-                counselorId={viewAllStudents ? null : profile.id}
+                counselorId={(viewAllStudents || profile.role === 'viewer' || profile.role === 'admin') ? null : profile.id}
                 onSelectStudent={(student) => {
   const fullStudent = students.find(s => s.id === student.id) || student;
   setSelectedStudent(fullStudent);
