@@ -91,7 +91,9 @@ regardless of caseload.
   `students` (roster), `at-risk`, `cte-pathways`, `contact-snapshot`,
   `mtss-interventions`. Holds the **My Students / All Students** toggle
   (`viewAllStudents` state) and per-student detail with notes, emails, parent
-  alerts, contracts, archive. Admins enter here via "switch to counselor".
+  alerts, contracts, archive. Admins enter here via "switch to counselor". The
+  `students` roster toolbar has a **📣 Email Group** button (`BulkEmailModal`)
+  for emailing a filtered group at once (counselor/case_manager/admin only).
 - **`AdminDashboard`** (App.jsx ~1181 — *note:* there is also a separate
   `components/AdminDashboard.jsx`; the in-`App.jsx` one is what's routed):
   school-wide management — data sync upload, at-risk, CTE pathways, attendance
@@ -167,7 +169,12 @@ across views), `calculatePathwayProgress` (CTE), `generateAlerts`,
 ## 8. Edge functions (`supabase/`)
 
 - **`send-advising-email/index.ts`** — Deno function that emails advising
-  notes/plans. Invoked at `functions/v1/send-advising-email`.
+  content to a single student (plus optional CCs) and logs to
+  `email_audit_logs`. Invoked at `functions/v1/send-advising-email`. Restricted
+  to `counselor`/`admin`/`case_manager`. `contentType` accepts `notes`, `plan`,
+  `both` (advising-notes framing) and `message`, `message_plan` (custom message
+  with a neutral "A message from your counselor" intro; takes a `messageHtml`
+  param). The bulk-email feature calls this once per recipient.
 - **`invite-parent/index.ts`** — creates/invites a parent account and links it to
   a student. Payload: `{ parentEmail, studentId, studentName, counselorName,
   schoolId }`. Invoked at `functions/v1/invite-parent`.
