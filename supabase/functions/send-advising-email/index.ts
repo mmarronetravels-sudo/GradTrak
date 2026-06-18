@@ -61,6 +61,7 @@ serve(async (req) => {
       contentType,
       notesHtml,
       planHtml,
+      messageHtml,
     } = await req.json();
 
     if (!studentEmail || !subject || !contentType) {
@@ -78,6 +79,7 @@ serve(async (req) => {
       contentType,
       notesHtml,
       planHtml,
+      messageHtml,
     });
 
     // ── Send via Resend ──
@@ -179,6 +181,7 @@ function buildEmailHtml({
   contentType,
   notesHtml,
   planHtml,
+  messageHtml,
 }: {
   studentName: string;
   senderName: string;
@@ -186,13 +189,32 @@ function buildEmailHtml({
   contentType: string;
   notesHtml?: string;
   planHtml?: string;
+  messageHtml?: string;
 }) {
+  // contentType "message" / "message_plan" are custom-message sends (e.g. bulk
+  // group email). They use a neutral intro instead of the advising-notes framing.
+  const isMessage = contentType === "message" || contentType === "message_plan";
+
   const contentTitle =
+    isMessage ? "A message from your counselor" :
     contentType === "notes" ? "Advising Notes" :
     contentType === "plan" ? "Graduation Progress" :
     "Advising Summary";
 
   let bodyContent = "";
+
+  if (isMessage && messageHtml) {
+    bodyContent += messageHtml;
+  }
+
+  if (contentType === "message_plan" && planHtml) {
+    bodyContent += `
+      <h2 style="font-size: 16px; color: #1e293b; margin: 24px 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;">
+        📋 Your Graduation Progress
+      </h2>
+      ${planHtml}
+    `;
+  }
 
   if ((contentType === "notes" || contentType === "both") && notesHtml) {
     bodyContent += `
@@ -244,7 +266,9 @@ function buildEmailHtml({
                 Hi ${studentName},
               </p>
               <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 0 0 24px 0;">
-                Your counselor, <strong>${senderName}</strong>, has shared your ${contentTitle.toLowerCase()} from ScholarPath Graduation Progress. Please review the information below.
+                ${isMessage
+                  ? `Your counselor, <strong>${senderName}</strong>, has sent you the following message from ScholarPath Graduation Progress.`
+                  : `Your counselor, <strong>${senderName}</strong>, has shared your ${contentTitle.toLowerCase()} from ScholarPath Graduation Progress. Please review the information below.`}
               </p>
 
               ${bodyContent}

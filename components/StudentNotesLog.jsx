@@ -378,22 +378,6 @@ const NoteEntry = ({ note, counselorId, onStatusToggle, onDelete, onEdit, editSt
           </div>
         </div>
 
-        {/* Author attribution */}
-        {note.counselor && (
-          <div className="mb-3">
-            <a
-              href={`mailto:${note.counselor.email || ''}`}
-              title={note.counselor.email || 'No email on file'}
-              className="text-xs text-slate-400 hover:text-cyan-400 transition-colors inline-flex items-center gap-1"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              {note.counselor.full_name || 'Unknown counselor'}
-            </a>
-          </div>
-        )}
-
         {/* Note content */}
         <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
           {note.content || note.note}
@@ -985,7 +969,7 @@ const StudentNotesLog = ({
         const result = await Promise.race([
           supabase
             .from('student_notes')
-            .select('*, counselor:profiles!student_notes_counselor_id_fkey(full_name, email)')
+            .select('*')
             .eq('student_id', studentId)
             .order('created_at', { ascending: false }),
           quickTimeout
@@ -1000,7 +984,7 @@ const StudentNotesLog = ({
         if (!token) throw new Error('No auth token found');
         
         const res = await fetch(
-          'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes?student_id=eq.' + studentId + '&select=*,counselor:profiles!student_notes_counselor_id_fkey(full_name,email)&order=created_at.desc',
+          'https://vstiweftxjaszhnjwggb.supabase.co/rest/v1/student_notes?student_id=eq.' + studentId + '&select=*&order=created_at.desc',
           {
             headers: {
               'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdGl3ZWZ0eGphc3pobmp3Z2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTQ0NjcsImV4cCI6MjA4MzgzMDQ2N30.qY9ky3YBFlWHTG39eJpwqwghaOuEseosGZ1eMRZDi2k',

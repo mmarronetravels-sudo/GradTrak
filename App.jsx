@@ -8,12 +8,13 @@ import StudentNotesLog from './components/StudentNotesLog';
 import CTEPathwayReport from './components/CTEPathwayReport';
 import SendAdvisingEmail from './components/SendAdvisingEmail';
 import SendParentAlert from './components/SendParentAlert';
+import BulkEmailModal from './components/BulkEmailModal';
 import MTSSInterventionReport from './components/MTSSInterventionReport';
 import AcademicContractForm from './components/AcademicContractForm';
 import AttendanceContactExport from './components/AttendanceContactExport';
 import AdminStudentManager from './components/AdminStudentManager';
 import CreditProgressTimeline from './components/CreditProgressTimeline';
-const APP_VERSION = '2.14.0';
+const APP_VERSION = '2.15.0';
 
 
 // ============================================
@@ -2639,6 +2640,7 @@ function CounselorDashboard({ user, profile, onLogout, onSwitchToAdmin, initialS
   const [preferredNameSaving, setPreferredNameSaving] = useState(false);  
   const [isReactivating, setIsReactivating] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
   const [showParentAlertModal, setShowParentAlertModal] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
   const [notesRefreshKey, setNotesRefreshKey] = useState(0);
@@ -4259,9 +4261,29 @@ const summaryStats = {
       ✕ Clear filters
     </button>
   )}
+  {(profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'admin') && (
+    <button
+      onClick={() => setShowBulkEmailModal(true)}
+      className="ml-auto px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+    >
+      📣 Email Group
+    </button>
+  )}
 </div>
 
-{students.length === 0 ? (       
+<BulkEmailModal
+  isOpen={showBulkEmailModal}
+  onClose={() => setShowBulkEmailModal(false)}
+  students={filteredStudents}
+  pathways={pathways}
+  categories={categories}
+  counselorProfile={profile}
+  supabaseClient={supabase}
+  getRiskLevel={getStudentRiskLevel}
+  onSent={() => setNotesRefreshKey(prev => prev + 1)}
+/>
+
+{students.length === 0 ? (
   <div className="text-center py-12 text-slate-400">No students have signed up yet.</div>
 ) : filteredStudents.length === 0 ? (
   <div className="text-center py-12 text-slate-400">No students match your search.</div>
@@ -4999,7 +5021,38 @@ useEffect(() => {
     );
   }
 
-  if (!user || !profile) { return <AuthScreen onLogin={(user) => { setUser(user); }} />; }
+  if (!user) { return <AuthScreen onLogin={(user) => { setUser(user); }} />; }
+
+  // Authenticated, but no profile row could be loaded. This is NOT the same as
+  // "not logged in" — bouncing the user back to AuthScreen here just makes a
+  // successful sign-in look broken. It usually means the profiles row is
+  // missing, or its id doesn't match the auth user's id (so RLS hides it from
+  // the user's own query). Show an actionable error instead of looping the
+  // login screen.
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
+          <h1 className="text-lg font-semibold text-white mb-2">We couldn't load your account</h1>
+          <p className="text-sm text-slate-400 mb-1">
+            You're signed in as <span className="text-slate-200">{user.email}</span>, but no
+            matching user profile was found for this account.
+          </p>
+          <p className="text-sm text-slate-400 mb-5">
+            This usually needs an administrator to link your account. Please contact your
+            school admin and share the email above.
+          </p>
+          <button
+            onClick={handleLogout}
+            className="w-full bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg py-2.5"
+          >
+            Sign out
+          </button>
+          <p className="text-xs text-slate-600 mt-4">v{APP_VERSION}</p>
+        </div>
+      </div>
+    );
+  }
 
 if (profile.role === 'admin') {
   if (adminViewMode === 'counselor') {

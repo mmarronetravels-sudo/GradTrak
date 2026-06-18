@@ -87,17 +87,13 @@ export default function DataSyncUpload({ schoolId }) {
     return standardDiploma || anyMatchingDiploma || diplomaTypes[0] || null;
   };
 
-  // Calculate graduation year from grade level.
-  // Accepts grade 8 as well as 9-12: 8th graders are imported as full
-  // students ahead of fall enrollment. The schoolYear + (13 - gradeNum)
-  // formula already yields the correct year for grade 8 (5 years out);
-  // the lower bound just needs to permit it.
+  // Calculate graduation year from grade level
   const calculateGraduationYear = (grade) => {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
     const schoolYear = currentMonth >= 7 ? currentYear : currentYear - 1;
     const gradeNum = parseInt(grade, 10);
-    if (isNaN(gradeNum) || gradeNum < 8 || gradeNum > 12) return null;
+    if (isNaN(gradeNum) || gradeNum < 9 || gradeNum > 12) return null;
     return schoolYear + (13 - gradeNum);
   };
 
@@ -157,7 +153,7 @@ export default function DataSyncUpload({ schoolId }) {
 
       if (normalized.length > 0) {
         const columns = Object.keys(normalized[0]);
-
+        
         const isStudentSheet = columns.some(c => 
           c === 'student_email' || c === 'first_name'
         ) && !columns.includes('credit_amount') && !columns.includes('credit_type');
@@ -206,9 +202,14 @@ export default function DataSyncUpload({ schoolId }) {
       const lastName = s.last_name?.trim();
       const fullName = s.full_name?.trim() || `${firstName} ${lastName}`.trim();
       const grade = parseInt(s.grade, 10);
-
       
       let graduationYear = parseInt(s.graduation_year, 10);
+      // Guard against 2-digit graduation years (e.g. "28" instead of "2028")
+      // that some Engage exports produce. Without this, getGradeLevel() in
+      // AdminStudentManager computes absurd grade values and returns null.
+      if (!isNaN(graduationYear) && graduationYear < 100) {
+        graduationYear += 2000;
+      }
       if (isNaN(graduationYear) && !isNaN(grade)) {
         graduationYear = calculateGraduationYear(grade);
       }
@@ -224,53 +225,25 @@ export default function DataSyncUpload({ schoolId }) {
         continue;
       }
 
-      // Grade floor: 8th graders are imported as full students ahead of
-      // fall enrollment. Rows below grade 8 (elementary / junk data) are
-      // still skipped. NaN grades are also skipped here.
-      if (isNaN(grade) || grade < 8) continue;
+      if (grade < 9) continue;
 
       const diplomaType = getDefaultDiplomaType(graduationYear);
       const diplomaTypeId = diplomaType?.id || null;
 
-      // Find an existing profile. Match on engage_id FIRST — it is the
-      // stable, unique identifier from Engage and is immune to email
-      // casing/address drift. Only fall back to email when there is no
-      // engage_id match (e.g. a profile that predates engage_id capture).
-      //
-      // Do NOT filter on is_active here: an archived student who
-      // reappears in an import must be matched and re-activated, not
-      // duplicated. Order by created_at so that if legacy duplicates
-      // still exist we deterministically pick the oldest (original) row.
-      let existing = null;
-
-      if (studentIdLocal) {
-        const { data: byEngageId } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('engage_id', studentIdLocal)
-          .eq('school_id', schoolId)
-          .order('created_at', { ascending: true })
-          .limit(1);
-        existing = byEngageId?.[0] || null;
-      }
-
-      if (!existing) {
-        const { data: byEmail } = await supabase
-          .from('profiles')
-          .select('id')
-          .ilike('email', email)
-          .eq('school_id', schoolId)
-          .order('created_at', { ascending: true })
-          .limit(1);
-        existing = byEmail?.[0] || null;
-      }
+      // Check if student exists by email — use maybeSingle + is_active filter
+      // to avoid .single() errors when inactive duplicates exist
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('email', email)
+        .eq('school_id', schoolId)
+        .eq('is_active', true)
+        .maybeSingle();
 
       let studentProfileId = existing?.id;
 
       if (existing) {
-        // Update existing student. Also set is_active: true so a student
-        // who was previously archived but is back in the roster is
-        // correctly re-activated rather than left archived.
+        // Update existing student
         const { error } = await supabase
           .from('profiles')
           .update({ 
@@ -280,7 +253,6 @@ export default function DataSyncUpload({ schoolId }) {
             diploma_type_id: diplomaTypeId,
             student_id_local: studentIdLocal,
             engage_id: studentIdLocal,
-            is_active: true,
           })
           .eq('id', existing.id);
         
@@ -291,40 +263,38 @@ export default function DataSyncUpload({ schoolId }) {
           studentProfileId = existing.id;
         }
       } else {
-        // New student. We deliberately DO NOT call supabase.auth.signUp()
-        // here. Bulk imports of many new students (e.g. a whole 8th-grade
-        // cohort) would otherwise hit Supabase's auth signup rate limit,
-        // causing most rows to fail. Students do not need a login account
-        // at import time — advisors work with the profile records, and
-        // student logins can be provisioned separately later. So we always
-        // create the profile row directly.
-        //
-        // First check whether a profile already exists (an earlier partial
-        // import, or a student who already had an auth account from before
-        // this change). engage_id first, email fallback.
+        // New student — try auth signup first, but don't stop if signups are disabled
         let newUserId = null;
-        let found = null;
-        if (studentIdLocal) {
-          const { data: byEngageId } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('engage_id', studentIdLocal)
-            .order('created_at', { ascending: true })
-            .limit(1);
-          found = byEngageId?.[0] || null;
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email,
+          password: 'GradTrack2026!',
+        });
+
+        if (authErr) {
+          const msg = authErr.message.toLowerCase();
+          if (msg.includes('already registered')) {
+            // Auth account exists — will look up profile below
+          } else if (msg.includes('signups not allowed') || msg.includes('not allowed')) {
+            // Signups disabled — skip auth creation, still upsert profile
+          } else {
+            errors.push(`Auth signup ${email}: ${authErr.message}`);
+            continue;
+          }
+        } else {
+          newUserId = authData?.user?.id || null;
         }
-        if (!found) {
-          const { data: byEmail } = await supabase
+
+        // If no auth user ID yet, look up existing profile by email
+        if (!newUserId) {
+          const { data: existingByEmail } = await supabase
             .from('profiles')
             .select('id')
             .ilike('email', email)
-            .order('created_at', { ascending: true })
-            .limit(1);
-          found = byEmail?.[0] || null;
+            .maybeSingle();
+          newUserId = existingByEmail?.id || null;
         }
-        newUserId = found?.id || null;
 
-        // No existing profile — insert one. The DB generates the id.
+        // If still no ID, insert profile directly (signups disabled case)
         if (!newUserId) {
           const { data: newProfile, error: insertErr } = await supabase
             .from('profiles')
@@ -343,12 +313,12 @@ export default function DataSyncUpload({ schoolId }) {
             .select('id')
             .single();
           if (insertErr || !newProfile) {
-            errors.push(`Insert ${email}: ${insertErr?.message || 'could not create profile'}`);
+            errors.push(`Insert ${email}: could not create profile`);
             continue;
           }
           newUserId = newProfile.id;
         } else {
-          // Existing profile — update it.
+          // Upsert profile with known ID
           const { error } = await supabase
             .from('profiles')
             .upsert({
@@ -379,14 +349,17 @@ export default function DataSyncUpload({ schoolId }) {
         studentIdMap[studentIdLocal] = studentProfileId;
       }
 
-      // Assign counselor — update if changed, insert if new
+      // Assign counselor — update if changed, insert if new.
+      // Using .limit(1) instead of .maybeSingle() so pre-existing
+      // duplicate rows don't cause an error that skips the cleanup.
       if (studentProfileId && counselorId) {
-        const { data: existingAssignment } = await supabase
+        const { data: existingRows } = await supabase
           .from('counselor_assignments')
           .select('id, counselor_id')
           .eq('student_id', studentProfileId)
           .eq('assignment_type', 'counselor')
-          .maybeSingle();
+          .limit(1);
+        const existingAssignment = existingRows?.[0] || null;
 
         if (existingAssignment && existingAssignment.counselor_id !== counselorId) {
           // Advisor changed — delete old assignment
@@ -505,7 +478,14 @@ export default function DataSyncUpload({ schoolId }) {
       else if (term) termFormatted = `${term} ${currentYearSuffix}`;
       else termFormatted = '';
 
-      const status = finalGrade ? 'completed' : 'in_progress';
+      // A course is only "completed" if it has a grade that represents a final result.
+      // "IP" (In Progress) and "I" (Incomplete) are placeholder grades for unfinished work
+      // and must stay as in_progress even though the cell is non-empty.
+      const inProgressGrades = ['IP', 'I'];
+      const gradeUpper = (finalGrade || '').toUpperCase();
+      const status = finalGrade && !inProgressGrades.includes(gradeUpper)
+        ? 'completed'
+        : 'in_progress';
 
       parsed.push({
         studentProfileId,
@@ -572,40 +552,8 @@ export default function DataSyncUpload({ schoolId }) {
       return year * 10 + pos;
     };
 
-    // Tracks rows already queued for insert in THIS import, keyed the same
-    // way as strictIndex. Prevents two identical rows in the same file from
-    // both being inserted (the database strictIndex is built once up front
-    // and never sees rows queued during this loop).
-    const pendingInsertByKey = new Map();
-
     for (const row of parsed) {
       const strictKey = `${row.studentProfileId}|${row.courseName}|${row.termFormatted}`;
-
-      // Intra-file duplicate: a row earlier in this same file already
-      // queued an insert for this exact key. Don't queue a second one.
-      const pendingInsert = pendingInsertByKey.get(strictKey);
-      if (pendingInsert) {
-        const sameData =
-          creditsEqual(pendingInsert.credits, row.creditAmount) &&
-          pendingInsert.category_id === row.categoryId &&
-          (pendingInsert.grade || null) === row.finalGrade &&
-          pendingInsert.status === row.status;
-        if (sameData) {
-          // True duplicate row — nothing to do.
-          skipped++;
-        } else {
-          // Same course, differing data (e.g. corrected grade later in
-          // the file). Last row in the file wins: mutate the queued
-          // insert in place rather than creating a second row.
-          pendingInsert.credits = row.creditAmount;
-          pendingInsert.category_id = row.categoryId;
-          pendingInsert.grade = row.finalGrade;
-          pendingInsert.status = row.status;
-          updated++;
-        }
-        continue;
-      }
-
       let existing = strictIndex.get(strictKey);
       if (!existing && row.finalGrade) {
         const candidate = inProgressIndex.get(
@@ -637,16 +585,20 @@ export default function DataSyncUpload({ schoolId }) {
           continue;
         }
 
-        toUpdate.push({
+        const updateObj = {
           id: existing.id,
           credits: row.creditAmount,
           category_id: row.categoryId,
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
-        });
+        };
+        if (row.status === 'completed' && existing.status !== 'completed') {
+          updateObj.completed_at = new Date().toISOString();
+        }
+        toUpdate.push(updateObj);
       } else {
-        const insertRow = {
+        toInsert.push({
           student_id: row.studentProfileId,
           name: row.courseName,
           credits: row.creditAmount,
@@ -654,10 +606,8 @@ export default function DataSyncUpload({ schoolId }) {
           term: row.termFormatted,
           grade: row.finalGrade,
           status: row.status,
-        };
-        toInsert.push(insertRow);
-        // Register so later identical rows in this file are caught above.
-        pendingInsertByKey.set(strictKey, insertRow);
+          completed_at: row.status === 'completed' ? new Date().toISOString() : null,
+        });
       }
     }
 

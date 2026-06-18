@@ -1,32 +1,29 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import React, { useMemo } from 'react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 
 function termToDate(term) {
   if (!term) return null;
-  const parts = term.trim().split(/\s+/);
+  const parts = term.trim().split(' ');
+  if (parts.length < 2) return null;
 
-  const trimester = (parts[0] || '').toUpperCase();
+  const trimester = parts[0].toUpperCase();
   const yearPart = parts[1];
 
   let year;
-  if (yearPart && yearPart.includes('/')) {
+  if (yearPart.includes('/')) {
     const [startYr, endYr] = yearPart.split('/');
-    const s = parseInt(startYr, 10);
-    const e = parseInt(endYr, 10);
-    const startYear = s < 100 ? 2000 + s : s;
+    const s = parseInt(startYr);
+    const e = parseInt(endYr);
+    year = s < 100 ? 2000 + s : s;
     const endYear = e < 100 ? 2000 + e : e;
-    const firstHalf = (trimester === 'T1' || trimester === 'S1' ||
-                       trimester === 'Q1' || trimester === 'Q2');
-    year = firstHalf ? startYear : endYear;
-  } else if (yearPart) {
-    year = parseInt(yearPart, 10);
-    if (year < 100) year += 2000;
+    if (trimester === 'T1' || trimester === 'S1') year = year;
+    else year = endYear;
   } else {
-    return null;
+    year = parseInt(yearPart);
+    if (year < 100) year += 2000;
   }
 
-  if (isNaN(year)) return null;
-
+  // Map trimester/semester to approximate completion month
   switch (trimester) {
     case 'T1': return new Date(year, 10, 1);  // Nov
     case 'T2': return new Date(year, 1, 1);   // Feb
@@ -34,17 +31,8 @@ function termToDate(term) {
     case 'SU': return new Date(year, 6, 1);   // Jul
     case 'S1': return new Date(year, 0, 1);   // Jan
     case 'S2': return new Date(year, 5, 1);   // Jun
-    case 'Q1': return new Date(year, 9, 1);   // Oct
-    case 'Q2': return new Date(year, 0, 1);   // Jan
-    case 'Q3': return new Date(year, 2, 1);   // Mar
-    case 'Q4': return new Date(year, 5, 1);   // Jun
-    case 'YR': return new Date(year, 5, 1);   // Jun
-    default:   return new Date(year, 5, 1);   // Jun fallback
+    default:   return new Date(year, 5, 1);   // Default to Jun
   }
-}
-
-function monthKey(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function formatMonth(dateStr) {
@@ -53,36 +41,12 @@ function formatMonth(dateStr) {
 }
 
 export default function CreditProgressTimeline({ courses, totalRequired, graduationYear }) {
-  // Self-measuring container so the chart never renders into a zero-sized box.
-  const wrapRef = useRef(null);
-  const [chartWidth, setChartWidth] = useState(0);
-  const CHART_HEIGHT = 192;
-
-  useEffect(() => {
-    if (!wrapRef.current) return;
-    const el = wrapRef.current;
-    const measure = () => {
-      const w = el.clientWidth;
-      if (w > 0) setChartWidth(w);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   const chartData = useMemo(() => {
     if (!courses || courses.length === 0 || !totalRequired) return [];
 
-    // graduationYear may arrive as a 2-digit value (e.g. 25 for "Class of
-    // 25"). Normalize to a 4-digit year — the same correction termToDate
-    // applies to term years. Without this, new Date(25 - 4, ...) builds
-    // buckets in the year 1921 and every course falls outside the window.
-    let gradYear = parseInt(graduationYear, 10) || (new Date().getFullYear() + 1);
-    if (gradYear < 100) gradYear += 2000;
-
+    const gradYear = parseInt(graduationYear) || new Date().getFullYear() + 1;
     const startDate = new Date(gradYear - 4, 7, 1);  // Aug 1 of freshman year
-    const endDate = new Date(gradYear + 1, 7, 31);   // Aug 31 of year after grad
+    const endDate = new Date(gradYear, 5, 30);        // Jun 30 of senior year
     const totalMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
                         (endDate.getMonth() - startDate.getMonth());
 
@@ -97,37 +61,44 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
 
     if (completed.length === 0) return [];
 
+    // Build monthly buckets across the full 4-year span
     const monthBuckets = {};
     for (let i = 0; i <= totalMonths; i++) {
       const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-      const key = monthKey(d);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const pace = totalRequired * (i / totalMonths);
       monthBuckets[key] = { month: key, earned: 0, pace: Math.round(pace * 100) / 100 };
     }
 
-    const keys = Object.keys(monthBuckets).sort();
-    const firstKey = keys[0];
-    const lastKey = keys[keys.length - 1];
-
+    // Place credits into their term-derived month
     completed.forEach(c => {
-      let key = monthKey(c.date);
-      if (key < firstKey) key = firstKey;
-      else if (key > lastKey) key = lastKey;
-      monthBuckets[key].earned += c.credits;
+      const key = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
+      if (monthBuckets[key]) {
+        monthBuckets[key].earned += c.credits;
+      }
     });
 
+    // Convert to cumulative
+    const keys = Object.keys(monthBuckets).sort();
     let runningTotal = 0;
+
+    // Credits earned before the timeline starts
+    completed.forEach(c => {
+      const key = `${c.date.getFullYear()}-${String(c.date.getMonth() + 1).padStart(2, '0')}`;
+      if (key < keys[0]) runningTotal += c.credits;
+    });
+
     keys.forEach(key => {
       runningTotal += monthBuckets[key].earned;
       monthBuckets[key].earned = Math.round(runningTotal * 1000) / 1000;
     });
 
-    const lastActivityKey = monthKey(completed[completed.length - 1].date);
-    const currentKey = monthKey(new Date());
-    const visibleEndKey = lastActivityKey > currentKey ? lastActivityKey : currentKey;
+    // Only show months up to current month (don't project future earned)
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     return keys
-      .filter(k => k <= visibleEndKey)
+      .filter(k => k <= currentKey || monthBuckets[k].pace > 0)
       .map(k => monthBuckets[k]);
   }, [courses, totalRequired, graduationYear]);
 
@@ -184,14 +155,9 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
         )}
       </div>
 
-      <div ref={wrapRef} style={{ width: '100%', height: CHART_HEIGHT }}>
-        {chartWidth > 0 ? (
-          <AreaChart
-            width={chartWidth}
-            height={CHART_HEIGHT}
-            data={chartData}
-            margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
-          >
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="earnedGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
@@ -220,7 +186,7 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               label={{ value: `${totalRequired} required`, position: 'right', fill: '#64748b', fontSize: 10 }}
             />
             <Area
-              type="linear"
+              type="stepAfter"
               dataKey="pace"
               stroke="#475569"
               strokeDasharray="6 3"
@@ -229,7 +195,7 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               name="Expected Pace"
             />
             <Area
-              type="monotone"
+              type="stepAfter"
               dataKey="earned"
               stroke="#818cf8"
               strokeWidth={2}
@@ -238,9 +204,7 @@ export default function CreditProgressTimeline({ courses, totalRequired, graduat
               name="Credits Earned"
             />
           </AreaChart>
-        ) : (
-          <div className="w-full h-full" />
-        )}
+        </ResponsiveContainer>
       </div>
 
       <div className="flex items-center justify-center gap-6 mt-3 text-xs text-slate-400">
