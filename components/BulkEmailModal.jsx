@@ -242,10 +242,8 @@ export default function BulkEmailModal({
     }
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const messageHtml = buildMessageHtml();
     const contentType = includeProgress ? 'message_plan' : 'message';
-    const contactDate = new Date().toLocaleDateString('en-CA');
 
     setPhase('sending');
     setProgress({ done: 0, total: recipients.length });
@@ -272,6 +270,11 @@ export default function BulkEmailModal({
             messageHtml,
             notesHtml: null,
             planHtml: includeProgress ? buildPlanHtml(student) : null,
+            // Log the contact note server-side (service role) so it works even
+            // when the sender (e.g. a viewer+superuser) lacks RLS insert rights.
+            logContact: true,
+            contactNote: `Bulk email sent: "${subject.trim()}"${includeProgress ? ' (incl. graduation progress)' : ''}`,
+            contactNoteType: 'bulk_email',
           }),
         });
 
@@ -299,32 +302,8 @@ export default function BulkEmailModal({
         errMsg = e.message || 'Network error';
       }
 
-      // Log one contact note per recipient — only on a successful send.
-      if (status === 'sent') {
-        try {
-          await fetch(`${supabaseUrl}/rest/v1/student_notes`, {
-            method: 'POST',
-            headers: {
-              'apikey': anonKey,
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=minimal',
-            },
-            body: JSON.stringify({
-              student_id: student.id,
-              counselor_id: counselorProfile.id,
-              school_id: counselorProfile.school_id,
-              note: `Bulk email sent: "${subject.trim()}"${includeProgress ? ' (incl. graduation progress)' : ''}`,
-              note_type: 'bulk_email',
-              status: 'completed',
-              contact_date: contactDate,
-            }),
-          });
-        } catch (noteErr) {
-          // Email already went out; don't fail the recipient over the note.
-          console.error('Failed to log bulk-email contact note:', noteErr);
-        }
-      }
+      // The contact note is logged server-side by the edge function (service
+      // role) on a successful send — see `logContact` in the request body.
 
       runResults.push({
         id: student.id,

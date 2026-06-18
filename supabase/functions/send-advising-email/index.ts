@@ -40,12 +40,19 @@ serve(async (req) => {
     // Get sender profile (counselor/admin)
     const { data: senderProfile } = await supabase
       .from("profiles")
-      .select("full_name, email, role")
+      .select("full_name, email, role, school_id, is_superuser")
       .eq("id", user.id)
       .single();
 
-    if (!senderProfile || !["counselor", "admin", "case_manager"].includes(senderProfile.role)) {
-      return new Response(JSON.stringify({ error: "Only counselors, admins, and case managers can send emails" }), {
+    // Allowed senders: counselors, admins, case managers — plus any superuser
+    // (e.g. a school-wide `viewer` flagged is_superuser who acts as a counselor).
+    const senderAllowed =
+      !!senderProfile &&
+      (["counselor", "admin", "case_manager"].includes(senderProfile.role) ||
+        senderProfile.is_superuser === true);
+
+    if (!senderAllowed) {
+      return new Response(JSON.stringify({ error: "Only counselors, admins, case managers, and superusers can send emails" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -62,6 +69,9 @@ serve(async (req) => {
       notesHtml,
       planHtml,
       messageHtml,
+      logContact,        // when true, log a student_notes contact row (bulk email)
+      contactNote,       // note text to store
+      contactNoteType,   // note_type to store (defaults to 'bulk_email')
     } = await req.json();
 
     if (!studentEmail || !subject || !contentType) {
@@ -156,6 +166,25 @@ serve(async (req) => {
       status: "sent",
       resend_message_id: resendData.id || null,
     });
+
+    // ── Optional: log a contact note on the student's record (bulk email) ──
+    // Written with the service-role client so it works regardless of the
+    // sender's RLS insert privileges (e.g. a viewer+superuser counselor).
+    if (logContact) {
+      const { error: noteError } = await supabase.from("student_notes").insert({
+        student_id: studentId,
+        counselor_id: user.id,
+        school_id: senderProfile.school_id,
+        note: contactNote || `Bulk email sent: "${subject}"`,
+        note_type: contactNoteType || "bulk_email",
+        status: "completed",
+        contact_date: new Date().toLocaleDateString("en-CA"),
+      });
+      if (noteError) {
+        // Email already sent — don't fail the request over the note.
+        console.error("Failed to log bulk-email contact note:", noteError.message);
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, messageId: resendData.id }), {
       status: 200,

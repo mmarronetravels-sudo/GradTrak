@@ -6,7 +6,7 @@
 > every component does, the data model, and a running change log.
 
 - **Last updated:** June 18, 2026
-- **App version:** `2.15.0` (constant `APP_VERSION` in `App.jsx`)
+- **App version:** `2.15.1` (constant `APP_VERSION` in `App.jsx`)
 - **Package name:** `gradtrack` (package.json), version `2.0.0`
 - **Naming note:** The product is branded **"ScholarPath Graduation Progress"** in
   the README and **"GradTrack/GradTrak"** in the repo/package and in component
@@ -93,7 +93,8 @@ regardless of caseload.
   (`viewAllStudents` state) and per-student detail with notes, emails, parent
   alerts, contracts, archive. Admins enter here via "switch to counselor". The
   `students` roster toolbar has a **📣 Email Group** button (`BulkEmailModal`)
-  for emailing a filtered group at once (counselor/case_manager/admin only).
+  for emailing a filtered group at once (counselor/case_manager/admin, plus any
+  superuser).
 - **`AdminDashboard`** (App.jsx ~1181 — *note:* there is also a separate
   `components/AdminDashboard.jsx`; the in-`App.jsx` one is what's routed):
   school-wide management — data sync upload, at-risk, CTE pathways, attendance
@@ -147,7 +148,7 @@ across views), `calculatePathwayProgress` (CTE), `generateAlerts`,
 | `AcademicContractForm.jsx` | Modal to create/review academic contracts (`academic_contracts`). | object props |
 | `SendAdvisingEmail.jsx` | Email a student's notes/plan via the `send-advising-email` edge function. | object props |
 | `SendParentAlert.jsx` | "Student behind in coursework" alert to a parent. | object props |
-| `BulkEmailModal.jsx` | Email a filtered group of students at once (by grade/risk/pathway/flag or whole current view); loops `send-advising-email` per recipient and logs one `bulk_email` contact note each. Opened from the roster's "📣 Email Group" button. | `students`, `pathways`, `categories`, `counselorProfile`, `supabaseClient`, `getRiskLevel`, `onSent` |
+| `BulkEmailModal.jsx` | Email a filtered group of students at once (by grade/risk/pathway/flag or whole current view); loops `send-advising-email` per recipient with `logContact: true`, so each `bulk_email` contact note is written server-side. Opened from the roster's "📣 Email Group" button. | `students`, `pathways`, `categories`, `counselorProfile`, `supabaseClient`, `getRiskLevel`, `onSent` |
 | `AttendanceContactExport.jsx` | Admin CSV export of notes flagged as attendance contacts. | `supabaseClient`, `schoolId` |
 | `DataSyncUpload.jsx` | Bulk import of students/courses (CSV/XLSX via dropzone), mapped against diploma types. | `schoolId` |
 | `AdminStudentManager.jsx` | Admin roster management; caps display grade at 12 for "super seniors". | `schoolId`, `profile`, `onViewStudent` |
@@ -171,10 +172,14 @@ across views), `calculatePathwayProgress` (CTE), `generateAlerts`,
 - **`send-advising-email/index.ts`** — Deno function that emails advising
   content to a single student (plus optional CCs) and logs to
   `email_audit_logs`. Invoked at `functions/v1/send-advising-email`. Restricted
-  to `counselor`/`admin`/`case_manager`. `contentType` accepts `notes`, `plan`,
-  `both` (advising-notes framing) and `message`, `message_plan` (custom message
-  with a neutral "A message from your counselor" intro; takes a `messageHtml`
-  param). The bulk-email feature calls this once per recipient.
+  to `counselor`/`admin`/`case_manager` **or any `is_superuser` sender**.
+  `contentType` accepts `notes`, `plan`, `both` (advising-notes framing) and
+  `message`, `message_plan` (custom message with a neutral "A message from your
+  counselor" intro; takes a `messageHtml` param). When the request includes
+  `logContact: true` (+ `contactNote`, `contactNoteType`), it also inserts a
+  `student_notes` contact row using the **service-role key** (bypasses RLS, so
+  it works for senders without notes-insert rights). The bulk-email feature
+  calls this once per recipient with `logContact: true`.
 - **`invite-parent/index.ts`** — creates/invites a parent account and links it to
   a student. Payload: `{ parentEmail, studentId, studentName, counselorName,
   schoolId }`. Invoked at `functions/v1/invite-parent`.
@@ -269,6 +274,7 @@ filter (flagged in-code as a cross-tenant issue for a future security commit).
 
 | Date | Commit | Change |
 |------|--------|--------|
+| 2026-06-18 | _(pending)_ | **Superusers can use bulk email; bulk contact-note logging moved server-side.** A school counselor (`rmacswain@summitlc.org`) set up as role `viewer` + `is_superuser = true` (school-wide visibility, no caseload) couldn't see the 📣 Email Group button, and the `send-advising-email` edge function would have rejected her (`viewer` not in the allowed list). Widened the button gate to also include `profile.is_superuser`, and the edge function to allow any `is_superuser` sender (in addition to counselor/admin/case_manager). Because a viewer almost certainly lacks RLS INSERT rights on `student_notes` (the `notes_insert_staff` policy is counselor-scoped), the per-recipient contact note is now written **server-side inside the edge function using the service-role key** (RLS-proof) when the request includes `logContact: true` (+ `contactNote`, `contactNoteType`); `BulkEmailModal` no longer inserts the note client-side. Single-student `SendAdvisingEmail` and `SendParentAlert` are unaffected (they don't send `logContact`; SendParentAlert still logs its own `parent_contact` note). Confirmed `case_manager` is covered by both the button and the edge function. **Requires edge-function redeploy.** Bumped `APP_VERSION` to `2.15.1`. |
 | 2026-06-18 | _(pending)_ | **Advisor bulk email to a filtered group, logged as a contact.** New `components/BulkEmailModal.jsx`, opened from a "📣 Email Group" button in the `CounselorDashboard` roster toolbar (gated to `counselor`/`case_manager`/`admin`; hidden from `viewer`). An advisor picks a group — Everyone in current view, by grade, by risk level (uses `getStudentRiskLevel`), by CTE pathway, or by flag (IEP/504/ELL/GED) — then deselects individuals if needed, writes a subject + message, and optionally attaches each student's graduation-progress summary. It loops the recipients sequentially (≈350ms throttle), sending one personalized email per student via the existing `send-advising-email` edge function, and logs **one `student_notes` contact per successful recipient** (`note_type: 'bulk_email'`, `status: 'completed'`, `contact_date`) — mirroring the `SendParentAlert` auto-log pattern. The bulk note shows in Contact Snapshot and on each student's timeline but does **not** inflate the MTSS tracker, which only counts `note_type === 'intervention'`. Students with no email on file are listed and skipped. Recipient scope comes from `filteredStudents`, so it already respects caseload / All-Students and `school_id`. **Edge function change (requires redeploy):** `send-advising-email/index.ts` now accepts `messageHtml` and two new `contentType` values, `message` and `message_plan`, rendering a neutral "A message from your counselor" intro instead of the advising-notes framing; existing `notes`/`plan`/`both` paths are unchanged. Bumped `APP_VERSION` to `2.15.0`. |
 | 2026-06-18 | _(pending)_ | **Authenticated-but-no-profile now shows an actionable error instead of silently looping the login screen.** A `viewer` staff member (`ahood@summitlc.org`) could authenticate (`SIGNED_IN`) but `findOrCreateProfile` returned `null`, so the app spun for 30s then fell through to `AuthScreen` — making a successful sign-in look like a failed login. Root cause was a **profile/auth id mismatch**: her `profiles.id` did not equal her `auth.users.id`, so the by-id lookup missed and the by-email self-heal was hidden by RLS (which scopes `profiles` to `id = auth.uid()`), so the relink PATCH never ran. Data fix: repoint `profiles.id` to the real auth UID. Code fix (this commit): split the `!user \|\| !profile` guard so an authenticated user with no profile sees a "We couldn't load your account / contact your admin" screen with a Sign out button, rather than being bounced to login. Bumped `APP_VERSION` to `2.14.1`. **Follow-up:** the by-email self-heal can never work under RLS keyed on `id`; profile creation should always set `profiles.id = auth uid` (trigger on `auth.users` insert or fix the invite flow). |
 | 2026-06-15 | `b7356d4` | **At-Risk & CTE reports now show all students for `viewer`/`admin` roles.** A staff member with the `viewer` role (read-only, school-wide by design) could see the full roster but the At-Risk and CTE tabs collapsed to a "caseload." Cause: those reports passed `counselorId={viewAllStudents ? null : profile.id}`, but `viewer`/`admin` never get the My/All Students toggle, so `viewAllStudents` was always false and `counselorId` defaulted to their own id. Fixed to `counselorId={(viewAllStudents \|\| profile.role === 'viewer' \|\| profile.role === 'admin') ? null : profile.id}`, matching the roster's existing viewer/admin handling. Not an RLS issue — the `courses` school-wide policy was already in place. |

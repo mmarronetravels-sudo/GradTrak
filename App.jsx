@@ -14,7 +14,7 @@ import AcademicContractForm from './components/AcademicContractForm';
 import AttendanceContactExport from './components/AttendanceContactExport';
 import AdminStudentManager from './components/AdminStudentManager';
 import CreditProgressTimeline from './components/CreditProgressTimeline';
-const APP_VERSION = '2.15.0';
+const APP_VERSION = '2.15.1';
 
 
 // ============================================
@@ -4261,7 +4261,7 @@ const summaryStats = {
       ✕ Clear filters
     </button>
   )}
-  {(profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'admin') && (
+  {(profile.role === 'counselor' || profile.role === 'case_manager' || profile.role === 'admin' || profile.is_superuser) && (
     <button
       onClick={() => setShowBulkEmailModal(true)}
       className="ml-auto px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg text-sm font-medium hover:bg-indigo-500/30 transition-colors"
