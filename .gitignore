@@ -10,3 +10,6 @@ dist
 # OS / editor cruft
 .DS_Store
 .claude
+
+# Supabase CLI local cache
+supabase/.temp
