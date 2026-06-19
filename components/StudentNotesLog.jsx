@@ -1,6 +1,6 @@
 /**
  * StudentNotesLog.jsx
- * Structured note-taking component for GradTrack counselors
+ * Structured note-taking component for ScholarPath counselors
  * 
  * Features:
  * - Chronological log with timestamps
@@ -979,7 +979,7 @@ const StudentNotesLog = ({
         if (err.message !== 'CLIENT_FROZEN') throw err;
         
         // Client is frozen — bypass it with raw fetch
-        console.log('GradTrack: Supabase client frozen, using direct fetch');
+        console.log('ScholarPath: Supabase client frozen, using direct fetch');
         const token = JSON.parse(localStorage.getItem('sb-vstiweftxjaszhnjwggb-auth-token'))?.access_token;
         if (!token) throw new Error('No auth token found');
         
@@ -995,7 +995,7 @@ const StudentNotesLog = ({
         );
         
         if (res.status === 401) {
-          console.warn('GradTrack: Token expired — redirecting to login');
+          console.warn('ScholarPath: Token expired — redirecting to login');
           localStorage.clear();
           sessionStorage.clear();
           window.location.replace(window.location.origin);

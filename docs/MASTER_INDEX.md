@@ -5,12 +5,14 @@
 > guide for working *inside* the code: where things live, how roles route, what
 > every component does, the data model, and a running change log.
 
-- **Last updated:** June 18, 2026
+- **Last updated:** June 19, 2026
 - **App version:** `2.15.1` (constant `APP_VERSION` in `App.jsx`)
-- **Package name:** `gradtrack` (package.json), version `2.0.0`
-- **Naming note:** The product is branded **"ScholarPath Graduation Progress"** in
-  the README and **"GradTrack/GradTrak"** in the repo/package and in component
-  header comments. Same product; the inconsistency is historical.
+- **Package name:** `scholarpath-graduation-progress` (package.json), version `2.0.0`
+- **Naming note:** The product is branded **"ScholarPath Graduation Progress"**
+  everywhere in code (UI, README, package name, component header comments, and
+  log prefixes). The GitHub repo (`GradTrak`), Vercel project (`grad-trak`), and
+  the `gradtrak.scholarpathsystems.org` domain still use the legacy `gradtrak`
+  slug as infrastructure identifiers — renaming those is a separate ops task.
 
 ---
 
@@ -259,14 +261,20 @@ filter (flagged in-code as a cross-tenant issue for a future security commit).
 
 ## 12. Known issues / cleanup backlog
 
-- **`diploma_requirements` cross-tenant fetch** missing a `school_id` filter
-  (flagged in `CounselorDashboard`) — security follow-up.
-- **Brand naming** is split between "ScholarPath" (README) and "GradTrak/GradTrack"
-  (everywhere else).
-- **`node_modules/` appears tracked** in git (it shows up in status) — should be
-  gitignored to keep diffs clean.
-- Two `AdminDashboard` definitions exist (in `App.jsx` and `components/`); only
-  the App.jsx one is routed — potential source of confusion.
+- ✅ **`diploma_requirements` cross-tenant fetch** — FIXED (2026-06-19). The
+  `CounselorDashboard` fetch is now scoped through this school's diploma types.
+- ✅ **Brand naming** — RESOLVED (2026-06-19). Standardized on "ScholarPath
+  Graduation Progress" across code. Repo/Vercel/domain `gradtrak` slugs left as
+  infra identifiers (separate ops task).
+- ⏳ **`node_modules/` tracked in git** — `.gitignore` updated (2026-06-19), but
+  the files are still tracked. Run locally to finish:
+  `git rm -r --cached node_modules dist && git commit -m "Stop tracking node_modules/dist"`.
+- ⏳ **Duplicate `AdminDashboard`** — confirmed `components/AdminDashboard.jsx` is
+  imported nowhere (dead code; the routed one lives in `App.jsx`). Delete locally:
+  `git rm components/AdminDashboard.jsx`.
+- ⚠️ **`GradTrack2026!` default password** in `DataSyncUpload.jsx` (line ~270) —
+  hardcoded password for bulk-imported accounts. Not a brand string; flagged as a
+  security smell for a future commit.
 
 ---
 
@@ -274,6 +282,7 @@ filter (flagged in-code as a cross-tenant issue for a future security commit).
 
 | Date | Commit | Change |
 |------|--------|--------|
+| 2026-06-19 | _(uncommitted)_ | **Known-issues cleanup pass.** (1) **Security:** scoped the `CounselorDashboard` `diploma_requirements` fetch through the school's diploma types (the table has no `school_id` column), removing the cross-tenant read — downstream filtering by `diploma_type_id` is unchanged. (2) **Brand:** standardized on "ScholarPath Graduation Progress" across code (component header comments, `console` log prefixes `GradTrack:`→`ScholarPath:`, `package.json` name `gradtrack`→`scholarpath-graduation-progress`); left the `gradtrak` domain and `GradTrack2026!` password untouched. (3) **Repo hygiene:** added `node_modules`/`dist`/`.DS_Store`/`.claude` to `.gitignore`. All changes are working-tree only (not committed/pushed — sandbox `.git` was locked). Follow-ups: `git rm -r --cached node_modules dist`, `git rm components/AdminDashboard.jsx` (dead code), and confirm the `send-advising-email` Supabase **edge-function redeploy** from the 2.15.x changes. |
 | 2026-06-18 | _(pending)_ | **DB trigger keeps `profiles.id` aligned with `auth.users.id` at signup** (`migrations/2026_06_18_sync_profile_id_on_auth_user.sql`). Prevents a recurrence of the `ahood` login hang (profile/auth id mismatch hidden by RLS). AFTER INSERT on `auth.users`: if a profile already has the new uid → no-op; else if a profile matches the email under a different id → repoint it; else insert a minimal profile. `SECURITY DEFINER`, wrapped in an exception handler that only WARNs, so it can never block signups; idempotent and safe alongside any existing `handle_new_user` trigger. Run in the Supabase SQL editor (not part of the app build, so no `APP_VERSION` bump). |
 | 2026-06-18 | _(pending)_ | **Superusers can use bulk email; bulk contact-note logging moved server-side.** A school counselor (`rmacswain@summitlc.org`) set up as role `viewer` + `is_superuser = true` (school-wide visibility, no caseload) couldn't see the 📣 Email Group button, and the `send-advising-email` edge function would have rejected her (`viewer` not in the allowed list). Widened the button gate to also include `profile.is_superuser`, and the edge function to allow any `is_superuser` sender (in addition to counselor/admin/case_manager). Because a viewer almost certainly lacks RLS INSERT rights on `student_notes` (the `notes_insert_staff` policy is counselor-scoped), the per-recipient contact note is now written **server-side inside the edge function using the service-role key** (RLS-proof) when the request includes `logContact: true` (+ `contactNote`, `contactNoteType`); `BulkEmailModal` no longer inserts the note client-side. Single-student `SendAdvisingEmail` and `SendParentAlert` are unaffected (they don't send `logContact`; SendParentAlert still logs its own `parent_contact` note). Confirmed `case_manager` is covered by both the button and the edge function. **Requires edge-function redeploy.** Bumped `APP_VERSION` to `2.15.1`. |
 | 2026-06-18 | _(pending)_ | **Advisor bulk email to a filtered group, logged as a contact.** New `components/BulkEmailModal.jsx`, opened from a "📣 Email Group" button in the `CounselorDashboard` roster toolbar (gated to `counselor`/`case_manager`/`admin`; hidden from `viewer`). An advisor picks a group — Everyone in current view, by grade, by risk level (uses `getStudentRiskLevel`), by CTE pathway, or by flag (IEP/504/ELL/GED) — then deselects individuals if needed, writes a subject + message, and optionally attaches each student's graduation-progress summary. It loops the recipients sequentially (≈350ms throttle), sending one personalized email per student via the existing `send-advising-email` edge function, and logs **one `student_notes` contact per successful recipient** (`note_type: 'bulk_email'`, `status: 'completed'`, `contact_date`) — mirroring the `SendParentAlert` auto-log pattern. The bulk note shows in Contact Snapshot and on each student's timeline but does **not** inflate the MTSS tracker, which only counts `note_type === 'intervention'`. Students with no email on file are listed and skipped. Recipient scope comes from `filteredStudents`, so it already respects caseload / All-Students and `school_id`. **Edge function change (requires redeploy):** `send-advising-email/index.ts` now accepts `messageHtml` and two new `contentType` values, `message` and `message_plan`, rendering a neutral "A message from your counselor" intro instead of the advising-notes framing; existing `notes`/`plan`/`both` paths are unchanged. Bumped `APP_VERSION` to `2.15.0`. |

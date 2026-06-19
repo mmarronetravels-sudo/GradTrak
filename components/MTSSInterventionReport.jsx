@@ -1,6 +1,6 @@
 // ============================================
 // MTSSInterventionReport.jsx
-// GradTrack — MTSS Intervention Tracker
+// ScholarPath — MTSS Intervention Tracker
 // February 22, 2026
 // ============================================
 // Shows students with intervention notes, sorted by count.

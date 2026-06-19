@@ -1,6 +1,6 @@
 // ============================================
 // SendAdvisingEmail.jsx
-// GradTrack - Send Notes/Plan via Email
+// ScholarPath - Send Notes/Plan via Email
 // February 2026
 // ============================================
 // Usage in App.jsx:

@@ -1,6 +1,6 @@
 // ============================================
 // BulkEmailModal.jsx
-// GradTrack - Email a filtered group of students at once
+// ScholarPath - Email a filtered group of students at once
 // June 2026
 // ============================================
 // Lets an advisor (counselor / case_manager / admin) email a defined group

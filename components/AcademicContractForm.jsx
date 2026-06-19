@@ -1,6 +1,6 @@
 // ============================================
 // AcademicContractForm.jsx
-// GradTrack — Academic Contract Form
+// ScholarPath — Academic Contract Form
 // February 2026
 // ============================================
 // Modal form for creating and reviewing academic contracts.

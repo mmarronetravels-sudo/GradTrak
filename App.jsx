@@ -2844,14 +2844,20 @@ async function handleSavePreferredName() {
       logAudit('view_counselor_dashboard', 'profiles', null);
 
       // ── Phase 1: Independent reference-data queries in parallel ──
-      const [catData, diplomaReqData, pathData, cpData] = await Promise.all([
+      const [catData, diplomaTypeData, pathData, cpData] = await Promise.all([
         doGet(`credit_categories?select=*&school_id=eq.${profile.school_id}&order=display_order`),
-        // TODO: diploma_requirements fetch is missing a school_id filter —
-        // cross-tenant concern flagged for a separate security commit.
-        doGet(`diploma_requirements?select=*`),
+        doGet(`diploma_types?select=id&school_id=eq.${profile.school_id}`),
         doGet(`cte_pathways?select=*&school_id=eq.${profile.school_id}&order=display_order`),
         doGet(`course_pathways?select=*`),
       ]);
+
+      // diploma_requirements has no school_id column, so scope it through this
+      // school's diploma types (mirrors getDiplomaTypesWithRequirements). This
+      // prevents pulling another tenant's requirements cross-school.
+      const diplomaTypeIds = (diplomaTypeData || []).map(t => t.id);
+      const diplomaReqData = diplomaTypeIds.length
+        ? await doGet(`diploma_requirements?select=*&diploma_type_id=${inList(diplomaTypeIds)}`)
+        : [];
 
       // ── Phase 2: Determine which students this user can see ──
       let assignedStudentIds = [];
@@ -4964,39 +4970,39 @@ useEffect(() => {
       hiddenSince = null;
 
       if (awayDuration < MINIMUM_AWAY_MS) {
-        console.log(`GradTrack: Tab visible after ${Math.round(awayDuration / 1000)}s — light session nudge`);
+        console.log(`ScholarPath: Tab visible after ${Math.round(awayDuration / 1000)}s — light session nudge`);
         // Just call getSession to wake up Supabase's internal state
         // This doesn't refresh the token — just reads from memory
         await supabase.auth.getSession();
         return;
       }
 
-      console.log(`GradTrack: Tab visible after ${Math.round(awayDuration / 60000)} min — checking session`);
+      console.log(`ScholarPath: Tab visible after ${Math.round(awayDuration / 60000)} min — checking session`);
 
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error || !session) {
-          console.warn('GradTrack: Session expired — attempting refresh');
+          console.warn('ScholarPath: Session expired — attempting refresh');
           const { error: refreshError } = await supabase.auth.refreshSession();
           if (refreshError) {
-            console.warn('GradTrack: Refresh token expired — logging out');
+            console.warn('ScholarPath: Refresh token expired — logging out');
             setUser(null);
             setProfile(null);
             setLoading(false);
             return;
           }
-          console.log('GradTrack: Session refreshed successfully');
+          console.log('ScholarPath: Session refreshed successfully');
           return;
         }
 
         const timeUntilExpiry = session.expires_at - Math.floor(Date.now() / 1000);
         if (timeUntilExpiry < 300) {
-          console.log(`GradTrack: Token expires in ${timeUntilExpiry}s — refreshing`);
+          console.log(`ScholarPath: Token expires in ${timeUntilExpiry}s — refreshing`);
           await supabase.auth.refreshSession();
         }
       } catch (err) {
-        console.warn('GradTrack: Session check failed — will retry on next query', err);
+        console.warn('ScholarPath: Session check failed — will retry on next query', err);
       }
     };
 

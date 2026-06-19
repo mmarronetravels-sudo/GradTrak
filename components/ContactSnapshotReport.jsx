@@ -1,6 +1,6 @@
 // ============================================
 // ContactSnapshotReport.jsx
-// GradTrack — Contact Snapshot Report
+// ScholarPath — Contact Snapshot Report
 // February 2026
 // ============================================
 // Shows # of contacts (notes) per counselor per month,

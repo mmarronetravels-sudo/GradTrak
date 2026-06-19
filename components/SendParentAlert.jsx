@@ -1,6 +1,6 @@
 // ============================================
 // SendParentAlert.jsx
-// GradTrack — Alert Parent: Student Behind in Coursework
+// ScholarPath — Alert Parent: Student Behind in Coursework
 // February 2026
 // ============================================
 // Usage in App.jsx:

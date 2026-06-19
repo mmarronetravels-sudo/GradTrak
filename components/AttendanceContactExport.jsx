@@ -1,6 +1,6 @@
 // ============================================
 // AttendanceContactExport.jsx
-// GradTrack — Attendance Contact CSV Export
+// ScholarPath — Attendance Contact CSV Export
 // February 22, 2026
 // ============================================
 // Admin-only report showing all notes marked as
